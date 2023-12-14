@@ -1,19 +1,19 @@
 const express = require('express');
-const MongoClient = require('mongodb').MongoClient;
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const port = 3000;
 
-const uri = 'your_connection_string'; // Replace with your actual connection string
+const uri = 'mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/?retryWrites=true&w=majority'; // Replace with your actual connection string
 
-MongoClient.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, (err, client) => {
+MongoClient.connect(uri, { useUnifiedTopology: true }, (err, client) => {
   if (err) {
     console.error('Error connecting to MongoDB Atlas:', err);
     return;
   }
 
-  const db = client.db('your_database'); // Replace with your actual database name
-  const collection = db.collection('your_collection'); // Replace with your actual collection name
+  const db = client.db('FoodForNow'); // Replace with your actual database name
+  const collection = db.collection('Recipes'); // Replace with your actual collection name
 
   // Define route to fetch data
   app.get('/data', (req, res) => {
