@@ -1,30 +1,31 @@
+// server.js
 const express = require('express');
-const { MongoClient } = require('mongodb');
-
+const mongoose = require('mongoose');
 const app = express();
 const port = 3000;
 
-const uri = 'mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/?retryWrites=true&w=majority'; // Replace with your actual connection string
+// Connect to MongoDB (replace 'your_connection_string' with your actual connection string)
+mongoose.connect('mongodb://your_connection_string', { useNewUrlParser: true, useUnifiedTopology: true });
 
-MongoClient.connect(uri, { useUnifiedTopology: true }, (err, client) => {
-  if (err) {
-    console.error('Error connecting to MongoDB Atlas:', err);
-    return;
+// Define a mongoose schema and model
+const itemSchema = new mongoose.Schema({
+  name: String,
+  description: String,
+});
+
+const Item = mongoose.model('Item', itemSchema);
+
+// Define a route to retrieve and send data
+app.get('/api/items', async (req, res) => {
+  try {
+    const items = await Item.find();
+    res.json(items);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
+});
 
-  const db = client.db('FoodForNow'); // Replace with your actual database name
-  const collection = db.collection('Recipes'); // Replace with your actual collection name
-
-  // Define route to fetch data
-  app.get('/data', (req, res) => {
-    collection.find({}).toArray((err, data) => {
-      if (err) throw err;
-      res.json(data);
-    });
-  });
-
-  // Start the server
-  app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-  });
+app.listen(port, () => {
+  console.log(`Server listening at http://localhost:${port}`);
 });
