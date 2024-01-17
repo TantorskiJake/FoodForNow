@@ -2,7 +2,7 @@ const express = require('express');
 const { MongoClient } = require('mongodb');
 
 const app = express();
-const port = 3000;
+const port = 8080;
 
 // MongoDB connection URL and database name
 const url = 'mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/?retryWrites=true&w=majority';
