@@ -9,7 +9,7 @@ const url = 'mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80
 const dbName = 'FoodForNow';
 
 // Update your MongoClient connection code
-MongoClient.connect(url, { useNewUrlParser: true, useUnifiedTopology: true }, (err, client) => {
+MongoClient.connect(url, (err, client) => {
     if (err) {
         console.error('Error connecting to MongoDB:', err);
         return;
