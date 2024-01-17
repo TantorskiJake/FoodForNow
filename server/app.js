@@ -15,7 +15,7 @@ MongoClient.connect(url, (err, client) => {
         return;
     }
 
-    console.log('Connected to MongoDB');
+    console.log(`Connected to MongoDB database: ${dbName}`);
 
     // Get the database instance
     const db = client.db(dbName);
