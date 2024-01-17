@@ -7,7 +7,7 @@ const app = express();
 const port = 3000;
 
 // MongoDB connection URL and database name
-const url = 'mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/';
+const url = 'mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/FoodForNow';
 const dbName = 'FoodForNow';
 
 // Update your MongoClient connection code
