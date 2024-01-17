@@ -6,7 +6,7 @@ const port = 3000;
 
 // MongoDB connection URL and database name
 const url = 'mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/?retryWrites=true&w=majority';
-const dbName = 'FoodForNow';
+const dbName = 'FoodForNowRecipes';
 
 // Update your MongoClient connection code
 MongoClient.connect(url, (err, client) => {
