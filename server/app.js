@@ -1,12 +1,13 @@
 const express = require('express');
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const { routes } = require('./routes/routes')
 
 const app = express();
 const port = 8080;
 
 // MongoDB connection URL and database name
 const uri = "mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/?retryWrites=true&w=majority";
-const dbName = 'FoodForNowRecipes';
+const dbName = 'FoodForNow';
 
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -36,6 +37,12 @@ async function run() {
       await client.close();
     }
   }
+
+  run().catch(console.dir);
+
+app.use(routes)
+
+
 
 
  // Start the Express server
