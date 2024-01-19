@@ -30,7 +30,7 @@ routes.get('/', async (req, res) => {
     // Access the 'Recipes' collection in the specified database
     const collection = client.db(dbName).collection('Recipes');
     // Retrieve all documents from the collection
-    const documents = await collection.find({}).toArray();
+    const documents = await collection.find({}, { projection: { _id: 1, title: 1, ingredients: 1 } }).toArray();
     console.log("Found documents:", documents);
 
     // Respond with the retrieved documents in JSON format

@@ -28,8 +28,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        {/* You can replace the logo with your own content */}
-        <h1>FoodForNow</h1>
+        <h1>FoodForNow!</h1>
         {formattedData}
       </header>
     </div>
