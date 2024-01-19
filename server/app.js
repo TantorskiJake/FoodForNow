@@ -15,5 +15,6 @@ app.use(routes);
 
 // Start the Express server and listen on the specified port
 app.listen(port, () => {
+    // Log a message indicating that the server is running and on which port
     console.log(`Server is running on port ${port}`);
 });
