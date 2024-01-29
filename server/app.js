@@ -10,11 +10,14 @@ const app = express();
 // Set the port number for the server
 const port = 8080;
 
+// Use middleware to parse JSON in incoming requests
+app.use(express.json());
+
 // Use the imported routes in the Express application
 app.use(routes);
 
 // Start the Express server and listen on the specified port
 app.listen(port, () => {
-    // Log a message indicating that the server is running and on which port
-    console.log(`Server is running on port ${port}`);
+  // Log a message indicating that the server is running and on which port
+  console.log(`Server is running on port ${port}`);
 });
