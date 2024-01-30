@@ -1,64 +1,61 @@
 // controllers/dataController.js
 
-// Importing required modules for MongoDB connection
+// Import necessary modules from the 'mongodb' package
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
-// MongoDB connection details
+// MongoDB connection parameters
 const MONGO_URI = "mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/?retryWrites=true&w=majority";
 const DB_NAME = 'FoodForNow';
 
-/**
- * Establish a connection to MongoDB and return the connected database instance.
- * @returns {Promise} A Promise that resolves to the MongoDB database instance.
- */
+// Function to establish a connection to MongoDB and return the database instance
 const connectToMongoDB = async () => {
-  // Creating a new MongoClient instance with specified server API version and options
+  // Create a new MongoClient instance with specified options
   const client = new MongoClient(MONGO_URI, {
     serverApi: {
-      version: ServerApiVersion.v1,
-      strict: true,
-      deprecationErrors: true,
+      version: ServerApiVersion.v1, // Specify the version of the MongoDB Server API
+      strict: true, // Enable strict mode for the Server API
+      deprecationErrors: true, // Log deprecation errors for the Server API
     },
   });
 
   try {
-    // Attempting to establish a connection to the MongoDB server
+    // Attempt to connect to the MongoDB instance
     await client.connect();
   } catch (error) {
-    // Handling and logging any errors that occur during the connection attempt
+    // Log and rethrow any connection errors
     console.error('Error connecting to MongoDB:', error);
-    throw error; // Re-throwing the error to be caught by the calling function
+    throw error;
   }
 
-  // Returning the connected MongoDB database instance
+  // Return the connected database instance
   return client.db(DB_NAME);
 };
 
-/**
- * Retrieve recipes from the MongoDB database.
- * @returns {Promise} A Promise that resolves to an array of recipe documents.
- */
+// Function to retrieve recipes from the MongoDB database
 const getRecipes = async () => {
   try {
-    // Establishing a connection to the MongoDB database
+    // Establish a connection to the MongoDB database
     const db = await connectToMongoDB();
 
-    // Accessing the 'Recipes' collection within the database
+    // Access the 'Recipes' collection within the connected database
     const collection = db.collection('Recipes');
 
-    // Fetching all documents from the 'Recipes' collection and converting them to an array
+    // Retrieve all documents from the 'Recipes' collection and convert them to an array
     const documents = await collection.find({}).toArray();
 
-    // Returning the array of recipe documents
+    // Log the retrieved documents for debugging purposes
+    console.log('Retrieved documents:', documents);
+
+    // Return the array of retrieved documents
     return documents;
   } catch (error) {
-    // Handling and logging any errors that occur during the fetch operation
+    // Log and rethrow any errors that occur during the process
     console.error('Error fetching recipes from MongoDB:', error);
-    throw error; // Re-throwing the error to be caught by the calling function
+    throw error;
   }
 };
 
-// Exporting the getRecipes function to make it accessible to other modules
+// Export the 'getRecipes' function for use in other modules
 module.exports = {
   getRecipes,
 };
