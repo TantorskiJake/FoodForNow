@@ -1,29 +1,23 @@
-// Import the Express framework
-const express = require('express');
+// app.js
 
-// Import the router instance from the specified path
+const express = require('express');
+const cors = require('cors'); // Import the cors middleware
 const { router } = require('./routes/routes');
 
-// Create an instance of the Express application
 const app = express();
-
-// Set the port number for the server
 const port = 8080;
 
-// Use middleware to parse JSON in incoming requests
-app.use(express.json());
+// Use cors middleware to enable CORS
+app.use(cors());
 
-// Use the imported router in the Express application
+app.use(express.json());
 app.use(router);
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).send('Internal Server Error');
 });
 
-// Start the Express server and listen on the specified port
 app.listen(port, () => {
-  // Log a message indicating that the server is running and on which port
   console.log(`Server is running on port ${port}`);
 });

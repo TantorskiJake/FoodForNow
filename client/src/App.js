@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 function App() {
@@ -8,7 +8,7 @@ function App() {
     const fetchData = async () => {
       try {
         // Update the API endpoint to match your server route
-        const response = await axios.get('http://localhost:8080/');
+        const response = await axios.get('http://localhost:8080/api/data');
         setData(response.data);
       } catch (error) {
         console.error(error);
@@ -19,9 +19,10 @@ function App() {
   }, []);
 
   const formattedData = data.map(item => (
-    <div key={item._id}>
+    <div key={item._id.$oid}>
       <h3>{item.title}</h3>
-      <p>{item.ingredients}</p>
+      <p>{item.ingredients.map(ingredient => `${ingredient.quantity} ${ingredient.quantity_type} ${ingredient.type}`).join(', ')}</p>
+      <p>{item.instructions}</p>
     </div>
   ));
 
