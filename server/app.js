@@ -1,8 +1,8 @@
 // app.js
 
 // Import the necessary modules
-const express = require('express'); // Express.js for building the web application
-const cors = require('cors'); // CORS middleware for handling Cross-Origin Resource Sharing
+const express = require('express');
+const cors = require('cors');
 const router = require('./routes/routes'); // Importing the router as the default export
 
 // Create an instance of the Express application

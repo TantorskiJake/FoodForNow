@@ -9,25 +9,26 @@ const DB_NAME = 'FoodForNow';
 
 // Function to establish a connection to MongoDB and return the database instance
 const connectToMongoDB = async () => {
-  const client = new MongoClient(mongoURI, {
-    serverApi: {
-      version: ServerApiVersion.v1,
-      strict: true,
-      deprecationErrors: true,
-    },
-  });
-
   try {
+    const client = new MongoClient(mongoURI, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
+    });
+
     // Attempt to connect to the MongoDB instance
     await client.connect();
+    console.log(`Connected to MongoDB database: ${DB_NAME}`);
+
+    // Return the connected database instance
+    return client.db(DB_NAME);
   } catch (error) {
     // Log and rethrow any connection errors
     console.error('Error connecting to MongoDB:', error);
     throw error;
   }
-
-  // Return the connected database instance
-  return client.db(DB_NAME);
 };
 
 // Function to retrieve recipes from the MongoDB database

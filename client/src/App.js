@@ -1,6 +1,7 @@
 // Importing necessary dependencies from React and Axios
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import RecipeDisplay from './RecipeDisplay'; // Importing the RecipeDisplay component
 
 // Functional component 'App' representing the main application
 function App() {
@@ -16,7 +17,7 @@ function App() {
         const response = await axios.get('http://localhost:8080/api/data');
         setData(response.data); // Set the fetched data in the state variable
       } catch (error) {
-        console.error(error); // Log any errors that occur during the data fetching process
+        console.error('Error fetching data:', error); // Log any errors that occur during the data fetching process
       }
     };
 
@@ -29,45 +30,14 @@ function App() {
     setRandomRecipe(data[randomIndex]); // Set the randomly selected recipe in the state variable
   };
 
-  // Function to recursively render fields of an object or array in a structured format
-  const renderField = (fieldName, fieldValue) => {
-    if (Array.isArray(fieldValue)) { // Check if the field value is an array
-      return (
-        <div key={fieldName}>
-          <p>{fieldName}:</p>
-          <ul>
-            {fieldValue.map((item, index) => (
-              <li key={index}>{renderField(index, item)}</li>
-            ))}
-          </ul>
-        </div>
-      );
-    } else if (typeof fieldValue === 'object' && fieldValue !== null) { // Check if the field value is an object
-      return (
-        <div key={fieldName}>
-          <p>{fieldName}:</p>
-          <ul>
-            {Object.entries(fieldValue).map(([key, value]) => (
-              <li key={key}>{renderField(key, value)}</li>
-            ))}
-          </ul>
-        </div>
-      );
-    } else { // Render a simple key-value pair if the field value is neither an array nor an object
-      return <p key={fieldName}>{`${fieldName}: ${fieldValue}`}</p>;
-    }
-  };
-
-  // Create a formatted representation of the random recipe using the renderField function
-  const formattedData = randomRecipe ? renderField('Recipe', randomRecipe) : null;
-
   // JSX structure representing the UI of the application
   return (
     <div className="App">
       <header className="App-header">
         <h1>FoodForNow!</h1>
         <button onClick={getRandomRecipe}>Get Random Recipe</button>
-        <div style={{ textAlign: 'left' }}>{formattedData}</div>
+        {/* Using RecipeDisplay component to display recipe details */}
+        <RecipeDisplay randomRecipe={randomRecipe} />
       </header>
     </div>
   );
