@@ -7,18 +7,25 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const flash = require('connect-flash');
 const router = require('../routes/routes');
-
 const User = require('../models/user');
 
+// Configure Passport
 passport.use(new LocalStrategy(
-  function(username, password, done) {
-    User.findOne({ username: username }, function(err, user) {
-      if (err) { return done(err); }
+  async function(username, password, done) {
+    try {
+      // Find the user in the database
+      const user = await User.findOne({ username: username });
+
+      // If user not found or password is incorrect
       if (!user || !user.validPassword(password)) {
         return done(null, false, { message: 'Incorrect username or password' });
       }
+
+      // If user and password are correct
       return done(null, user);
-    });
+    } catch (error) {
+      return done(error);
+    }
   }
 ));
 
@@ -37,7 +44,7 @@ const configureExpress = (app) => {
 
   app.use(cors());
   app.use(express.json());
-
+  
   app.use(session({
     secret: 'your-secret-key',
     resave: false,

@@ -2,17 +2,11 @@
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const { mongoURI } = require('../config/config');
-const passport = require('passport'); // Add this line to import Passport
 
 const DB_NAME = 'FoodForNow';
 
-const connectToMongoDB = async (req) => {
+const connectToMongoDB = async () => {
   try {
-    // Check if the user is authenticated before proceeding
-    if (!req.isAuthenticated()) {
-      throw new Error('Unauthorized');
-    }
-
     const client = new MongoClient(mongoURI, {
       serverApi: {
         version: ServerApiVersion.v1,
@@ -31,14 +25,11 @@ const connectToMongoDB = async (req) => {
   }
 };
 
-const getRecipesFromDatabase = async (req) => {
+const getRecipesFromDatabase = async () => {
   try {
-    // Establish a connection to the MongoDB database
-    const db = await connectToMongoDB(req);
-
+    const db = await connectToMongoDB();
     const collection = db.collection('Recipes');
     const documents = await collection.find({}).toArray();
-
     return documents;
   } catch (error) {
     console.error('Error fetching recipes from MongoDB:', error);

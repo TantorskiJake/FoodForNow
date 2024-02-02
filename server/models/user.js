@@ -1,5 +1,4 @@
 // models/user.js
-
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
@@ -8,7 +7,6 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true }
 });
 
-// Method to validate the entered password
 userSchema.methods.validPassword = function(password) {
   return bcrypt.compareSync(password, this.password);
 };
