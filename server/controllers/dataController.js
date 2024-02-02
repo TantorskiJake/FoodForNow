@@ -1,15 +1,13 @@
 // controllers/dataController.js
 
 // Import the data model
-const { getRecipesFromDatabase } = require('../models/datamodel');
+const { getRecipesFromDatabase } = require('../models/dataModel');
 
 // Function to retrieve recipes using the data model
 const getRecipes = async () => {
   try {
     // Use the data model to get recipes from the database
     const documents = await getRecipesFromDatabase();
-
-    // Perform any additional controller logic if needed
 
     // Return the retrieved recipes
     return documents;
