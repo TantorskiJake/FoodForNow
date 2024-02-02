@@ -12,6 +12,7 @@ FoodForNow is a digital cookbook, pantry, and meal planner designed to make cook
   ```bash
   npm install axios cors dotenv express mongodb mongoose
 
+
 ## Usage
 
 FoodForNow is easy to use, with no specific commands or configurations required.
@@ -27,7 +28,7 @@ We value creativity and a positive vibe, so have fun with it! If you have any qu
 
 ## License
 
-FoodForNow is has no license as of yet!
+FoodForNow is open-sourced and available under the [MIT License](link-to-license-file). Feel free to use, modify, and distribute the code as you see fit.
 
 ## Credits
 
