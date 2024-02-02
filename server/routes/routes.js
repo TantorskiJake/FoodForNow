@@ -34,5 +34,5 @@ router.get('/api/data', asyncHandler(async (req, res) => {
   }
 }));
 
-// Exporting the router for use in other parts of the application
-module.exports = { router };
+// Exporting the router as the default export for use in other parts of the application
+module.exports = router;
