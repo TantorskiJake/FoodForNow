@@ -1,15 +1,18 @@
 // models/datamodel.js
 
-// Import necessary modules from the 'mongodb' package
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const { mongoURI } = require('../config/config'); // Import the configuration
+const { mongoURI } = require('../config/config');
+const passport = require('passport'); // Add this line to import Passport
 
-// MongoDB connection parameters
 const DB_NAME = 'FoodForNow';
 
-// Function to establish a connection to MongoDB and return the database instance
-const connectToMongoDB = async () => {
+const connectToMongoDB = async (req) => {
   try {
+    // Check if the user is authenticated before proceeding
+    if (!req.isAuthenticated()) {
+      throw new Error('Unauthorized');
+    }
+
     const client = new MongoClient(mongoURI, {
       serverApi: {
         version: ServerApiVersion.v1,
@@ -18,41 +21,31 @@ const connectToMongoDB = async () => {
       },
     });
 
-    // Attempt to connect to the MongoDB instance
     await client.connect();
     console.log(`Connected to MongoDB database: ${DB_NAME}`);
 
-    // Return the connected database instance
     return client.db(DB_NAME);
   } catch (error) {
-    // Log and rethrow any connection errors
     console.error('Error connecting to MongoDB:', error);
     throw error;
   }
 };
 
-// Function to retrieve recipes from the MongoDB database
-const getRecipesFromDatabase = async () => {
+const getRecipesFromDatabase = async (req) => {
   try {
     // Establish a connection to the MongoDB database
-    const db = await connectToMongoDB();
+    const db = await connectToMongoDB(req);
 
-    // Access the 'Recipes' collection within the connected database
     const collection = db.collection('Recipes');
-
-    // Retrieve all documents from the 'Recipes' collection and convert them to an array
     const documents = await collection.find({}).toArray();
 
-    // Return the array of retrieved documents
     return documents;
   } catch (error) {
-    // Log and rethrow any errors that occur during the process
     console.error('Error fetching recipes from MongoDB:', error);
     throw error;
   }
 };
 
-// Export the 'connectToMongoDB' and 'getRecipesFromDatabase' functions for use in other modules
 module.exports = {
   connectToMongoDB,
   getRecipesFromDatabase,

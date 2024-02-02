@@ -2,33 +2,62 @@
 
 const express = require('express');
 const cors = require('cors');
-const router = require('../routes/routes'); // Adjust the path based on your project structure
+const session = require('express-session');
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const flash = require('connect-flash');
+const router = require('../routes/routes');
 
-const configureExpress = () => {
-  // Create an instance of the Express application
-  const app = express();
+const User = require('../models/user');
 
-  // Define the port on which the server will listen
-  const port = 8080;
+passport.use(new LocalStrategy(
+  function(username, password, done) {
+    User.findOne({ username: username }, function(err, user) {
+      if (err) { return done(err); }
+      if (!user || !user.validPassword(password)) {
+        return done(null, false, { message: 'Incorrect username or password' });
+      }
+      return done(null, user);
+    });
+  }
+));
 
-  // Use cors middleware to enable Cross-Origin Resource Sharing
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+  User.findById(id, function(err, user) {
+    done(err, user);
+  });
+});
+
+const configureExpress = (app) => {
+  const port = process.env.PORT || 8080;
+
   app.use(cors());
-
-  // Parse incoming JSON requests
   app.use(express.json());
 
-  // Use the custom router defined in the routes directory
+  app.use(session({
+    secret: 'your-secret-key',
+    resave: false,
+    saveUninitialized: false
+  }));
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  app.use(flash());
+
   app.use(router);
 
-  // Error handling middleware to catch any errors that occur during request processing
   app.use((err, req, res, next) => {
-    console.error('Error:', err); // Log the error to the console
-    res.status(500).send('Internal Server Error'); // Send a 500 Internal Server Error response to the client
+    console.error('Error:', err);
+    res.status(500).send('Internal Server Error');
   });
 
-  // Start the server and listen on the specified port
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`); // Log a message indicating that the server is running
+  return app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
   });
 };
 
