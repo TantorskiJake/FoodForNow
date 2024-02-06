@@ -2,7 +2,7 @@ const Recipe = require('../models/recipe');
 
 const getAllRecipes = async () => {
   try {
-    const recipes = await Recipe.find({}, { title: 1, _id: 0 });
+    const recipes = await Recipe.find({}, { title: 1, _id: 0 }); //Projection of Title Only
     console.log('Fetched recipes:', recipes);  // Add this line to log fetched recipes
     return recipes;
   } catch (error) {

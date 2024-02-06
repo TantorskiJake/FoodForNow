@@ -2,7 +2,20 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
-  // ... (unchanged content)
+  _id: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
 });
 
 userSchema.methods.validPassword = function(password) {

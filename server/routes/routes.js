@@ -1,11 +1,14 @@
 const express = require('express');
+const passport = require('passport');
 const { getAllRecipes } = require('../controllers/recipeController');
+const isAuth = require('../middleware/authMiddleware');  // Updated identifier
 const router = express.Router();
 
 const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// Public route - does not require authentication
 router.get('/api/publicdata', asyncHandler(async (req, res) => {
   try {
     const recipes = await getAllRecipes();
@@ -16,11 +19,20 @@ router.get('/api/publicdata', asyncHandler(async (req, res) => {
   }
 }));
 
-function isAuthenticated(req, res, next) {
-  if (req.isAuthenticated()) {
-    return next();
+// Authenticated route - requires authentication
+router.get('/api/protecteddata', passport.authenticate('local'), isAuth, asyncHandler(async (req, res) => {
+  try {
+    // Access the user through req.user if needed
+    const userId = req.user._id;
+    
+    // Example of protected data fetching
+    // const protectedData = await getProtectedData(userId);
+    
+    res.json({ message: 'This is protected data for authenticated users.' });
+  } catch (error) {
+    console.error('Error fetching protected data:', error);
+    res.status(500).send('Internal Server Error');
   }
-  res.status(401).json({ message: 'Unauthorized' });
-}
+}));
 
 module.exports = router;

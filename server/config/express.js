@@ -9,6 +9,7 @@ const mainRoutes = require('../routes/routes');
 const User = require('../models/user');
 const mongoose = require('mongoose');
 
+// Configure the LocalStrategy for Passport
 passport.use(new LocalStrategy(
   async function(username, password, done) {
     try {
@@ -25,6 +26,7 @@ passport.use(new LocalStrategy(
   }
 ));
 
+// Implement serialization and deserialization logic for Passport
 passport.serializeUser((user, done) => {
   // Implement serialization logic, e.g., done(null, user.id);
 });
@@ -34,17 +36,15 @@ passport.deserializeUser((id, done) => {
 });
 
 const configureExpress = (app) => {
-  const port = process.env.PORT || 8080;
+  const port = process.env.PORT || 3000;
 
   app.use(cors());
   app.use(express.json());
 
+  // Connect to MongoDB
   mongoose.connect(process.env.MONGODB_URI, {
     dbName: 'FoodForNow', // Specify the correct database name
-    // No need for useNewUrlParser and useUnifiedTopology
   });
-  
-  
 
   mongoose.connection.on('connected', () => {
     console.log('Connected to MongoDB');
@@ -65,20 +65,25 @@ const configureExpress = (app) => {
     });
   });
 
+  // Configure session middleware
   app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
   }));
 
+  // Initialize Passport and use session
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Use connect-flash for flash messages
   app.use(flash());
 
+  // Mount your routes
   app.use(authRoutes);
   app.use(mainRoutes);
 
+  // Error handling middleware
   app.use((err, req, res, next) => {
     console.error('Error:', err);
     res.status(500).send('Internal Server Error');
