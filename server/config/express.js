@@ -28,11 +28,13 @@ passport.use(new LocalStrategy(
 
 // Implement serialization and deserialization logic for Passport
 passport.serializeUser((user, done) => {
-  // Implement serialization logic, e.g., done(null, user.id);
+  done(null, user.id);
 });
 
 passport.deserializeUser((id, done) => {
-  // Implement deserialization logic, e.g., User.findById(id, (err, user) => done(err, user));
+  User.findById(id, (err, user) => {
+    done(err, user);
+  });
 });
 
 const configureExpress = (app) => {
