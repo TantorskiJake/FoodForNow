@@ -1,27 +1,23 @@
-// config/express.js
-
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const flash = require('connect-flash');
-const router = require('../routes/routes');
+const authRoutes = require('../routes/authRoutes');
+const mainRoutes = require('../routes/routes');
 const User = require('../models/user');
+const mongoose = require('mongoose');
 
-// Configure Passport
 passport.use(new LocalStrategy(
   async function(username, password, done) {
     try {
-      // Find the user in the database
       const user = await User.findOne({ username: username });
 
-      // If user not found or password is incorrect
       if (!user || !user.validPassword(password)) {
         return done(null, false, { message: 'Incorrect username or password' });
       }
 
-      // If user and password are correct
       return done(null, user);
     } catch (error) {
       return done(error);
@@ -29,14 +25,12 @@ passport.use(new LocalStrategy(
   }
 ));
 
-passport.serializeUser(function(user, done) {
-  done(null, user.id);
+passport.serializeUser((user, done) => {
+  // Implement serialization logic, e.g., done(null, user.id);
 });
 
-passport.deserializeUser(function(id, done) {
-  User.findById(id, function(err, user) {
-    done(err, user);
-  });
+passport.deserializeUser((id, done) => {
+  // Implement deserialization logic, e.g., User.findById(id, (err, user) => done(err, user));
 });
 
 const configureExpress = (app) => {
@@ -44,9 +38,35 @@ const configureExpress = (app) => {
 
   app.use(cors());
   app.use(express.json());
+
+  mongoose.connect(process.env.MONGODB_URI, {
+    dbName: 'FoodForNow', // Specify the correct database name
+    // No need for useNewUrlParser and useUnifiedTopology
+  });
   
+  
+
+  mongoose.connection.on('connected', () => {
+    console.log('Connected to MongoDB');
+  });
+
+  mongoose.connection.on('error', (err) => {
+    console.error('MongoDB connection error:', err);
+  });
+
+  mongoose.connection.on('disconnected', () => {
+    console.log('Disconnected from MongoDB');
+  });
+
+  process.on('SIGINT', () => {
+    mongoose.connection.close(() => {
+      console.log('MongoDB connection closed due to app termination');
+      process.exit(0);
+    });
+  });
+
   app.use(session({
-    secret: 'your-secret-key',
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false
   }));
@@ -56,7 +76,8 @@ const configureExpress = (app) => {
 
   app.use(flash());
 
-  app.use(router);
+  app.use(authRoutes);
+  app.use(mainRoutes);
 
   app.use((err, req, res, next) => {
     console.error('Error:', err);
