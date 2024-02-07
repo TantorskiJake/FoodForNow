@@ -9,9 +9,13 @@ const App = () => {
     <Router>
       <div>
         <Routes>
-          <Route path="/register" component={RegistrationForm} />
-          <Route path="/login" component={LoginForm} />
-          {/* Add more routes here */}
+          {/* Route for RegistrationForm */}
+          <Route path="/register" element={<RegistrationForm />} />
+
+          {/* Route for LoginForm */}
+          <Route path="/login" element={<LoginForm />} />
+
+          {/* Add more routes here if needed */}
         </Routes>
       </div>
     </Router>
