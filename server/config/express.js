@@ -73,7 +73,7 @@ const configureExpress = (app) => {
 
   // Configure session middleware
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
   }));
