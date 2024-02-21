@@ -19,12 +19,11 @@ router.get('/api/publicdata', asyncHandler(async (req, res) => {
   }
 }));
 
-// Authenticated route - requires authentication
 router.get('/api/protecteddata', 
-  passport.authenticate('local'), // Middleware for authentication
   isAuth, // Custom middleware to check if user is authenticated
   asyncHandler(async (req, res) => {
     try {
+      console.log("****")
       // Access the user through req.user if needed
       const userId = req.user._id;
       
@@ -38,5 +37,6 @@ router.get('/api/protecteddata',
     }
   })
 );
+
 
 module.exports = router;

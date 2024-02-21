@@ -3,11 +3,12 @@ import React, { useState } from 'react';
 const LoginForm = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/login', {
+      const response = await fetch('http://localhost:8080/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -16,11 +17,16 @@ const LoginForm = () => {
       });
       if (response.ok) {
         console.log('Login successful');
+        const responseData = await response.json();
+        // Redirect the user to the specified URL upon successful login
+        window.location.href = responseData.redirectURL;
       } else {
-        console.error('Login failed');
+        const errorMessage = await response.text();
+        throw new Error(errorMessage || 'Login failed');
       }
     } catch (error) {
       console.error('Error during login:', error);
+      setError(error.message || 'An unexpected error occurred');
     }
   };
 
@@ -38,6 +44,7 @@ const LoginForm = () => {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
+      {error && <div style={{ color: 'red' }}>{error}</div>}
       <button type="submit">Login</button>
     </form>
   );

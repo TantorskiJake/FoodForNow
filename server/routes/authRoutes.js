@@ -27,7 +27,14 @@ router.post('/register', async (req, res) => {
 router.post('/login', passport.authenticate('local'), (req, res) => {
   // If this function gets called, authentication was successful.
   // `req.user` contains the authenticated user.
-  res.json({ message: 'Login successful', user: req.user });
+  console.log(req.user)
+  res.json({ 
+      message: 'Login successful', 
+      user: req.user,
+      redirectURL: 'http://localhost:8080/api/protecteddata'
+  });
 });
+
+
 
 module.exports = router;

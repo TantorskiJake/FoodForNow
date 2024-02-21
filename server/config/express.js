@@ -42,7 +42,7 @@ passport.deserializeUser(async (id, done) => {
 });
 
 const configureExpress = (app) => {
-  const port = process.env.PORT;
+  const port = process.env.PORT || 8080;
 
   app.use(cors());
   app.use(express.json());
@@ -73,7 +73,7 @@ const configureExpress = (app) => {
 
   // Configure session middleware
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
   }));
