@@ -1,16 +1,17 @@
+// server/controllers/recipeController.js
+
 const Recipe = require('../models/recipe');
 
 const getAllRecipes = async () => {
   try {
-    const recipes = await Recipe.find({}, { title: 1, _id: 0 }); //Projection of Title Only
-    console.log('Fetched recipes:', recipes);  // Add this line to log fetched recipes
+    const recipes = await Recipe.find({}, { title: 1, _id: 0 });
+    console.log('Fetched recipes:', recipes);
     return recipes;
   } catch (error) {
     console.error('Error fetching recipes:', error);
     throw error;
   }
 };
-
 
 const getRecipeById = async (recipeId) => {
   try {

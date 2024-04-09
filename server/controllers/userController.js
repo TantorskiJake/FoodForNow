@@ -1,3 +1,5 @@
+// server/controllers/userController.js
+
 const bcrypt = require('bcrypt');
 const User = require('../models/user');
 
@@ -9,7 +11,7 @@ const createUser = async (userData) => {
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       const error = new Error('Username already exists');
-      error.statusCode = 400; // Set a custom status code for validation error
+      error.statusCode = 400;
       throw error;
     }
 

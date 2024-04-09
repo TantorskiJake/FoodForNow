@@ -1,4 +1,4 @@
-// models/recipe.js
+// server/models/recipe.js
 
 const mongoose = require('mongoose');
 
@@ -44,4 +44,3 @@ const recipeSchema = new mongoose.Schema({
 
 const Recipe = mongoose.model('Recipe', recipeSchema); // Specify the collection name
 module.exports = Recipe;
-
