@@ -1,13 +1,14 @@
-const express = require('express');
 const cors = require('cors');
-const session = require('express-session');
-const passport = require('passport');
-const LocalStrategy = require('passport-local').Strategy;
+const express = require('express');
 const flash = require('connect-flash');
+const LocalStrategy = require('passport-local').Strategy;
+const mongoose = require('mongoose');
+const passport = require('passport');
+const session = require('express-session');
+
+const User = require('../models/user');
 const authRoutes = require('../routes/authRoutes');
 const mainRoutes = require('../routes/routes');
-const User = require('../models/user');
-const mongoose = require('mongoose');
 
 // Configure the LocalStrategy for Passport
 passport.use(new LocalStrategy(
@@ -31,14 +32,17 @@ passport.serializeUser((user, done) => {
   done(null, user.id);
 });
 
-passport.deserializeUser((id, done) => {
-  User.findById(id, (err, user) => {
-    done(err, user);
-  });
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error);
+  }
 });
 
 const configureExpress = (app) => {
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 8080;
 
   app.use(cors());
   app.use(express.json());
@@ -69,7 +73,7 @@ const configureExpress = (app) => {
 
   // Configure session middleware
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
   }));
