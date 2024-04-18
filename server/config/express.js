@@ -32,7 +32,7 @@ const configureExpress = (app) => {
 
   // Routes
   app.use('/api', authRoutes);
-  app.use('/api', recipeRoutes);
+  app.use('/recipe', recipeRoutes);
 
   // Error handling
   app.use((err, req, res, next) => {
