@@ -1,13 +1,25 @@
-// server/app.js
-
-require('dotenv').config();
-
 const express = require('express');
+const session = require('express-session');
+const passport = require('passport');
 const configureExpress = require('./config/express');
+
+// Import Passport configuration
+require('./config/passport')(passport);
 
 const app = express();
 
-app.use(express.static('client/public'));
+// Session middleware
+app.use(session({
+  secret: 'your-secret',
+  resave: false,
+  saveUninitialized: false
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Other configurations and middleware
 configureExpress(app);
 
 const PORT = process.env.PORT || 8080;
