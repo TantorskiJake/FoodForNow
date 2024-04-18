@@ -10,7 +10,7 @@ FoodForNow is a digital cookbook, pantry, and meal planner designed to make cook
 - **Node Modules:**
   - Run `npm install` to install the necessary dependencies.
   ```bash
-  npm install axios cors dotenv express mongodb mongoose
+  npm install axios bcrypt body-parser connect-flash cors dotenv express express-session mongodb mongoose morgan passport passport-local react-router-dom
 
 
 ## Usage
