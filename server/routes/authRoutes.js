@@ -40,37 +40,14 @@ router.post('/register', [
 });
 
 // Login route
-router.post('/login', (req, res, next) => {
-    passport.authenticate('local', (err, user, info) => {
-      if (err) {
-        // Log the error
-        console.error('Error during authentication:', err);
-        // Send error response
-        return res.status(500).json({ message: 'An unexpected error occurred during login' });
-      }
-      if (!user) {
-        // User not found or invalid credentials
-        console.log('Authentication failed:', info.message);
-        return res.status(401).json({ message: 'Invalid username or password' });
-      }
-      // Authentication successful
-      req.login(user, (err) => {
-        if (err) {
-          // Log the login error
-          console.error('Error during login:', err);
-          // Send error response
-          return res.status(500).json({ message: 'An unexpected error occurred during login' });
-        }
-        // Send success response
-        res.json({
-          message: 'Login successful',
-          user: req.user,
-          redirectURL: 'http://localhost:8080/api/protecteddata'
-        });
-      });
-    })(req, res, next);
+router.post('/login', passport.authenticate('local'), (req, res) => {
+  // If this function gets called, authentication was successful.
+  // `req.user` contains the authenticated user.
+  res.json({
+    message: 'Login successful',
+    user: req.user,
+    redirectURL: 'http://localhost:8080/api/protecteddata'
   });
-  
-  
+});
 
 module.exports = router;

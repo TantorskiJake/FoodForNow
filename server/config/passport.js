@@ -1,8 +1,6 @@
-// server/config/passport.js
-
-const LocalStrategy = require('passport-local').Strategy;
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcrypt'); // Import bcrypt
 const User = require('../models/user');
+const LocalStrategy = require('passport-local').Strategy;
 
 module.exports = function(passport) {
   passport.use(new LocalStrategy(async (username, password, done) => {
@@ -15,7 +13,7 @@ module.exports = function(passport) {
         return done(null, false, { message: 'Invalid username or password' });
       }
 
-      // Match password
+      // Match password using bcrypt.compare
       const isMatch = await bcrypt.compare(password, user.password);
       if (isMatch) {
         // Password matched, return user
@@ -35,8 +33,12 @@ module.exports = function(passport) {
   });
 
   passport.deserializeUser((id, done) => {
-    User.findById(id, (err, user) => {
-      done(err, user);
-    });
+    User.findById(id)
+      .then(user => {
+        done(null, user);
+      })
+      .catch(err => {
+        done(err);
+      });
   });
 };
