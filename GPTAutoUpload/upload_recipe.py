@@ -1,43 +1,46 @@
 from pymongo import MongoClient
 import json
+import uuid
 
 def connect_to_mongo(uri, db_name):
-    """Connect to MongoDB!"""
     client = MongoClient(uri)
     return client[db_name]
 
-def insert_recipe(db, collection_name, recipe):
-    """Insert a recipe into the specified MongoDB collection."""
-    collection = db[collection_name]
-    result = collection.insert_one(recipe)
-    return result.inserted_id
-
 def read_recipe_from_file(file_path):
-    """Read recipe data from a JSON file."""
     with open(file_path, 'r') as file:
-        recipe = json.load(file)
-    return recipe
+        return json.load(file)
 
-def read_recipe_from_string(recipe_string):
-    """Parse recipe data from a JSON string."""
-    recipe = json.loads(recipe_string)
-    return recipe
+def generate_unique_id():
+    return str(uuid.uuid4())
+
+def insert_recipe(db, collection_name, recipe):
+    try:
+        collection = db[collection_name]
+        recipe["_id"] = generate_unique_id()  # Add a unique ID to the recipe
+        print(f"Inserting recipe: {recipe}")  # Debug print
+        result = collection.insert_one(recipe)
+        print(f"Recipe inserted with ID: {result.inserted_id}")  # Debug print
+        return result.inserted_id
+    except Exception as e:
+        print(f"Error inserting recipe: {e}")
+        return None
 
 def main():
-    # MongoDB connection parameters
-    uri = "mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/?ssl=true&ssl_cert_reqs=CERT_NONE" # Replace with your MongoDB URI
+    uri = "mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/"
     db_name = "recipes_db"
     collection_name = "recipes"
 
-    # Connect to MongoDB
     db = connect_to_mongo(uri, db_name)
-
-    # Read recipe data (choose one method)
-    recipe = read_recipe_from_file('recipe.json')  # Uncomment this line if using a file
+    print(f"Connected to MongoDB: {db_name}")
     
-    # Insert the recipe into MongoDB
+    recipe = read_recipe_from_file('recipe.json')
+    print(f"Loaded recipe: {recipe}")
+
     inserted_id = insert_recipe(db, collection_name, recipe)
-    print(f"Recipe inserted with ID: {inserted_id}")
+    if inserted_id:
+        print(f"Recipe inserted with ID: {inserted_id}")
+    else:
+        print("Failed to insert recipe.")
 
 if __name__ == "__main__":
     main()
