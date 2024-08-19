@@ -19,7 +19,6 @@ def insert_recipe(db, collection_name, recipe):
         recipe["_id"] = generate_unique_id()  # Add a unique ID to the recipe
         print(f"Inserting recipe: {recipe}")  # Debug print
         result = collection.insert_one(recipe)
-        print(f"Recipe inserted with ID: {result.inserted_id}")  # Debug print
         return result.inserted_id
     except Exception as e:
         print(f"Error inserting recipe: {e}")

@@ -1,29 +1,77 @@
 {
-  "name": "Tiger Shrimp Sautéed with Garlic and Capers in a White Wine Lemon Sauce, tossed with Capellini",
+  "name": "Pan Roasted Chicken Breast with Garlic and Rosemary, Artichoke Hearts, Served with Lemony Arugula Salad",
   "ingredients": [
-    { "name": "tiger shrimp", "quantity": "12 oz, peeled and deveined" },
-    { "name": "capellini", "quantity": "8 oz" },
-    { "name": "olive oil", "quantity": "3 tbsp" },
-    { "name": "garlic", "quantity": "4 cloves, minced" },
-    { "name": "capers", "quantity": "2 tbsp, drained" },
-    { "name": "dry white wine", "quantity": "1/2 cup" },
-    { "name": "lemon juice", "quantity": "1/4 cup, fresh" },
-    { "name": "lemon zest", "quantity": "1 tbsp" },
-    { "name": "unsalted butter", "quantity": "2 tbsp" },
-    { "name": "fresh parsley", "quantity": "1/4 cup, chopped" },
-    { "name": "salt", "quantity": "to taste" },
-    { "name": "pepper", "quantity": "to taste" },
-    { "name": "lemon slices", "quantity": "for garnish, optional" },
-    { "name": "reserved pasta water", "quantity": "1/2 cup, optional" }
+    {
+      "name": "chicken breasts",
+      "quantity": "2, boneless, skin-on"
+    },
+    {
+      "name": "olive oil",
+      "quantity": "2 tbsp"
+    },
+    {
+      "name": "garlic",
+      "quantity": "4 cloves, minced"
+    },
+    {
+      "name": "fresh rosemary",
+      "quantity": "2 sprigs"
+    },
+    {
+      "name": "artichoke hearts",
+      "quantity": "1 cup, canned, drained and halved"
+    },
+    {
+      "name": "chicken broth",
+      "quantity": "1/2 cup"
+    },
+    {
+      "name": "unsalted butter",
+      "quantity": "1 tbsp"
+    },
+    {
+      "name": "salt",
+      "quantity": "to taste"
+    },
+    {
+      "name": "pepper",
+      "quantity": "to taste"
+    },
+    {
+      "name": "lemon wedges",
+      "quantity": "for serving"
+    },
+    {
+      "name": "arugula",
+      "quantity": "4 cups"
+    },
+    {
+      "name": "fresh lemon juice",
+      "quantity": "1 tbsp"
+    },
+    {
+      "name": "olive oil",
+      "quantity": "2 tbsp"
+    },
+    {
+      "name": "Parmesan cheese",
+      "quantity": "1/4 cup, shaved"
+    },
+    {
+      "name": "salt",
+      "quantity": "to taste"
+    },
+    {
+      "name": "pepper",
+      "quantity": "to taste"
+    }
   ],
   "instructions": [
-    "Cook the Capellini: Bring a large pot of salted water to a boil. Add the capellini and cook according to the package instructions until al dente. Drain and set aside, reserving about 1/2 cup of the pasta water.",
-    "Sauté the Shrimp: In a large skillet, heat 2 tablespoons of olive oil over medium heat. Add the shrimp, seasoning with salt and pepper. Cook for about 2-3 minutes on each side, until they turn pink and opaque. Remove the shrimp from the skillet and set aside.",
-    "Prepare the Sauce: In the same skillet, add the remaining 1 tablespoon of olive oil. Add the minced garlic and sauté until fragrant, about 1 minute. Stir in the capers, cooking for an additional 1-2 minutes.",
-    "Pour in the white wine and lemon juice, scraping up any browned bits from the bottom of the pan. Allow the mixture to simmer and reduce slightly, about 2-3 minutes.",
-    "Add the lemon zest and butter, stirring until the butter is melted and the sauce is smooth.",
-    "Combine and Toss: Return the cooked shrimp to the skillet, tossing them in the sauce to coat evenly. Add the cooked capellini to the skillet, tossing to combine. If the sauce seems too thick, add a bit of the reserved pasta water to reach the desired consistency.",
-    "Stir in the chopped parsley and adjust the seasoning with salt and pepper to taste.",
-    "Serve: Divide the shrimp and pasta among plates. Garnish with extra parsley and lemon slices, if desired. Serve immediately, with extra lemon wedges on the side for a fresh squeeze."
+    "Preheat the Oven: Preheat your oven to 375°F (190°C).",
+    "Prepare the Chicken: Season the chicken breasts generously with salt and pepper on both sides. In a large oven-safe skillet, heat the olive oil over medium-high heat. Place the chicken breasts skin-side down in the skillet. Cook for about 5-6 minutes, until the skin is golden brown and crispy. Flip the chicken over.",
+    "Add Garlic, Rosemary, and Artichokes: Add the minced garlic, fresh rosemary, and artichoke hearts to the skillet. Sauté for about 2 minutes until the garlic is fragrant.",
+    "Roast in the Oven: Pour in the chicken broth and add the butter to the skillet. Transfer the skillet to the preheated oven and roast for 15-20 minutes, or until the chicken is cooked through and reaches an internal temperature of 165°F (74°C).",
+    "Prepare the Salad: While the chicken is roasting, prepare the lemony arugula salad. In a large bowl, whisk together the fresh lemon juice and olive oil. Season with salt and pepper. Add the arugula and toss to coat. Top with shaved Parmesan cheese.",
+    "Serve: Remove the chicken from the oven and let it rest for a few minutes. Slice the chicken and serve it alongside the roasted artichokes, with a wedge of lemon for squeezing over the top. Plate the lemony arugula salad next to the chicken. Enjoy!"
   ]
 }
