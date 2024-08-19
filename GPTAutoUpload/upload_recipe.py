@@ -27,7 +27,7 @@ def insert_recipe(db, collection_name, recipe):
 
 def main():
     uri = "mongodb+srv://JakeTantorski:JakeTantorski@foodfornowrecipes.i9zgp80.mongodb.net/"
-    db_name = "recipes_db"
+    db_name = "FoodForNow"
     collection_name = "recipes"
 
     db = connect_to_mongo(uri, db_name)
