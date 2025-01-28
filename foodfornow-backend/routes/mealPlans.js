@@ -1,5 +1,6 @@
 const express = require("express");
 const MealPlan = require("../models/mealPlan");
+const Recipe = require("../models/recipe");
 const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
@@ -18,6 +19,15 @@ router.get("/", authMiddleware, async (req, res) => {
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const { week, meals } = req.body;
+
+    // Validate recipe references
+    const recipeIds = meals.map((meal) => meal.recipe);
+    const validRecipes = await Recipe.find({ _id: { $in: recipeIds } });
+
+    if (validRecipes.length !== recipeIds.length) {
+      return res.status(400).json({ error: "One or more recipes are invalid." });
+    }
+
     const newMealPlan = new MealPlan({
       user: req.user.id,
       week,
