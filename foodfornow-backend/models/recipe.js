@@ -7,12 +7,17 @@ const RecipeSchema = new mongoose.Schema({
     {
       ingredient: { type: mongoose.Schema.Types.ObjectId, ref: "Ingredient", required: true }, // Reference to Ingredient
       quantity: { type: Number, required: true }, // Quantity needed
-      unit: { type: String }, // Optional override for unit (defaults to Ingredient's defaultUnit)
-    },
+      unit: { type: String, required: true } // Require unit to prevent errors
+    }
   ],
-  steps: { type: [String], required: true }, // Step-by-step instructions
+  steps: [
+    {
+      stepNumber: { type: Number, required: true },
+      instruction: { type: String, required: true }
+    }
+  ], // Improved step tracking
   healthScore: { type: Number, default: 50 }, // Optional health score
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // User who created the recipe
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true } // Faster queries by indexing
 });
 
 module.exports = mongoose.model("Recipe", RecipeSchema);

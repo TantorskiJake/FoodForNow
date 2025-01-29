@@ -8,7 +8,7 @@ const cors = require("cors");
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
 const pantryRoutes = require("./routes/pantry");
-const recipeRoutes = require("./routes/recipes");
+const recipeRoutes = require("./routes/recipe");
 const mealPlanRoutes = require("./routes/mealPlans");
 const ingredientRoutes = require("./routes/ingred"); // Add the ingredient routes
 
