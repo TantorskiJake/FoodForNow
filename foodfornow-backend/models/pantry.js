@@ -1,14 +1,41 @@
 const mongoose = require("mongoose");
 
-const PantrySchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true }, // Each user has one pantry
-  items: [
-    {
-      ingredient: { type: mongoose.Schema.Types.ObjectId, ref: "Ingredient", required: true }, // Reference to Ingredient
-      quantity: { type: Number, required: true }, // Current quantity available
-      unit: { type: String, required: true }, // Unit for this ingredient
-    },
-  ],
+const pantryItemSchema = new mongoose.Schema({
+  ingredient: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Ingredient",
+    required: true
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  unit: {
+    type: String,
+    required: true,
+    enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']
+  },
+  expiryDate: {
+    type: Date
+  },
+  notes: {
+    type: String
+  }
 });
 
-module.exports = mongoose.model("Pantry", PantrySchema);
+const pantrySchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
+  items: [pantryItemSchema]
+}, {
+  timestamps: true
+});
+
+// Create compound index for user and ingredient within items
+pantrySchema.index({ user: 1, "items.ingredient": 1 }, { unique: true });
+
+module.exports = mongoose.model("Pantry", pantrySchema);

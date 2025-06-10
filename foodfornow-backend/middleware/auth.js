@@ -1,25 +1,42 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
+const User = require('../models/user');
 
-module.exports = (req, res, next) => {
-  const authHeader = req.header("Authorization");
-  if (!authHeader) {
-    console.error("❌ No authorization header found");
-    return res.status(401).json({ error: "Access denied. No token provided." });
-  }
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
-  const token = authHeader.split(" ")[1];
-  if (!token) {
-    console.error("❌ Invalid token format");
-    return res.status(401).json({ error: "Access denied. Invalid token format." });
-  }
-
+const auth = async (req, res, next) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("✅ Token verification successful:", decoded);
-    req.user = decoded;
+    // Get token from header
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      console.log('No token provided');
+      return res.status(401).json({ error: 'Please login' });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('Token decoded:', decoded);
+    
+    // Check if user still exists
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      console.log('User not found:', decoded.userId);
+      return res.status(401).json({ error: 'User no longer exists' });
+    }
+
+    // Add user to request
+    req.userId = user._id;
+    console.log('User authenticated:', req.userId);
     next();
-  } catch (err) {
-    console.error("❌ Token verification failed:", err.message);
-    return res.status(403).json({ error: "Invalid or expired token." });
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    res.status(401).json({ error: 'Please login' });
   }
 };
+
+module.exports = auth;

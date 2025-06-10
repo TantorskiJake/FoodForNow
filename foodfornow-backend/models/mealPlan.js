@@ -1,39 +1,59 @@
 const mongoose = require("mongoose");
 
-const MealPlanSchema = new mongoose.Schema(
+const mealPlanSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Associated user
-    week: { 
-      type: String, 
-      required: true, 
-      match: [/^\d{4}-W\d{2}$/, "Invalid week format. Use YYYY-WW (e.g., 2025-W03)"] 
-    }, // Ensures consistency in week format
-    meals: [
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
+    weekStart: {
+      type: Date,
+      required: true
+    },
+    day: {
+      type: String,
+      required: true,
+      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    },
+    meal: {
+      type: String,
+      required: true,
+      enum: ["Breakfast", "Lunch", "Dinner", "Snack"]
+    },
+    recipe: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Recipe",
+      required: true
+    },
+    notes: {
+      type: String
+    },
+    groceryList: [
       {
-        day: {
+        name: {
           type: String,
-          required: true,
-          enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], // Validate day
+          required: true
         },
-        recipe: { 
-          type: mongoose.Schema.Types.ObjectId, 
-          ref: "Recipe", 
-          required: true,
-          validate: {
-            validator: async function (value) {
-              const recipeExists = await mongoose.model("Recipe").findById(value);
-              return !!recipeExists;
-            },
-            message: "Invalid recipe ID"
-          }
-        }, // Linked recipe
-      },
-    ],
+        amount: {
+          type: Number,
+          required: true
+        },
+        unit: {
+          type: String,
+          required: true
+        },
+        purchased: {
+          type: Boolean,
+          default: false
+        }
+      }
+    ]
   },
-  { timestamps: true } // Auto adds createdAt and updatedAt fields
+  { timestamps: true }
 );
 
-// Ensure no duplicate days in a single meal plan
-MealPlanSchema.index({ user: 1, week: 1, "meals.day": 1 }, { unique: true });
+// Ensure no duplicate meals in a single week
+mealPlanSchema.index({ user: 1, weekStart: 1, day: 1, meal: 1 }, { unique: true });
 
-module.exports = mongoose.model("MealPlan", MealPlanSchema);
+module.exports = mongoose.model("MealPlan", mealPlanSchema);

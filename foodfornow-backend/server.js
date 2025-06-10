@@ -1,58 +1,95 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 // Import routes
 const authRoutes = require("./routes/auth");
-const userRoutes = require("./routes/user");
+const mealPlanRoutes = require("./routes/mealplan");
+const recipesRoutes = require("./routes/recipes");
 const pantryRoutes = require("./routes/pantry");
-const recipeRoutes = require("./routes/recipe");
-const mealPlanRoutes = require("./routes/mealPlans");
-const ingredientRoutes = require("./routes/ingred"); // Add the ingredient routes
+const ingredientRoutes = require("./routes/ingredients");
+const shoppingListRoutes = require("./routes/shopping-list");
 
-// Middleware imports
-const errorHandler = require("./middleware/errorHandler"); // Centralized error handler
-
-// Initialize app
 const app = express();
 
-// Middleware
-app.use(cors()); // Enable Cross-Origin Resource Sharing
-app.use(bodyParser.json()); // Parse JSON bodies
+// Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+});
 
-// Debugging: Log route registration
-console.log("Registering routes...");
+// Security middleware
+app.use(helmet()); // Adds various HTTP headers for security
+app.use(cors({
+  origin: 'http://localhost:5173', // Frontend URL
+  credentials: true
+}));
+
+// Rate limiting
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 100, // limit each IP to 100 requests per windowMs
+//   message: 'Too many requests from this IP, please try again later'
+// });
+// app.use(limiter);
+
+// Body parsing
+app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use("/auth", authRoutes);
-app.use("/user", userRoutes);
+app.use("/mealplan", mealPlanRoutes);
+app.use("/recipes", recipesRoutes);
 app.use("/pantry", pantryRoutes);
-app.use("/recipes", recipeRoutes);
-app.use("/meal-plans", mealPlanRoutes);
-app.use("/ingred", ingredientRoutes); // Register the ingredient routes
+app.use("/ingredients", ingredientRoutes);
+app.use("/shopping-list", shoppingListRoutes);
 
 // Root route
 app.get("/", (req, res) => {
-  res.send("Welcome to the FoodForNow API!");
+  res.send("FoodForNow API is running");
 });
 
-// Error handling middleware (must be the last middleware)
-app.use(errorHandler);
+// Error handling
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: "Something went wrong!" });
+});
 
-// MongoDB connection
-mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-    process.exit(1); // Exit the process if the database connection fails
-  });
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Promise Rejection:', err);
+});
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+// Start server function
+const startServer = async () => {
+  try {
+    // Connect to MongoDB Atlas
+    const MONGODB_URI = "mongodb+srv://JakeTantorski:JakeTantorski@ffn-cluster.bsetl.mongodb.net/foodfornow";
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    console.log("MongoDB connected");
+
+    // Start Express server
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();

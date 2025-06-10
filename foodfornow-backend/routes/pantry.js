@@ -1,23 +1,82 @@
 const express = require("express");
 const Pantry = require("../models/pantry");
-const Ingredient = require("../models/ingred");
+const Ingredient = require("../models/ingredient");
 const authMiddleware = require("../middleware/auth");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
-// Get all pantry items for a user
-router.get("/", authMiddleware, async (req, res) => {
+// Get pantry
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const pantry = await Pantry.findOne({ user: req.user.id }).populate("items.ingredient");
+    let pantry = await Pantry.findOne({ user: req.userId });
+    if (!pantry) {
+      pantry = new Pantry({ user: req.userId, items: [] });
+      await pantry.save();
+    }
+    res.json(pantry.items || []);
+  } catch (error) {
+    console.error('Error getting pantry:', error);
+    res.status(500).json({ error: 'Failed to get pantry' });
+  }
+});
 
-    if (!pantry || pantry.items.length === 0) {
-      return res.json([]); // Return an empty array if pantry is empty
+// Update item
+router.patch('/items/:itemId', authMiddleware, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const pantry = await Pantry.findOne({ user: req.userId });
+    if (!pantry) return res.status(404).json({ error: 'Pantry not found' });
+    
+    const item = pantry.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    
+    item.amount = amount;
+    
+    if (item.amount <= 0) {
+      pantry.items = pantry.items.filter(i => i._id.toString() !== req.params.itemId);
+    }
+    
+    await pantry.save();
+    res.json(pantry);
+  } catch (error) {
+    res.status(400).json({ error: 'Failed to update item' });
+  }
+});
+
+// Get pantry items
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    console.log('Fetching pantry for user:', req.userId);
+    const pantry = await Pantry.findOne({ user: req.userId })
+      .populate('items.ingredient', 'name category');
+    
+    console.log('Found pantry:', pantry);
+    
+    if (!pantry) {
+      console.log('No pantry found, returning empty items array');
+      return res.json({ items: [] });
     }
 
-    res.json(pantry.items);
+    // Ensure each item has the required fields and ingredient data
+    const items = pantry.items.map(item => ({
+      _id: item._id,
+      ingredient: item.ingredient ? {
+        _id: item.ingredient._id,
+        name: item.ingredient.name,
+        category: item.ingredient.category
+      } : null,
+      quantity: item.quantity,
+      unit: item.unit,
+      expiryDate: item.expiryDate,
+      notes: item.notes
+    }));
+
+    console.log('Returning items:', items);
+    res.json({ items });
   } catch (err) {
-    console.error("Error fetching pantry items:", err.message);
-    res.status(500).json({ error: "Failed to fetch pantry items" });
+    console.error('Error fetching pantry:', err);
+    res.status(500).json({ error: 'Failed to fetch pantry items' });
   }
 });
 
@@ -28,77 +87,101 @@ router.post("/", authMiddleware, async (req, res) => {
 
     console.log("Pantry Item Add Request:", { ingredient, quantity, unit });
 
-    // Validate ingredient is a valid ObjectId
+    // Validate required fields
     if (!ingredient || !quantity || !unit) {
       return res.status(400).json({ error: "Ingredient, quantity, and unit are required" });
     }
 
+    // Validate unit
+    const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+    if (!validUnits.includes(unit)) {
+      return res.status(400).json({ error: `Invalid unit. Must be one of: ${validUnits.join(', ')}` });
+    }
+
+    // Validate ingredient exists
     const validIngredient = await Ingredient.findById(ingredient);
     if (!validIngredient) {
       console.error("Invalid ingredient ID:", ingredient);
       return res.status(400).json({ error: "Invalid ingredient ID" });
     }
 
-    let pantry = await Pantry.findOne({ user: req.user.id });
+    // Find or create pantry
+    let pantry = await Pantry.findOne({ user: req.userId });
 
     if (!pantry) {
-      pantry = new Pantry({
-        user: req.user.id,
-        items: [{ ingredient, quantity, unit }],
+      // Create new pantry with first item
+      const newPantry = new Pantry({
+        user: req.userId,
+        items: [{
+          ingredient: new mongoose.Types.ObjectId(ingredient),
+          quantity: Number(quantity),
+          unit: unit
+        }]
       });
-      await pantry.save();
-      console.log("New Pantry Created:", pantry);
-      return res.status(201).json(pantry);
+
+      console.log("Creating new pantry:", newPantry);
+      const savedPantry = await newPantry.save();
+      console.log("New pantry saved:", savedPantry);
+      return res.status(201).json(savedPantry);
     }
 
-    // Check if the ingredient already exists in the pantry with the same unit
-    const itemIndex = pantry.items.findIndex(
-      (item) => item.ingredient.toString() === ingredient && item.unit === unit
+    // Clean up any items with old schema structure
+    pantry.items = pantry.items.filter(item => item.ingredient);
+
+    // Ensure items array exists
+    if (!pantry.items) {
+      pantry.items = [];
+    }
+
+    // Check if ingredient already exists with same unit
+    const existingItemIndex = pantry.items.findIndex(item => 
+      item.ingredient && item.ingredient.toString() === ingredient && item.unit === unit
     );
 
-    if (itemIndex > -1) {
-      pantry.items[itemIndex].quantity += quantity; // Update existing item quantity
+    if (existingItemIndex > -1) {
+      // Update existing item
+      pantry.items[existingItemIndex].quantity += Number(quantity);
     } else {
-      pantry.items.push({ ingredient, quantity, unit }); // Add new item
+      // Add new item
+      pantry.items.push({
+        ingredient: new mongoose.Types.ObjectId(ingredient),
+        quantity: Number(quantity),
+        unit: unit
+      });
     }
 
+    console.log("Updating pantry:", pantry);
     const updatedPantry = await pantry.save();
-    console.log("Updated Pantry:", updatedPantry);
+    console.log("Updated pantry saved:", updatedPantry);
     res.status(201).json(updatedPantry);
   } catch (err) {
-    console.error("Error adding pantry item:", err.message);
+    console.error("Error adding pantry item:", err);
     res.status(500).json({ error: "Failed to add pantry item" });
   }
 });
 
-// Delete a single pantry item
-router.delete("/:id", authMiddleware, async (req, res) => {
+// Delete item
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const pantry = await Pantry.findOne({ user: req.user.id });
-
+    const pantry = await Pantry.findOne({ user: req.userId });
     if (!pantry) {
-      return res.status(404).json({ error: "Pantry not found" });
+      return res.status(404).json({ error: 'Pantry not found' });
     }
 
-    const itemIndex = pantry.items.findIndex((item) => item._id.toString() === req.params.id);
-    if (itemIndex === -1) {
-      return res.status(404).json({ error: "Item not found in pantry" });
-    }
-
-    pantry.items.splice(itemIndex, 1); // Remove the item
+    pantry.items = pantry.items.filter(item => item._id.toString() !== req.params.id);
     await pantry.save();
 
-    res.json({ message: "Item deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting pantry item:", err.message);
-    res.status(500).json({ error: "Failed to delete pantry item" });
+    res.json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    res.status(500).json({ error: 'Failed to delete item' });
   }
 });
 
 // Delete all pantry items for a user
 router.delete("/", authMiddleware, async (req, res) => {
   try {
-    const pantry = await Pantry.findOne({ user: req.user.id });
+    const pantry = await Pantry.findOne({ user: req.userId });
 
     if (!pantry) {
       return res.status(404).json({ error: "Pantry not found" });
