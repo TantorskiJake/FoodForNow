@@ -64,7 +64,7 @@ const Ingredients = () => {
   const fetchIngredients = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/ingredients', {
+      const response = await axios.get('http://localhost:3001/ingredients', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setIngredients(response.data);
@@ -113,13 +113,13 @@ const Ingredients = () => {
       const token = localStorage.getItem('token');
       if (editingIngredient) {
         await axios.put(
-          `http://localhost:3000/ingredients/${editingIngredient._id}`,
+          `http://localhost:3001/ingredients/${editingIngredient._id}`,
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         await axios.post(
-          'http://localhost:3000/ingredients',
+          'http://localhost:3001/ingredients',
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -135,7 +135,7 @@ const Ingredients = () => {
   const handleDeleteIngredient = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3000/ingredients/${id}`, {
+      await axios.delete(`http://localhost:3001/ingredients/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchIngredients();

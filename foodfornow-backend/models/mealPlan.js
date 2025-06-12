@@ -53,7 +53,12 @@ const mealPlanSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Ensure no duplicate meals in a single week
+// Drop any existing indexes
+mealPlanSchema.indexes().forEach(index => {
+  mealPlanSchema.index(index[0], { unique: false });
+});
+
+// Add the correct unique index
 mealPlanSchema.index({ user: 1, weekStart: 1, day: 1, meal: 1 }, { unique: true });
 
 module.exports = mongoose.model("MealPlan", mealPlanSchema);

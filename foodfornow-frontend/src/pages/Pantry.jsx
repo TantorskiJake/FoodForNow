@@ -62,7 +62,7 @@ const Pantry = () => {
     try {
       console.log('Fetching pantry items...');
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/pantry', {
+      const response = await axios.get('http://localhost:3001/api/pantry', {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Raw pantry response:', response.data);
@@ -101,7 +101,7 @@ const Pantry = () => {
   const fetchIngredients = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/ingredients', {
+      const response = await axios.get('http://localhost:5000/ingredients', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setIngredients(response.data);
@@ -160,13 +160,13 @@ const Pantry = () => {
 
       if (editingItem) {
         await axios.put(
-          `http://localhost:3000/pantry/${editingItem._id}`,
+          `http://localhost:3001/api/pantry/${editingItem._id}`,
           submitData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         const response = await axios.post(
-          'http://localhost:3000/pantry',
+          'http://localhost:3001/api/pantry',
           submitData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -189,7 +189,7 @@ const Pantry = () => {
   const handleDeleteItem = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3000/pantry/${id}`, {
+      await axios.delete(`http://localhost:3001/api/pantry/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchPantryItems();
@@ -203,7 +203,7 @@ const Pantry = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `http://localhost:3000/pantry/${id}/quantity`,
+        `http://localhost:3001/api/pantry/${id}/quantity`,
         { quantity: newQuantity },
         { headers: { Authorization: `Bearer ${token}` } }
       );

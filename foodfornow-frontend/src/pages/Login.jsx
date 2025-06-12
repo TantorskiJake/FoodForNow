@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
-  Paper,
+  Typography,
   TextField,
   Button,
-  Typography,
   Box,
   Alert,
-  CircularProgress,
+  Paper,
 } from '@mui/material';
 import axios from 'axios';
 
@@ -19,118 +18,97 @@ const Login = () => {
     password: '',
   });
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    // Clear error when user starts typing
-    if (error) setError('');
+  const { email, password } = formData;
+
+  const onChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    setError(''); // Clear any previous errors
-    setIsLoading(true);
-
-    // Validate form data
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      console.log('Attempting login with:', { ...formData, password: '***' });
-      const response = await axios.post('http://localhost:3000/auth/login', formData);
+      setError('');
+      console.log('Attempting login...');
+      const response = await axios.post('http://localhost:3001/api/auth/login', {
+        email,
+        password,
+      });
+
+      console.log('Login response:', response.data);
       
-      console.log('Login successful:', response.data);
-      if (!response.data.token) {
-        throw new Error('No token received from server');
+      if (response.data.token) {
+        console.log('Token received, storing in localStorage');
+        localStorage.setItem('token', response.data.token);
+        navigate('/dashboard');
+      } else {
+        console.error('No token in response');
+        setError('Login failed. Please try again.');
       }
-      
-      // Store token
-      localStorage.setItem('token', response.data.token);
-      console.log('Token stored:', response.data.token);
-      
-      // Set default axios headers
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-      
-      // Navigate to dashboard
-      navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
       if (err.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
         console.error('Error response:', err.response.data);
         setError(err.response.data.error || 'Login failed. Please try again.');
-      } else if (err.request) {
-        // The request was made but no response was received
-        console.error('No response received:', err.request);
-        setError('No response from server. Please check your connection.');
       } else {
-        // Something happened in setting up the request that triggered an Error
-        console.error('Error setting up request:', err.message);
-        setError('An error occurred. Please try again.');
+        setError('Login failed. Please try again.');
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center">
-            Login
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
+          <Typography component="h1" variant="h5" align="center" gutterBottom>
+            Sign In
           </Typography>
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
-          <form onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={onSubmit} sx={{ mt: 1 }}>
             <TextField
-              fullWidth
-              label="Email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
               margin="normal"
               required
-              error={error && !formData.email}
-              helperText={error && !formData.email ? 'Email is required' : ''}
-              disabled={isLoading}
+              fullWidth
+              id="email"
+              label="Email Address"
+              name="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={onChange}
             />
             <TextField
-              fullWidth
-              label="Password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
               margin="normal"
               required
-              error={error && !formData.password}
-              helperText={error && !formData.password ? 'Password is required' : ''}
-              disabled={isLoading}
+              fullWidth
+              name="password"
+              label="Password"
+              type="password"
+              id="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={onChange}
             />
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              color="primary"
-              sx={{ mt: 3 }}
-              disabled={isLoading}
+              sx={{ mt: 3, mb: 2 }}
             >
-              {isLoading ? <CircularProgress size={24} /> : 'Login'}
+              Sign In
             </Button>
-          </form>
+          </Box>
         </Paper>
       </Box>
     </Container>

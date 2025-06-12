@@ -61,7 +61,7 @@ const Recipes = () => {
   const fetchIngredients = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/ingredients', {
+      const response = await axios.get('http://localhost:3001/ingredients', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setIngredients(response.data);
@@ -84,7 +84,7 @@ const Recipes = () => {
         return;
       }
       console.log('Fetching recipes with token:', token);
-      const response = await axios.get('http://localhost:3000/recipes', {
+      const response = await axios.get('http://localhost:3001/recipes', {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -173,13 +173,13 @@ const Recipes = () => {
 
       if (editingRecipe) {
         await axios.put(
-          `http://localhost:3000/recipes/${editingRecipe._id}`,
+          `http://localhost:3001/recipes/${editingRecipe._id}`,
           recipeData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         await axios.post(
-          'http://localhost:3000/recipes',
+          'http://localhost:3001/recipes',
           recipeData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -195,7 +195,7 @@ const Recipes = () => {
   const handleDeleteRecipe = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3000/recipes/${id}`, {
+      await axios.delete(`http://localhost:3001/recipes/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchRecipes();

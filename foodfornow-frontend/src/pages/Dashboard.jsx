@@ -8,97 +8,78 @@ import {
   Typography,
   Button,
   Box,
-  TextField,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   Alert,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import axios from 'axios';
+import MealPlanGrid from '../components/MealPlanGrid';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [foodItems, setFoodItems] = useState([]);
-  const [newItem, setNewItem] = useState({
-    name: '',
-    quantity: '',
-    expiryDate: '',
-  });
-  const [error, setError] = useState('');
+  const [recipes, setRecipes] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
   const [popularRecipes, setPopularRecipes] = useState([]);
+  const [error, setError] = useState('');
   const [openMealDialog, setOpenMealDialog] = useState(false);
   const [mealFormData, setMealFormData] = useState({
+    weekStart: '',
     day: '',
     meal: '',
-    recipe: '',
+    recipeId: '',
   });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      console.log('No token found, redirecting to login');
       navigate('/login');
       return;
     }
-    fetchFoodItems();
+    fetchRecipes();
     fetchMealPlan();
     fetchPopularRecipes();
   }, [navigate]);
 
-  const fetchFoodItems = async () => {
+  const fetchRecipes = async () => {
     try {
       const token = localStorage.getItem('token');
-      console.log('Fetching food items with token:', token);
-      const response = await axios.get('http://localhost:3000/pantry', {
+      const response = await axios.get('http://localhost:3001/recipes', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Food items fetched:', response.data);
-      setFoodItems(response.data);
+      setRecipes(response.data);
     } catch (err) {
-      console.error('Error fetching food items:', err);
-      if (err.response?.status === 401) {
-        console.log('Unauthorized, redirecting to login');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        setError('Failed to fetch food items. Please try again.');
-      }
+      console.error('Error fetching recipes:', err);
+      setError('Failed to fetch recipes. Please try again.');
     }
   };
 
   const fetchMealPlan = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/mealplan', {
+      const response = await axios.get('http://localhost:3001/mealplan', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMealPlan(response.data);
     } catch (err) {
       console.error('Error fetching meal plan:', err);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        setError('Failed to fetch meal plan. Please try again.');
-      }
+      setError('Failed to fetch meal plan. Please try again.');
     }
   };
 
   const fetchPopularRecipes = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/recipes/popular', {
+      const response = await axios.get('http://localhost:3001/recipes/popular', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setPopularRecipes(response.data);
@@ -108,61 +89,38 @@ const Dashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    console.log('Logging out');
-    localStorage.removeItem('token');
-    navigate('/login');
-  };
+  const handleOpenMealDialog = (day, mealType, existingMeal = null) => {
+    // Set default week start to the current week's Monday
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1);
+    monday.setHours(0, 0, 0, 0);
 
-  const handleAddItem = async (e) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('token');
-      console.log('Adding new food item:', newItem);
-      await axios.post(
-        'http://localhost:3000/pantry',
-        newItem,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setNewItem({ name: '', quantity: '', expiryDate: '' });
-      fetchFoodItems();
-    } catch (err) {
-      console.error('Error adding food item:', err);
-      setError('Failed to add food item. Please try again.');
-    }
-  };
-
-  const handleDeleteItem = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      console.log('Deleting food item:', id);
-      await axios.delete(`http://localhost:3000/pantry/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchFoodItems();
-    } catch (err) {
-      console.error('Error deleting food item:', err);
-      setError('Failed to delete food item. Please try again.');
-    }
-  };
-
-  const handleOpenMealDialog = () => {
+    setMealFormData({
+      weekStart: existingMeal?.weekStart || monday.toISOString().split('T')[0],
+      day: day || existingMeal?.day || '',
+      meal: mealType || existingMeal?.meal || '',
+      recipeId: existingMeal?.recipe?._id || '',
+    });
     setOpenMealDialog(true);
   };
 
   const handleCloseMealDialog = () => {
     setOpenMealDialog(false);
-    setMealFormData({ day: '', meal: '', recipe: '' });
+    setMealFormData({
+      weekStart: '',
+      day: '',
+      meal: '',
+      recipeId: '',
+    });
   };
 
   const handleAddMeal = async (e) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.post(
-        'http://localhost:3000/mealplan',
+      const response = await axios.post(
+        'http://localhost:3001/mealplan',
         mealFormData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -170,20 +128,36 @@ const Dashboard = () => {
       fetchMealPlan();
     } catch (err) {
       console.error('Error adding meal:', err);
-      setError('Failed to add meal. Please try again.');
+      if (err.response?.data?.error === 'A meal already exists for this day and time') {
+        setError('You already have a meal planned for this day and time. Please choose a different day or meal type.');
+      } else if (err.response?.data?.error === 'Week start, day, meal, and recipe are required') {
+        setError('Please fill in all required fields.');
+      } else if (err.response?.data?.error === 'Recipe not found') {
+        setError('The selected recipe could not be found. Please try again.');
+      } else {
+        setError('Failed to add meal. Please try again.');
+      }
     }
+  };
+
+  const handleEditMeal = (day, mealType, existingMeal) => {
+    handleOpenMealDialog(day, mealType, existingMeal);
   };
 
   const handleDeleteMeal = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3000/mealplan/${id}`, {
+      await axios.delete(`http://localhost:3001/mealplan/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchMealPlan();
     } catch (err) {
       console.error('Error deleting meal:', err);
-      setError('Failed to delete meal. Please try again.');
+      if (err.response?.data?.error === 'Meal plan item not found') {
+        setError('The meal could not be found. It may have already been deleted.');
+      } else {
+        setError('Failed to delete meal. Please try again.');
+      }
     }
   };
 
@@ -194,11 +168,8 @@ const Dashboard = () => {
           <Grid item xs={12}>
             <Box display="flex" justifyContent="space-between" alignItems="center">
               <Typography variant="h4" component="h1">
-                Food Inventory
+                Dashboard
               </Typography>
-              <Button variant="outlined" color="secondary" onClick={handleLogout}>
-                Logout
-              </Button>
             </Box>
           </Grid>
 
@@ -210,127 +181,34 @@ const Dashboard = () => {
             </Grid>
           )}
 
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Add New Item
-                </Typography>
-                <form onSubmit={handleAddItem}>
-                  <TextField
-                    fullWidth
-                    label="Food Name"
-                    value={newItem.name}
-                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                    margin="normal"
-                    required
-                  />
-                  <TextField
-                    fullWidth
-                    label="Quantity"
-                    value={newItem.quantity}
-                    onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-                    margin="normal"
-                    required
-                  />
-                  <TextField
-                    fullWidth
-                    label="Expiry Date"
-                    type="date"
-                    value={newItem.expiryDate}
-                    onChange={(e) => setNewItem({ ...newItem, expiryDate: e.target.value })}
-                    margin="normal"
-                    required
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    sx={{ mt: 2 }}
-                  >
-                    Add Item
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={8}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Current Inventory
-                </Typography>
-                <List>
-                  {foodItems.map((item) => (
-                    <ListItem key={item._id}>
-                      <ListItemText
-                        primary={item.name}
-                        secondary={`Quantity: ${item.quantity} | Expires: ${new Date(
-                          item.expiryDate
-                        ).toLocaleDateString()}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <IconButton
-                          edge="end"
-                          aria-label="delete"
-                          onClick={() => handleDeleteItem(item._id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Meal Planning Section */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
             <Card>
               <CardContent>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6">Meal Plan</Typography>
+                  <Typography variant="h5">Meal Plan</Typography>
                   <Button
                     variant="contained"
                     color="primary"
                     startIcon={<AddIcon />}
-                    onClick={handleOpenMealDialog}
+                    onClick={() => handleOpenMealDialog('', '')}
                   >
                     Add Meal
                   </Button>
                 </Box>
-                <List>
-                  {mealPlan.map((meal) => (
-                    <ListItem key={meal._id}>
-                      <ListItemText
-                        primary={meal.recipe}
-                        secondary={`${meal.day} - ${meal.meal}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <IconButton
-                          edge="end"
-                          aria-label="delete"
-                          onClick={() => handleDeleteMeal(meal._id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                </List>
+                <MealPlanGrid
+                  mealPlan={mealPlan}
+                  onAddMeal={handleOpenMealDialog}
+                  onDeleteMeal={handleDeleteMeal}
+                  onEditMeal={handleEditMeal}
+                />
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Popular Recipes Section */}
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h5" gutterBottom>
                   Popular Recipes
                 </Typography>
                 <List>
@@ -338,26 +216,8 @@ const Dashboard = () => {
                     <ListItem key={recipe._id}>
                       <ListItemText
                         primary={recipe.name}
-                        secondary={
-                          <Box sx={{ mt: 1 }}>
-                            {recipe.tags.map((tag) => (
-                              <Chip
-                                key={tag}
-                                label={tag}
-                                size="small"
-                                sx={{ mr: 0.5, mb: 0.5 }}
-                              />
-                            ))}
-                          </Box>
-                        }
+                        secondary={`${recipe.ingredients.length} ingredients`}
                       />
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => navigate(`/recipes/${recipe._id}`)}
-                      >
-                        View Recipe
-                      </Button>
                     </ListItem>
                   ))}
                 </List>
@@ -367,63 +227,74 @@ const Dashboard = () => {
         </Grid>
       </Box>
 
-      {/* Add Meal Dialog */}
       <Dialog open={openMealDialog} onClose={handleCloseMealDialog}>
-        <DialogTitle>Add Meal to Plan</DialogTitle>
+        <DialogTitle>
+          {mealFormData.day && mealFormData.meal 
+            ? `Add ${mealFormData.meal} for ${mealFormData.day}`
+            : 'Add Meal to Plan'}
+        </DialogTitle>
         <DialogContent>
           <Box component="form" onSubmit={handleAddMeal} sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              select
-              label="Day"
-              value={mealFormData.day}
-              onChange={(e) => setMealFormData({ ...mealFormData, day: e.target.value })}
-              margin="normal"
-              required
-              SelectProps={{
-                native: true,
-              }}
-            >
-              <option value="">Select a day</option>
-              <option value="Monday">Monday</option>
-              <option value="Tuesday">Tuesday</option>
-              <option value="Wednesday">Wednesday</option>
-              <option value="Thursday">Thursday</option>
-              <option value="Friday">Friday</option>
-              <option value="Saturday">Saturday</option>
-              <option value="Sunday">Sunday</option>
-            </TextField>
-            <TextField
-              fullWidth
-              select
-              label="Meal"
-              value={mealFormData.meal}
-              onChange={(e) => setMealFormData({ ...mealFormData, meal: e.target.value })}
-              margin="normal"
-              required
-              SelectProps={{
-                native: true,
-              }}
-            >
-              <option value="">Select a meal</option>
-              <option value="Breakfast">Breakfast</option>
-              <option value="Lunch">Lunch</option>
-              <option value="Dinner">Dinner</option>
-              <option value="Snack">Snack</option>
-            </TextField>
-            <TextField
-              fullWidth
-              label="Recipe"
-              value={mealFormData.recipe}
-              onChange={(e) => setMealFormData({ ...mealFormData, recipe: e.target.value })}
-              margin="normal"
-              required
-            />
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Day</InputLabel>
+                  <Select
+                    value={mealFormData.day}
+                    onChange={(e) => setMealFormData({ ...mealFormData, day: e.target.value })}
+                    required
+                  >
+                    <MenuItem value="Monday">Monday</MenuItem>
+                    <MenuItem value="Tuesday">Tuesday</MenuItem>
+                    <MenuItem value="Wednesday">Wednesday</MenuItem>
+                    <MenuItem value="Thursday">Thursday</MenuItem>
+                    <MenuItem value="Friday">Friday</MenuItem>
+                    <MenuItem value="Saturday">Saturday</MenuItem>
+                    <MenuItem value="Sunday">Sunday</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Meal Type</InputLabel>
+                  <Select
+                    value={mealFormData.meal}
+                    onChange={(e) => setMealFormData({ ...mealFormData, meal: e.target.value })}
+                    required
+                  >
+                    <MenuItem value="Breakfast">Breakfast</MenuItem>
+                    <MenuItem value="Lunch">Lunch</MenuItem>
+                    <MenuItem value="Dinner">Dinner</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Recipe</InputLabel>
+                  <Select
+                    value={mealFormData.recipeId}
+                    onChange={(e) => setMealFormData({ ...mealFormData, recipeId: e.target.value })}
+                    required
+                  >
+                    {recipes.map((recipe) => (
+                      <MenuItem key={recipe._id} value={recipe._id}>
+                        {recipe.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseMealDialog}>Cancel</Button>
-          <Button onClick={handleAddMeal} variant="contained" color="primary">
+          <Button 
+            onClick={handleAddMeal} 
+            variant="contained" 
+            color="primary"
+            disabled={!mealFormData.day || !mealFormData.meal || !mealFormData.recipeId}
+          >
             Add Meal
           </Button>
         </DialogActions>

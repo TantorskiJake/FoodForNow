@@ -1,70 +1,30 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import axios from 'axios';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import RecipeDetail from './pages/RecipeDetail';
 import Pantry from './pages/Pantry';
 import Recipes from './pages/Recipes';
 import Ingredients from './pages/Ingredients';
 import ShoppingList from './pages/ShoppingList';
+import PrivateRoute from './components/PrivateRoute';
 import Navbar from './components/Navbar';
 
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#2E7D32', // Green shade
+      main: '#2e7d32',
     },
     secondary: {
-      main: '#FFA000', // Amber shade
+      main: '#ff9800',
     },
   },
 });
 
-// Initialize axios defaults
-const initializeAxios = () => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    console.log('Initializing axios with token');
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }
-};
-
-// Add axios interceptor to include token in all requests
-axios.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Add axios interceptor to handle 401 responses
-axios.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      console.log('Received 401, clearing token and redirecting to login');
-      localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-const App = () => {
-  useEffect(() => {
-    initializeAxios();
-  }, []);
-
+function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -73,16 +33,59 @@ const App = () => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/pantry" element={<Pantry />} />
-          <Route path="/ingredients" element={<Ingredients />} />
-          <Route path="/recipes" element={<Recipes />} />
-          <Route path="/shopping-list" element={<ShoppingList />} />
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/recipes/:id"
+            element={
+              <PrivateRoute>
+                <RecipeDetail />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/pantry"
+            element={
+              <PrivateRoute>
+                <Pantry />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/ingredients"
+            element={
+              <PrivateRoute>
+                <Ingredients />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/recipes"
+            element={
+              <PrivateRoute>
+                <Recipes />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/shopping-list"
+            element={
+              <PrivateRoute>
+                <ShoppingList />
+              </PrivateRoute>
+            }
+          />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
     </ThemeProvider>
   );
-};
+}
 
 export default App;

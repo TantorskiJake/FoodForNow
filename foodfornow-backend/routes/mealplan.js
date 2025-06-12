@@ -35,6 +35,18 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Recipe not found' });
     }
 
+    // Check if a meal already exists for this day and time
+    const existingMeal = await MealPlan.findOne({
+      user: req.userId,
+      weekStart: new Date(weekStart),
+      day,
+      meal
+    });
+
+    if (existingMeal) {
+      return res.status(400).json({ error: 'A meal already exists for this day and time' });
+    }
+
     const mealPlanItem = new MealPlan({
       user: req.userId,
       weekStart: new Date(weekStart),

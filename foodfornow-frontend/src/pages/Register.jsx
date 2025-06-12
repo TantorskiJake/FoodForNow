@@ -53,7 +53,7 @@ const Register = () => {
 
     try {
       console.log('Attempting registration with:', { ...formData, password: '***' });
-      const response = await axios.post('http://localhost:3000/auth/register', {
+      const response = await axios.post('http://localhost:3001/auth/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password,

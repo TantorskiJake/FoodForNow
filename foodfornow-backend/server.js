@@ -24,7 +24,7 @@ app.use((req, res, next) => {
 // Security middleware
 app.use(helmet()); // Adds various HTTP headers for security
 app.use(cors({
-  origin: 'http://localhost:5173', // Frontend URL
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173', // Frontend URL
   credentials: true
 }));
 
@@ -73,7 +73,7 @@ process.on('uncaughtException', (err) => {
 const startServer = async () => {
   try {
     // Connect to MongoDB Atlas
-    const MONGODB_URI = "mongodb+srv://JakeTantorski:JakeTantorski@ffn-cluster.bsetl.mongodb.net/foodfornow";
+    const MONGODB_URI = process.env.MONGO_URI || "mongodb+srv://JakeTantorski:JakeTantorski@ffn-cluster.bsetl.mongodb.net/foodfornow";
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
