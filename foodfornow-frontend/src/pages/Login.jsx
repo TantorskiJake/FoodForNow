@@ -37,14 +37,8 @@ const Login = () => {
 
       console.log('Login response:', response.data);
       
-      if (response.data.token) {
-        console.log('Token received, storing in localStorage');
-        localStorage.setItem('token', response.data.token);
-        navigate('/dashboard');
-      } else {
-        console.error('No token in response');
-        setError('Login failed. Please try again.');
-      }
+      // No token in response; rely on cookie
+      navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
       if (err.response) {
@@ -124,4 +118,4 @@ const Login = () => {
   );
 };
 
-export default Login; 
+export default Login;

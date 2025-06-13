@@ -53,12 +53,15 @@ const Ingredients = () => {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-    fetchIngredients();
+    const checkAuthAndFetch = async () => {
+      try {
+        await api.get('/auth/me');
+        fetchIngredients();
+      } catch {
+        navigate('/login');
+      }
+    };
+    checkAuthAndFetch();
   }, [navigate]);
 
   const fetchIngredients = async () => {

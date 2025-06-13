@@ -5,10 +5,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
 const auth = async (req, res, next) => {
   try {
-    // Get token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    // Get token from HTTP-only cookie
+    const token = req.cookies?.accessToken;
     if (!token) {
-      console.log('No token provided');
+      console.log('No accessToken cookie provided');
       return res.status(401).json({ error: 'Please login' });
     }
 

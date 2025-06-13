@@ -52,15 +52,13 @@ const Register = () => {
     }
 
     try {
-      console.log('Attempting registration with:', { ...formData, password: '***' });
       const response = await api.post('/auth/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password,
       });
       
-      console.log('Registration successful:', response.data);
-      localStorage.setItem('token', response.data.token);
+      // No token in response; rely on cookie
       navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
@@ -168,4 +166,4 @@ const Register = () => {
   );
 };
 
-export default Register; 
+export default Register;

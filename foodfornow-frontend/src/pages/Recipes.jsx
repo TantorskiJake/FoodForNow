@@ -49,13 +49,16 @@ const Recipes = () => {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-    fetchRecipes();
-    fetchIngredients();
+    const checkAuthAndFetch = async () => {
+      try {
+        await api.get('/auth/me');
+        fetchRecipes();
+        fetchIngredients();
+      } catch {
+        navigate('/login');
+      }
+    };
+    checkAuthAndFetch();
   }, [navigate]);
 
   const fetchIngredients = async () => {

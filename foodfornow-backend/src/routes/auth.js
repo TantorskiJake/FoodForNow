@@ -41,6 +41,12 @@ const generateTokens = async (userId) => {
   return { accessToken, refreshToken };
 };
 
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+};
+
 // Register
 router.post('/register', async (req, res) => {
   try {
@@ -86,23 +92,21 @@ router.post('/register', async (req, res) => {
     await user.save();
     console.log('User created successfully:', { id: user._id, email: user.email });
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user._id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Generate tokens
+    const { accessToken, refreshToken } = await generateTokens(user._id);
 
+    // Set cookies
+    res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
+    res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
     res.status(201).json({
       user: {
         id: user._id,
         name: user.name,
         email: user.email
-      },
-      token
+      }
     });
-  } catch (error) {
-    console.error('Registration error:', error);
+  } catch (err) {
+    console.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed. Please try again.' });
   }
 });
@@ -133,24 +137,21 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user._id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Generate tokens
+    const { accessToken, refreshToken } = await generateTokens(user._id);
 
-    console.log('Login successful for user:', { id: user._id, email: user.email });
+    // Set cookies
+    res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.json({
       user: {
         id: user._id,
         name: user.name,
         email: user.email
-      },
-      token
+      }
     });
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed. Please try again.' });
   }
 });
@@ -176,12 +177,11 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // Refresh access token
-router.post("/token", validateRequest(["refreshToken"]), async (req, res) => {
+router.post("/token", async (req, res) => {
   try {
-    const { refreshToken } = req.body;
-
+    const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
-      return res.status(400).json({ error: "Refresh token is required" });
+      return res.status(401).json({ error: 'No refresh token' });
     }
 
     // Check if refresh token exists in database and is not revoked
@@ -205,34 +205,20 @@ router.post("/token", validateRequest(["refreshToken"]), async (req, res) => {
     tokenDoc.isRevoked = true;
     await tokenDoc.save();
 
-    res.json({ accessToken, refreshToken: newRefreshToken });
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({ error: 'Failed to refresh token' });
+    // Set cookies
+    res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 });
+    res.cookie('refreshToken', newRefreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.json({ success: true });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid refresh token' });
   }
 });
 
 // Logout a user (invalidate refresh token)
-router.post("/logout", validateRequest(["refreshToken"]), async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-      return res.status(400).json({ error: "Refresh token is required" });
-    }
-
-    // Find and revoke the refresh token
-    const tokenDoc = await RefreshToken.findOne({ token: refreshToken });
-    if (tokenDoc) {
-      tokenDoc.isRevoked = true;
-      await tokenDoc.save();
-    }
-
-    res.json({ message: "User logged out successfully" });
-  } catch (err) {
-    console.error("Error during logout:", err);
-    res.status(500).json({ error: "Logout failed. Please try again later." });
-  }
+router.post("/logout", (req, res) => {
+  res.clearCookie('accessToken', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
+  res.json({ success: true });
 });
 
 module.exports = router;

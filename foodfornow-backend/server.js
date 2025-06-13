@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const cookieParser = require('cookie-parser');
 
 // Import routes
 const authRoutes = require("./src/routes/auth");
@@ -38,6 +39,7 @@ app.use(cors({
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 
 // Routes - all routes now have /api prefix
 app.use("/api/auth", authRoutes);

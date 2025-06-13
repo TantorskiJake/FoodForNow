@@ -27,8 +27,16 @@ const ShoppingList = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchShoppingList();
-  }, []);
+    const checkAuthAndFetch = async () => {
+      try {
+        await api.get('/auth/me');
+        fetchShoppingList();
+      } catch {
+        navigate('/login');
+      }
+    };
+    checkAuthAndFetch();
+  }, [navigate]);
 
   const fetchShoppingList = async () => {
     try {
@@ -166,4 +174,4 @@ const ShoppingList = () => {
   );
 };
 
-export default ShoppingList; 
+export default ShoppingList;

@@ -49,13 +49,16 @@ const Pantry = () => {
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-    fetchPantryItems();
-    fetchIngredients();
+    const checkAuthAndFetch = async () => {
+      try {
+        await api.get('/auth/me');
+        fetchPantryItems();
+        fetchIngredients();
+      } catch {
+        navigate('/login');
+      }
+    };
+    checkAuthAndFetch();
   }, [navigate]);
 
   const fetchPantryItems = async () => {

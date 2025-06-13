@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -17,6 +17,7 @@ import KitchenIcon from '@mui/icons-material/Kitchen';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
+import api from '../services/api';
 
 const pages = [
   { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
@@ -30,7 +31,22 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const token = localStorage.getItem('token');
+  const [authenticated, setAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        await api.get('/auth/me');
+        setAuthenticated(true);
+      } catch {
+        setAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -40,12 +56,13 @@ const Navbar = () => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    await api.post('/auth/logout');
+    setAuthenticated(false);
     navigate('/login');
   };
 
-  if (!token) {
+  if (loading || !authenticated) {
     return null;
   }
 
@@ -117,4 +134,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

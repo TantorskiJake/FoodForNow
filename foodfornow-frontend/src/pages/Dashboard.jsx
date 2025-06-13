@@ -40,14 +40,17 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-    fetchRecipes();
-    fetchMealPlan();
-    fetchPopularRecipes();
+    const checkAuthAndFetch = async () => {
+      try {
+        await api.get('/auth/me');
+        fetchRecipes();
+        fetchMealPlan();
+        fetchPopularRecipes();
+      } catch {
+        navigate('/login');
+      }
+    };
+    checkAuthAndFetch();
   }, [navigate]);
 
   const fetchRecipes = async () => {
