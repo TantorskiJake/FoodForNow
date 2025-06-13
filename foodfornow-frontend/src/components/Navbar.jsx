@@ -46,7 +46,7 @@ const Navbar = () => {
       }
     };
     checkAuth();
-  }, []);
+  }, [location.pathname]);
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
