@@ -28,7 +28,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
-import axios from 'axios';
+import api from '../services/api';
 
 const Recipes = () => {
   const navigate = useNavigate();
@@ -60,10 +60,7 @@ const Recipes = () => {
 
   const fetchIngredients = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/ingredients', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get('/ingredients');
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
@@ -78,19 +75,7 @@ const Recipes = () => {
 
   const fetchRecipes = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-      console.log('Fetching recipes with token:', token);
-      const response = await axios.get('http://localhost:3001/recipes', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      console.log('Recipes response:', response.data);
+      const response = await api.get('/recipes');
       setRecipes(response.data);
     } catch (err) {
       console.error('Error fetching recipes:', err.response?.data || err.message);
@@ -163,26 +148,16 @@ const Recipes = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
       const recipeData = {
         ...formData,
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
         ingredients: formData.ingredients.filter(ing => ing.ingredient && ing.quantity && ing.unit),
         instructions: formData.instructions.filter(instruction => instruction.trim())
       };
-
       if (editingRecipe) {
-        await axios.put(
-          `http://localhost:3001/recipes/${editingRecipe._id}`,
-          recipeData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.put(`/recipes/${editingRecipe._id}`, recipeData);
       } else {
-        await axios.post(
-          'http://localhost:3001/recipes',
-          recipeData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.post('/recipes', recipeData);
       }
       handleCloseDialog();
       fetchRecipes();
@@ -194,10 +169,7 @@ const Recipes = () => {
 
   const handleDeleteRecipe = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/recipes/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/recipes/${id}`);
       fetchRecipes();
     } catch (err) {
       console.error('Error deleting recipe:', err);
@@ -473,4 +445,4 @@ const Recipes = () => {
   );
 };
 
-export default Recipes; 
+export default Recipes;

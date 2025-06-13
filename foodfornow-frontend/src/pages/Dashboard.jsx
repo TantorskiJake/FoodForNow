@@ -22,7 +22,7 @@ import {
   ListItemText,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import axios from 'axios';
+import api from '../services/api';
 import MealPlanGrid from '../components/MealPlanGrid';
 
 const Dashboard = () => {
@@ -52,10 +52,7 @@ const Dashboard = () => {
 
   const fetchRecipes = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/recipes', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get('/recipes');
       setRecipes(response.data);
     } catch (err) {
       console.error('Error fetching recipes:', err);
@@ -65,10 +62,7 @@ const Dashboard = () => {
 
   const fetchMealPlan = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/mealplan', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get('/mealplan');
       setMealPlan(response.data);
     } catch (err) {
       console.error('Error fetching meal plan:', err);
@@ -78,10 +72,7 @@ const Dashboard = () => {
 
   const fetchPopularRecipes = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/recipes/popular', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get('/recipes/popular');
       setPopularRecipes(response.data);
     } catch (err) {
       console.error('Error fetching popular recipes:', err);
@@ -118,12 +109,7 @@ const Dashboard = () => {
   const handleAddMeal = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(
-        'http://localhost:3001/mealplan',
-        mealFormData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.post('/mealplan', mealFormData);
       handleCloseMealDialog();
       fetchMealPlan();
     } catch (err) {
@@ -146,10 +132,7 @@ const Dashboard = () => {
 
   const handleDeleteMeal = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/mealplan/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/mealplan/${id}`);
       fetchMealPlan();
     } catch (err) {
       console.error('Error deleting meal:', err);
@@ -303,4 +286,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

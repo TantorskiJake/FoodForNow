@@ -101,7 +101,7 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
                         {meal ? (
                           <>
                             <Typography variant="body2" noWrap>
-                              {meal.recipe.name}
+                              {meal.recipe && meal.recipe.name ? meal.recipe.name : 'No Recipe'}
                             </Typography>
                             <IconButton
                               size="small"
@@ -151,4 +151,4 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
   );
 };
 
-export default MealPlanGrid; 
+export default MealPlanGrid;

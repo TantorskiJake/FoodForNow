@@ -28,7 +28,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
-import axios from 'axios';
+import api from '../services/api';
 
 const UNITS = [
   'g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'
@@ -63,10 +63,7 @@ const Ingredients = () => {
 
   const fetchIngredients = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/ingredients', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get('/ingredients');
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
@@ -110,19 +107,10 @@ const Ingredients = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
       if (editingIngredient) {
-        await axios.put(
-          `http://localhost:3001/ingredients/${editingIngredient._id}`,
-          formData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.put(`/ingredients/${editingIngredient._id}`, formData);
       } else {
-        await axios.post(
-          'http://localhost:3001/ingredients',
-          formData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.post('/ingredients', formData);
       }
       handleCloseDialog();
       fetchIngredients();
@@ -134,10 +122,7 @@ const Ingredients = () => {
 
   const handleDeleteIngredient = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/ingredients/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/ingredients/${id}`);
       fetchIngredients();
     } catch (err) {
       console.error('Error deleting ingredient:', err);
@@ -299,4 +284,4 @@ const Ingredients = () => {
   );
 };
 
-export default Ingredients; 
+export default Ingredients;

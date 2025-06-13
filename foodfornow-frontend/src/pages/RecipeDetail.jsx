@@ -18,7 +18,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TimerIcon from '@mui/icons-material/Timer';
-import axios from 'axios';
+import api from '../services/api';
 
 const RecipeDetail = () => {
   const { id } = useParams();
@@ -29,10 +29,7 @@ const RecipeDetail = () => {
   useEffect(() => {
     const fetchRecipe = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`http://localhost:3001/recipes/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await api.get(`/recipes/${id}`);
         setRecipe(response.data);
       } catch (err) {
         console.error('Error fetching recipe:', err);
@@ -149,4 +146,4 @@ const RecipeDetail = () => {
   );
 };
 
-export default RecipeDetail; 
+export default RecipeDetail;

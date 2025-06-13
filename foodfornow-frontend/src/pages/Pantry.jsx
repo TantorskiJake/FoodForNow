@@ -30,7 +30,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import axios from 'axios';
+import api from '../services/api';
 
 const Pantry = () => {
   const navigate = useNavigate();
@@ -60,11 +60,7 @@ const Pantry = () => {
 
   const fetchPantryItems = async () => {
     try {
-      console.log('Fetching pantry items...');
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/api/pantry', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/pantry');
       console.log('Raw pantry response:', response.data);
       
       // Check if response.data exists and has items
@@ -100,10 +96,7 @@ const Pantry = () => {
 
   const fetchIngredients = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/ingredients', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get('/ingredients');
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
@@ -134,8 +127,6 @@ const Pantry = () => {
     console.log('Form submitted with data:', formData);
     
     try {
-      const token = localStorage.getItem('token');
-      
       // Validate required fields
       if (!formData.ingredient || !formData.quantity || !formData.unit) {
         setError('Please fill in all required fields');
@@ -159,18 +150,9 @@ const Pantry = () => {
       console.log('Submitting pantry item:', submitData);
 
       if (editingItem) {
-        await axios.put(
-          `http://localhost:3001/api/pantry/${editingItem._id}`,
-          submitData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.put(`/pantry/${editingItem._id}`, submitData);
       } else {
-        const response = await axios.post(
-          'http://localhost:3001/api/pantry',
-          submitData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        console.log('Server response:', response.data);
+        await api.post('/pantry', submitData);
       }
       
       // Close dialog and reset form
@@ -188,10 +170,7 @@ const Pantry = () => {
 
   const handleDeleteItem = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/api/pantry/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/pantry/${id}`);
       fetchPantryItems();
     } catch (err) {
       console.error('Error deleting pantry item:', err);
@@ -201,12 +180,7 @@ const Pantry = () => {
 
   const handleUpdateQuantity = async (id, newQuantity) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(
-        `http://localhost:3001/api/pantry/${id}/quantity`,
-        { quantity: newQuantity },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.put(`/pantry/${id}/quantity`, { quantity: newQuantity });
       fetchPantryItems();
     } catch (err) {
       console.error('Error updating quantity:', err);
@@ -395,4 +369,4 @@ const Pantry = () => {
   );
 };
 
-export default Pantry; 
+export default Pantry;
