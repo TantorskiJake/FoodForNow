@@ -112,4 +112,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Material-UI for the component library
 - MongoDB for the database
 - Express for the backend framework
-- React for the frontend framework
+- React for the frontend framework 
