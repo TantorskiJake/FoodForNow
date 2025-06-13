@@ -9,7 +9,7 @@ import {
   Box,
   Alert,
 } from '@mui/material';
-import axios from 'axios';
+import api from '../services/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -53,7 +53,7 @@ const Register = () => {
 
     try {
       console.log('Attempting registration with:', { ...formData, password: '***' });
-      const response = await axios.post('http://localhost:3001/auth/register', {
+      const response = await api.post('/auth/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -65,16 +65,12 @@ const Register = () => {
     } catch (err) {
       console.error('Registration error:', err);
       if (err.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
         console.error('Error response:', err.response.data);
         setError(err.response.data.error || 'Registration failed. Please try again.');
       } else if (err.request) {
-        // The request was made but no response was received
         console.error('No response received:', err.request);
         setError('No response from server. Please check your connection.');
       } else {
-        // Something happened in setting up the request that triggered an Error
         console.error('Error setting up request:', err.message);
         setError('An error occurred. Please try again.');
       }
@@ -82,75 +78,90 @@ const Register = () => {
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center">
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Paper
+          elevation={3}
+          sx={{
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%',
+          }}
+        >
+          <Typography component="h1" variant="h5">
             Register
           </Typography>
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
               {error}
             </Alert>
           )}
-          <form onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
             <TextField
+              margin="normal"
+              required
               fullWidth
-              label="Name"
+              id="name"
+              label="Full Name"
               name="name"
+              autoComplete="name"
+              autoFocus
               value={formData.name}
               onChange={handleChange}
-              margin="normal"
-              required
-              error={error && !formData.name}
-              helperText={error && !formData.name ? 'Name is required' : ''}
             />
             <TextField
+              margin="normal"
+              required
               fullWidth
-              label="Email"
+              id="email"
+              label="Email Address"
               name="email"
-              type="email"
+              autoComplete="email"
               value={formData.email}
               onChange={handleChange}
-              margin="normal"
-              required
-              error={error && !formData.email}
-              helperText={error && !formData.email ? 'Email is required' : ''}
             />
             <TextField
+              margin="normal"
+              required
               fullWidth
-              label="Password"
               name="password"
+              label="Password"
               type="password"
+              id="password"
+              autoComplete="new-password"
               value={formData.password}
               onChange={handleChange}
-              margin="normal"
-              required
-              error={error && formData.password.length < 8}
-              helperText={error && formData.password.length < 8 ? 'Password must be at least 8 characters' : ''}
             />
             <TextField
-              fullWidth
-              label="Confirm Password"
-              name="confirmPassword"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
               margin="normal"
               required
-              error={error && formData.password !== formData.confirmPassword}
-              helperText={error && formData.password !== formData.confirmPassword ? 'Passwords do not match' : ''}
+              fullWidth
+              name="confirmPassword"
+              label="Confirm Password"
+              type="password"
+              id="confirmPassword"
+              autoComplete="new-password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
             />
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              color="primary"
-              sx={{ mt: 3 }}
+              sx={{ mt: 3, mb: 2 }}
             >
               Register
             </Button>
-          </form>
+          </Box>
         </Paper>
       </Box>
     </Container>

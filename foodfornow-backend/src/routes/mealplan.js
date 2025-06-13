@@ -1,143 +1,125 @@
 const express = require('express');
-const router = express.Router();
-const auth = require('../middleware/auth');
-const MealPlan = require('../models/MealPlan');
-const Recipe = require('../models/Recipe');
-const Pantry = require('../models/Pantry');
-const ShoppingList = require('../models/ShoppingList');
+const authMiddleware = require('../middleware/auth');
+const MealPlan = require('../models/mealPlan');
+const Recipe = require('../models/recipe');
 
-// Get all meal plans for the user
-router.get('/', auth, async (req, res) => {
+const router = express.Router();
+
+// Get meal plan for a specific week
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const mealPlans = await MealPlan.find({ user: req.user.id })
-      .populate('recipe')
-      .sort({ weekStart: 1, day: 1 });
-    res.json(mealPlans);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.log('Fetching meal plan for user:', req.userId);
+    const mealPlan = await MealPlan.find({ user: req.userId }).populate('recipe');
+    console.log('Found meal plan:', mealPlan);
+    res.json(mealPlan);
+  } catch (error) {
+    console.error('Error fetching meal plan:', error);
+    res.status(500).json({ error: 'Failed to fetch meal plan', details: error.message });
   }
 });
 
-// Add a new meal to the plan
-router.post('/', auth, async (req, res) => {
+// Add meal to plan
+router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { weekStart, day, meal, recipeId } = req.body;
+    console.log('Adding meal to plan:', req.body);
+    const { weekStart, day, meal, recipeId, notes } = req.body;
 
+    // Validate required fields
     if (!weekStart || !day || !meal || !recipeId) {
       return res.status(400).json({ error: 'Week start, day, meal, and recipe are required' });
     }
 
+    // Verify recipe exists
+    const recipe = await Recipe.findById(recipeId);
+    if (!recipe) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
     // Check if a meal already exists for this day and time
     const existingMeal = await MealPlan.findOne({
-      user: req.user.id,
-      weekStart,
+      user: req.userId,
+      weekStart: new Date(weekStart),
       day,
-      meal,
+      meal
     });
 
     if (existingMeal) {
       return res.status(400).json({ error: 'A meal already exists for this day and time' });
     }
 
-    // Get the recipe
-    const recipe = await Recipe.findById(recipeId);
-    if (!recipe) {
-      return res.status(404).json({ error: 'Recipe not found' });
-    }
-
-    // Create the meal plan entry
-    const newMeal = new MealPlan({
-      weekStart,
+    const mealPlanItem = new MealPlan({
+      user: req.userId,
+      weekStart: new Date(weekStart),
       day,
       meal,
       recipe: recipeId,
-      user: req.user.id,
+      notes
     });
 
-    const savedMeal = await newMeal.save();
-
-    // Check ingredients against pantry and add to shopping list if needed
-    for (const ingredient of recipe.ingredients) {
-      // Check if ingredient exists in pantry
-      const pantryItem = await Pantry.findOne({
-        user: req.user.id,
-        name: ingredient.name,
-        used: false,
-      });
-
-      if (pantryItem) {
-        // If we have enough in pantry, mark it as used
-        if (pantryItem.quantity >= ingredient.quantity) {
-          pantryItem.used = true;
-          pantryItem.mealPlan = savedMeal._id;
-          await pantryItem.save();
-        } else {
-          // If we don't have enough, add the difference to shopping list
-          const remainingQuantity = ingredient.quantity - pantryItem.quantity;
-          pantryItem.used = true;
-          pantryItem.mealPlan = savedMeal._id;
-          await pantryItem.save();
-
-          const shoppingItem = new ShoppingList({
-            user: req.user.id,
-            name: ingredient.name,
-            quantity: remainingQuantity,
-            unit: ingredient.unit,
-            recipe: recipeId,
-            mealPlan: savedMeal._id,
-          });
-          await shoppingItem.save();
-        }
-      } else {
-        // If not in pantry, add to shopping list
-        const shoppingItem = new ShoppingList({
-          user: req.user.id,
-          name: ingredient.name,
-          quantity: ingredient.quantity,
-          unit: ingredient.unit,
-          recipe: recipeId,
-          mealPlan: savedMeal._id,
-        });
-        await shoppingItem.save();
-      }
+    await mealPlanItem.save();
+    console.log('Meal plan item saved:', mealPlanItem);
+    
+    // Populate recipe details before sending response
+    await mealPlanItem.populate('recipe');
+    res.status(201).json(mealPlanItem);
+  } catch (error) {
+    console.error('Error adding meal to plan:', error);
+    if (error.code === 11000) {
+      res.status(400).json({ error: 'A meal already exists for this day and time' });
+    } else {
+      res.status(500).json({ error: 'Failed to add meal to plan' });
     }
-
-    res.json(savedMeal);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Delete a meal from the plan
-router.delete('/:id', auth, async (req, res) => {
+// Update meal in plan
+router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const meal = await MealPlan.findById(req.params.id);
+    const { recipeId, notes } = req.body;
+    
+    // Verify recipe exists if being updated
+    if (recipeId) {
+      const recipe = await Recipe.findById(recipeId);
+      if (!recipe) {
+        return res.status(404).json({ error: 'Recipe not found' });
+      }
+    }
 
-    if (!meal) {
+    const mealPlanItem = await MealPlan.findOneAndUpdate(
+      { _id: req.params.id, user: req.userId },
+      { 
+        ...(recipeId && { recipe: recipeId }),
+        ...(notes !== undefined && { notes })
+      },
+      { new: true }
+    ).populate('recipe');
+
+    if (!mealPlanItem) {
       return res.status(404).json({ error: 'Meal plan item not found' });
     }
 
-    // Check if the meal belongs to the user
-    if (meal.user.toString() !== req.user.id) {
-      return res.status(401).json({ error: 'Not authorized' });
+    res.json(mealPlanItem);
+  } catch (error) {
+    console.error('Error updating meal plan item:', error);
+    res.status(500).json({ error: 'Failed to update meal plan item' });
+  }
+});
+
+// Delete meal from plan
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    console.log('Deleting meal plan item:', req.params.id);
+    const mealPlanItem = await MealPlan.findOneAndDelete({
+      _id: req.params.id,
+      user: req.userId
+    });
+    if (!mealPlanItem) {
+      return res.status(404).json({ error: 'Meal plan item not found' });
     }
-
-    // Mark pantry items as unused
-    await Pantry.updateMany(
-      { mealPlan: meal._id },
-      { $set: { used: false, mealPlan: null } }
-    );
-
-    // Remove shopping list items
-    await ShoppingList.deleteMany({ mealPlan: meal._id });
-
-    await meal.remove();
-    res.json({ message: 'Meal removed' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.json({ message: 'Meal plan item deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting meal plan item:', error);
+    res.status(500).json({ error: 'Failed to delete meal plan item' });
   }
 });
 

@@ -9,7 +9,7 @@ import {
   Alert,
   Paper,
 } from '@mui/material';
-import axios from 'axios';
+import api from '../services/api';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ const Login = () => {
     try {
       setError('');
       console.log('Attempting login...');
-      const response = await axios.post('http://localhost:3001/api/auth/login', {
+      const response = await api.post('/auth/login', {
         email,
         password,
       });
@@ -66,16 +66,25 @@ const Login = () => {
           alignItems: 'center',
         }}
       >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Sign In
+        <Paper
+          elevation={3}
+          sx={{
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%',
+          }}
+        >
+          <Typography component="h1" variant="h5">
+            Sign in
           </Typography>
           {error && (
-            <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
               {error}
             </Alert>
           )}
-          <Box component="form" onSubmit={onSubmit} sx={{ mt: 1 }}>
+          <Box component="form" onSubmit={onSubmit} sx={{ mt: 1, width: '100%' }}>
             <TextField
               margin="normal"
               required

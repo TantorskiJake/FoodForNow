@@ -6,12 +6,12 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 
 // Import routes
-const authRoutes = require("./routes/auth");
-const mealPlanRoutes = require("./routes/mealplan");
-const recipesRoutes = require("./routes/recipes");
-const pantryRoutes = require("./routes/pantry");
-const ingredientRoutes = require("./routes/ingredients");
-const shoppingListRoutes = require("./routes/shopping-list");
+const authRoutes = require("./src/routes/auth");
+const mealPlanRoutes = require("./src/routes/mealplan");
+const recipesRoutes = require("./src/routes/recipes");
+const pantryRoutes = require("./src/routes/pantry");
+const ingredientRoutes = require("./src/routes/ingredients");
+const shoppingListRoutes = require("./src/routes/shopping-list");
 
 const app = express();
 
@@ -39,13 +39,13 @@ app.use(cors({
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 
-// Routes
-app.use("/auth", authRoutes);
-app.use("/mealplan", mealPlanRoutes);
-app.use("/recipes", recipesRoutes);
-app.use("/pantry", pantryRoutes);
-app.use("/ingredients", ingredientRoutes);
-app.use("/shopping-list", shoppingListRoutes);
+// Routes - all routes now have /api prefix
+app.use("/api/auth", authRoutes);
+app.use("/api/mealplan", mealPlanRoutes);
+app.use("/api/recipes", recipesRoutes);
+app.use("/api/pantry", pantryRoutes);
+app.use("/api/ingredients", ingredientRoutes);
+app.use("/api/shopping-list", shoppingListRoutes);
 
 // Root route
 app.get("/", (req, res) => {
@@ -81,7 +81,7 @@ const startServer = async () => {
     console.log("MongoDB connected");
 
     // Start Express server
-    const PORT = process.env.PORT || 3000;
+    const PORT = process.env.PORT || 3001;
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
