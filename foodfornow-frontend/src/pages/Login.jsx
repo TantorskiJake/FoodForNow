@@ -111,6 +111,13 @@ const Login = () => {
             >
               Sign In
             </Button>
+            <Button
+              fullWidth
+              variant="text"
+              onClick={() => navigate('/register')}
+            >
+              Don't have an account? Register
+            </Button>
           </Box>
         </Paper>
       </Box>

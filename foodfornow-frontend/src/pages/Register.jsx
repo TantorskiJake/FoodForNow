@@ -20,12 +20,27 @@ const Register = () => {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState('');
+
+  const evaluatePassword = (pwd) => {
+    const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    const mediumRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (strongRegex.test(pwd)) return 'strong';
+    if (mediumRegex.test(pwd)) return 'medium';
+    if (pwd) return 'weak';
+    return '';
+  };
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+    if (name === 'password') {
+      setPasswordStrength(evaluatePassword(value));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -41,6 +56,13 @@ const Register = () => {
     // Validate password length
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    // Ensure password strength is not weak
+    const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!strongRegex.test(formData.password)) {
+      setError('Password is too weak');
       return;
     }
 
@@ -139,6 +161,21 @@ const Register = () => {
               value={formData.password}
               onChange={handleChange}
             />
+            {passwordStrength && (
+              <Typography
+                variant="body2"
+                sx={{
+                  color:
+                    passwordStrength === 'strong'
+                      ? 'green'
+                      : passwordStrength === 'medium'
+                      ? 'orange'
+                      : 'red',
+                }}
+              >
+                Password strength: {passwordStrength}
+              </Typography>
+            )}
             <TextField
               margin="normal"
               required
