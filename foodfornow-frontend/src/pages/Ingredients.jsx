@@ -293,8 +293,11 @@ const IngredientItem = ({ ingredient, onEdit, onDelete }) => {
                 label={ingredient.category}
                 size="small"
                 sx={{
-                  backgroundColor: getCategoryColor(ingredient.category),
+                  backgroundColor: getCategoryColor(ingredient.category).main,
                   color: 'white',
+                  '&:hover': {
+                    backgroundColor: getCategoryColor(ingredient.category).dark,
+                  },
                 }}
               />
             </Box>

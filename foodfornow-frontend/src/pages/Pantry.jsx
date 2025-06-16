@@ -256,8 +256,11 @@ const Pantry = () => {
                   label={item.ingredient.category}
                   size="small"
                   sx={{
-                    backgroundColor: getCategoryColor(item.ingredient.category),
+                    backgroundColor: getCategoryColor(item.ingredient.category).main,
                     color: 'white',
+                    '&:hover': {
+                      backgroundColor: getCategoryColor(item.ingredient.category).dark,
+                    },
                   }}
                 />
                 <Typography variant="body2" color="text.secondary">
