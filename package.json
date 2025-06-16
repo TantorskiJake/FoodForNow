@@ -1,0 +1,17 @@
+{
+  "name": "foodfornow-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "foodfornow-backend",
+    "foodfornow-frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w foodfornow-backend\" \"npm run dev -w foodfornow-frontend\"",
+    "build": "npm run build -w foodfornow-frontend",
+    "start": "npm run start -w foodfornow-backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

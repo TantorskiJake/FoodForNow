@@ -1,0 +1,71 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor and IDE files
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Output and build
+dist/
+dist-ssr/
+*.local
+tmp/
+temp/
+*.tgz
+
+# ESLint and other tool caches
+.eslintcache
+.rpt2_cache/
+.rts2_cache_*/
+
+# Yarn
+.yarn-integrity
+
+# REPL history
+.node_repl_history
+
+# Test coverage and artifacts
+coverage/
+.nyc_output/
+jest.config.js
+tests/temp/
+*.test.log
