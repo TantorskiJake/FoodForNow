@@ -22,10 +22,10 @@ import api from '../services/api';
 
 const pages = [
   { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
+  { name: 'Shopping List', path: '/shopping-list', icon: <ShoppingCartIcon /> },
   { name: 'Pantry', path: '/pantry', icon: <KitchenIcon /> },
-  { name: 'Ingredients', path: '/ingredients', icon: <LocalDiningIcon /> },
   { name: 'Recipes', path: '/recipes', icon: <MenuBookIcon /> },
-  { name: 'Shopping List', path: '/shopping-list', icon: <ShoppingCartIcon /> }
+  { name: 'Ingredients', path: '/ingredients', icon: <LocalDiningIcon /> }
 ];
 
 const Navbar = () => {
