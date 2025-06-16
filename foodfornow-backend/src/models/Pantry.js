@@ -35,7 +35,7 @@ const pantrySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create compound index for user and ingredient within items
-pantrySchema.index({ user: 1, "items.ingredient": 1 }, { unique: true });
+// Remove the unique index that was causing issues
+// pantrySchema.index({ user: 1, "items.ingredient": 1 }, { unique: true });
 
 module.exports = mongoose.model("Pantry", pantrySchema);

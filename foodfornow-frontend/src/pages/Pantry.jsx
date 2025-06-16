@@ -66,29 +66,9 @@ const Pantry = () => {
       const response = await api.get('/pantry');
       console.log('Raw pantry response:', response.data);
       
-      // Check if response.data exists and has items
-      if (response.data && Array.isArray(response.data.items)) {
-        // Ensure each item has the required data structure
-        const processedItems = response.data.items.map(item => {
-          console.log('Processing item:', item);
-          return {
-            _id: item._id,
-            ingredient: item.ingredient ? {
-              _id: item.ingredient._id,
-              name: item.ingredient.name,
-              category: item.ingredient.category
-            } : null,
-            quantity: item.quantity,
-            unit: item.unit,
-            expiryDate: item.expiryDate,
-            notes: item.notes
-          };
-        });
-        
-        console.log('Processed pantry items:', processedItems);
-        setPantryItems(processedItems);
+      if (response.data && response.data.items) {
+        setPantryItems(response.data.items);
       } else {
-        console.log('No items found in response or invalid format');
         setPantryItems([]);
       }
     } catch (err) {
@@ -108,12 +88,10 @@ const Pantry = () => {
   };
 
   const handleOpenDialog = () => {
-    console.log('Opening dialog...');
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
-    console.log('Closing dialog...');
     setOpenDialog(false);
     setEditingItem(null);
     setFormData({
@@ -130,7 +108,6 @@ const Pantry = () => {
     console.log('Form submitted with data:', formData);
     
     try {
-      // Validate required fields
       if (!formData.ingredient || !formData.quantity || !formData.unit) {
         setError('Please fill in all required fields');
         return;
@@ -142,7 +119,6 @@ const Pantry = () => {
         unit: formData.unit
       };
 
-      // Only add optional fields if they have values
       if (formData.expiryDate) {
         submitData.expiryDate = formData.expiryDate;
       }
@@ -158,11 +134,7 @@ const Pantry = () => {
         await api.post('/pantry', submitData);
       }
       
-      // Close dialog and reset form
       handleCloseDialog();
-      
-      // Fetch updated pantry items
-      console.log('Fetching updated pantry items...');
       await fetchPantryItems();
       
     } catch (err) {
@@ -213,78 +185,74 @@ const Pantry = () => {
         </Alert>
       )}
 
-      {console.log('Current pantry items in render:', pantryItems)}
       {pantryItems && pantryItems.length > 0 ? (
         <List>
-          {pantryItems.map((item) => {
-            console.log('Rendering item:', item);
-            return (
-              <ListItem
-                key={item._id}
-                sx={{
-                  bgcolor: 'background.paper',
-                  mb: 1,
-                  borderRadius: 1,
-                  boxShadow: 1,
-                }}
-              >
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle1">
-                        {item.ingredient?.name || 'Unknown Ingredient'}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={item.ingredient?.category || 'Uncategorized'}
-                        color="primary"
-                        variant="outlined"
-                      />
-                    </Box>
-                  }
-                  secondary={
-                    <Box sx={{ mt: 1 }}>
+          {pantryItems.map((item) => (
+            <ListItem
+              key={item._id}
+              sx={{
+                bgcolor: 'background.paper',
+                mb: 1,
+                borderRadius: 1,
+                boxShadow: 1,
+              }}
+            >
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="subtitle1">
+                      {item.ingredient?.name || 'Unknown Ingredient'}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={item.ingredient?.category || 'Uncategorized'}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                }
+                secondary={
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Quantity: {item.quantity} {item.unit}
+                    </Typography>
+                    {item.expiryDate && (
                       <Typography variant="body2" color="text.secondary">
-                        Quantity: {item.quantity} {item.unit}
+                        Expires: {new Date(item.expiryDate).toLocaleDateString()}
                       </Typography>
-                      {item.expiryDate && (
-                        <Typography variant="body2" color="text.secondary">
-                          Expires: {new Date(item.expiryDate).toLocaleDateString()}
-                        </Typography>
-                      )}
-                      {item.notes && (
-                        <Typography variant="body2" color="text.secondary">
-                          Notes: {item.notes}
-                        </Typography>
-                      )}
-                    </Box>
-                  }
-                />
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleUpdateQuantity(item._id, item.quantity - 1)}
-                    disabled={item.quantity <= 1}
-                  >
-                    <RemoveIcon />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
-                  >
-                    <AddIcon />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => handleDeleteItem(item._id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              </ListItem>
-            );
-          })}
+                    )}
+                    {item.notes && (
+                      <Typography variant="body2" color="text.secondary">
+                        Notes: {item.notes}
+                      </Typography>
+                    )}
+                  </Box>
+                }
+              />
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton
+                  size="small"
+                  onClick={() => handleUpdateQuantity(item._id, item.quantity - 1)}
+                  disabled={item.quantity <= 1}
+                >
+                  <RemoveIcon />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
+                >
+                  <AddIcon />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => handleDeleteItem(item._id)}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+            </ListItem>
+          ))}
         </List>
       ) : (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
