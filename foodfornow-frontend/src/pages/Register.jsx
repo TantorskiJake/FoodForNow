@@ -9,7 +9,15 @@ import {
   Box,
   Alert,
   LinearProgress,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
+import {
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+} from '@mui/icons-material';
 import api from '../services/api';
 
 const Register = () => {
@@ -21,14 +29,28 @@ const Register = () => {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
-  const [passwordStrength, setPasswordStrength] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState({
+    length: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    special: false,
+  });
 
   const evaluatePassword = (pwd) => {
-    const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-    const mediumRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    const newStrength = {
+      length: pwd.length >= 8,
+      uppercase: /[A-Z]/.test(pwd),
+      lowercase: /[a-z]/.test(pwd),
+      number: /[0-9]/.test(pwd),
+      special: /[^A-Za-z0-9]/.test(pwd),
+    };
+    setPasswordStrength(newStrength);
 
-    if (strongRegex.test(pwd)) return 'strong';
-    if (mediumRegex.test(pwd)) return 'medium';
+    // Calculate overall strength
+    const strengthCount = Object.values(newStrength).filter(Boolean).length;
+    if (strengthCount === 5) return 'strong';
+    if (strengthCount >= 3) return 'medium';
     if (pwd) return 'weak';
     return '';
   };
@@ -40,7 +62,7 @@ const Register = () => {
       [name]: value,
     });
     if (name === 'password') {
-      setPasswordStrength(evaluatePassword(value));
+      evaluatePassword(value);
     }
   };
 
@@ -54,16 +76,10 @@ const Register = () => {
       return;
     }
 
-    // Validate password length
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
-
-    // Ensure password strength is not weak
-    const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-    if (!strongRegex.test(formData.password)) {
-      setError('Password is too weak');
+    // Validate password requirements
+    const strengthCount = Object.values(passwordStrength).filter(Boolean).length;
+    if (strengthCount < 3) {
+      setError('Password does not meet minimum requirements');
       return;
     }
 
@@ -81,7 +97,6 @@ const Register = () => {
         password: formData.password,
       });
       
-      // No token in response; rely on cookie
       navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
@@ -96,6 +111,18 @@ const Register = () => {
         setError('An error occurred. Please try again.');
       }
     }
+  };
+
+  const getPasswordStrengthColor = () => {
+    const strengthCount = Object.values(passwordStrength).filter(Boolean).length;
+    if (strengthCount === 5) return 'success.main';
+    if (strengthCount >= 3) return 'warning.main';
+    return 'error.main';
+  };
+
+  const getPasswordStrengthValue = () => {
+    const strengthCount = Object.values(passwordStrength).filter(Boolean).length;
+    return (strengthCount / 5) * 100;
   };
 
   return (
@@ -162,47 +189,72 @@ const Register = () => {
               value={formData.password}
               onChange={handleChange}
             />
-            {passwordStrength && (
+            {formData.password && (
               <Box sx={{ mt: 1, width: '100%' }}>
                 <LinearProgress
                   variant="determinate"
-                  value={
-                    passwordStrength === 'strong'
-                      ? 100
-                      : passwordStrength === 'medium'
-                      ? 60
-                      : 30
-                  }
+                  value={getPasswordStrengthValue()}
                   sx={{
                     height: 10,
                     borderRadius: 5,
-                    backgroundColor: '#e0e0e0',
+                    backgroundColor: 'grey.200',
                     '& .MuiLinearProgress-bar': {
-                      backgroundColor:
-                        passwordStrength === 'strong'
-                          ? 'green'
-                          : passwordStrength === 'medium'
-                          ? 'orange'
-                          : 'red',
+                      backgroundColor: getPasswordStrengthColor(),
                     },
                   }}
                 />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    mt: 0.5,
-                    color:
-                      passwordStrength === 'strong'
-                        ? 'green'
-                        : passwordStrength === 'medium'
-                        ? 'orange'
-                        : 'red',
-                  }}
-                >
-                  {passwordStrength.charAt(0).toUpperCase() +
-                    passwordStrength.slice(1)}{' '}
-                  password
-                </Typography>
+                <List dense sx={{ mt: 1 }}>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordStrength.length ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="At least 8 characters" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordStrength.uppercase ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one uppercase letter" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordStrength.lowercase ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one lowercase letter" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordStrength.number ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one number" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordStrength.special ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one special character" />
+                  </ListItem>
+                </List>
               </Box>
             )}
             <TextField
