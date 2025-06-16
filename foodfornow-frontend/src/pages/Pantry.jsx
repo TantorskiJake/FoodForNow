@@ -25,12 +25,17 @@ import {
   FormControl,
   InputLabel,
   Paper,
+  useTheme
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import AddIcon from '@mui/icons-material/Add';
-import RemoveIcon from '@mui/icons-material/Remove';
+import {
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Add as AddIcon,
+  Remove as RemoveIcon,
+  AddShoppingCart as AddShoppingCartIcon
+} from '@mui/icons-material';
 import api from '../services/api';
+import { getCategoryColor } from '../utils/categoryColors';
 
 const Pantry = () => {
   const navigate = useNavigate();
@@ -47,6 +52,7 @@ const Pantry = () => {
   });
   const [ingredients, setIngredients] = useState([]);
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
+  const theme = useTheme();
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -163,6 +169,89 @@ const Pantry = () => {
     }
   };
 
+  const handleAddToShoppingList = async (item) => {
+    try {
+      await api.post('/shopping-list', { ingredient: item.ingredient._id, quantity: item.quantity });
+      fetchPantryItems();
+    } catch (err) {
+      console.error('Error adding to shopping list:', err);
+      setError('Failed to add to shopping list. Please try again.');
+    }
+  };
+
+  const PantryItem = ({ item, onDelete, onAddToShoppingList }) => {
+    const categoryColor = getCategoryColor(item.ingredient.category);
+    const isDarkMode = theme.palette.mode === 'dark';
+
+    return (
+      <ListItem
+        sx={{
+          mb: 1,
+          borderRadius: 1,
+          backgroundColor: isDarkMode ? 'background.paper' : 'background.default',
+          '&:hover': {
+            backgroundColor: isDarkMode ? 'action.hover' : 'action.hover',
+          },
+        }}
+      >
+        <ListItemText
+          primary={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                {item.ingredient.name}
+              </Typography>
+              <Chip
+                label={item.ingredient.category}
+                size="small"
+                sx={{
+                  backgroundColor: categoryColor.main,
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: categoryColor.dark,
+                  },
+                }}
+              />
+            </Box>
+          }
+          secondary={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">
+                {item.quantity} {item.unit}
+              </Typography>
+              {item.expiryDate && (
+                <Typography variant="body2" color="text.secondary">
+                  • Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                </Typography>
+              )}
+              {item.notes && (
+                <Typography variant="body2" color="text.secondary">
+                  • {item.notes}
+                </Typography>
+              )}
+            </Box>
+          }
+        />
+        <ListItemSecondaryAction>
+          <IconButton
+            edge="end"
+            aria-label="add to shopping list"
+            onClick={() => onAddToShoppingList(item)}
+            sx={{ mr: 1 }}
+          >
+            <AddShoppingCartIcon />
+          </IconButton>
+          <IconButton
+            edge="end"
+            aria-label="delete"
+            onClick={() => onDelete(item._id)}
+          >
+            <DeleteIcon />
+          </IconButton>
+        </ListItemSecondaryAction>
+      </ListItem>
+    );
+  };
+
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -188,70 +277,12 @@ const Pantry = () => {
       {pantryItems && pantryItems.length > 0 ? (
         <List>
           {pantryItems.map((item) => (
-            <ListItem
+            <PantryItem
               key={item._id}
-              sx={{
-                bgcolor: 'background.paper',
-                mb: 1,
-                borderRadius: 1,
-                boxShadow: 1,
-              }}
-            >
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="subtitle1">
-                      {item.ingredient?.name || 'Unknown Ingredient'}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      label={item.ingredient?.category || 'Uncategorized'}
-                      color="primary"
-                      variant="outlined"
-                    />
-                  </Box>
-                }
-                secondary={
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Quantity: {item.quantity} {item.unit}
-                    </Typography>
-                    {item.expiryDate && (
-                      <Typography variant="body2" color="text.secondary">
-                        Expires: {new Date(item.expiryDate).toLocaleDateString()}
-                      </Typography>
-                    )}
-                    {item.notes && (
-                      <Typography variant="body2" color="text.secondary">
-                        Notes: {item.notes}
-                      </Typography>
-                    )}
-                  </Box>
-                }
-              />
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleUpdateQuantity(item._id, item.quantity - 1)}
-                  disabled={item.quantity <= 1}
-                >
-                  <RemoveIcon />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
-                >
-                  <AddIcon />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleDeleteItem(item._id)}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            </ListItem>
+              item={item}
+              onDelete={handleDeleteItem}
+              onAddToShoppingList={handleAddToShoppingList}
+            />
           ))}
         </List>
       ) : (

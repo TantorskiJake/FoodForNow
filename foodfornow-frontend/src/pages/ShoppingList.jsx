@@ -22,14 +22,19 @@ import {
   DialogActions,
   TextField,
   MenuItem,
-  Paper
+  Paper,
+  CircularProgress,
+  Chip,
+  useTheme
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Add as AddIcon,
-  AddShoppingCart as AddShoppingCartIcon
+  AddShoppingCart as AddShoppingCartIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import api from '../services/api';
+import { getCategoryColor } from '../utils/categoryColors';
 
 const ShoppingList = () => {
   const navigate = useNavigate();
@@ -186,6 +191,8 @@ const ShoppingList = () => {
     return acc;
   }, {});
 
+  const theme = useTheme();
+
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -227,33 +234,13 @@ const ShoppingList = () => {
             </Typography>
             <List>
               {group.items.map((item) => (
-                <ListItem key={item._id}>
-                  <Checkbox
-                    checked={item.completed}
-                    onChange={() => handleToggleComplete(item._id)}
-                  />
-                  <ListItemText
-                    primary={item.ingredient.name}
-                    secondary={`${item.quantity} ${item.unit}`}
-                  />
-                  <ListItemSecondaryAction>
-                    <IconButton
-                      edge="end"
-                      aria-label="add to pantry"
-                      onClick={() => handleAddToPantry(item)}
-                      sx={{ mr: 1 }}
-                    >
-                      <AddShoppingCartIcon />
-                    </IconButton>
-                    <IconButton
-                      edge="end"
-                      aria-label="delete"
-                      onClick={() => handleDeleteItem(item._id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </ListItemSecondaryAction>
-                </ListItem>
+                <ShoppingListItem
+                  key={item._id}
+                  item={item}
+                  onDelete={handleDeleteItem}
+                  onAddToPantry={handleAddToPantry}
+                  onToggleComplete={handleToggleComplete}
+                />
               ))}
             </List>
           </Paper>
@@ -315,6 +302,90 @@ const ShoppingList = () => {
         </form>
       </Dialog>
     </Container>
+  );
+};
+
+const ShoppingListItem = ({ item, onDelete, onAddToPantry, onToggleComplete }) => {
+  const theme = useTheme();
+  const categoryColor = getCategoryColor(item.ingredient.category);
+  const isDarkMode = theme.palette.mode === 'dark';
+
+  return (
+    <ListItem
+      sx={{
+        mb: 1,
+        borderRadius: 1,
+        backgroundColor: isDarkMode ? 'background.paper' : 'background.default',
+        '&:hover': {
+          backgroundColor: isDarkMode ? 'action.hover' : 'action.hover',
+        },
+        opacity: item.completed ? 0.6 : 1,
+      }}
+    >
+      <ListItemText
+        primary={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 'medium',
+                textDecoration: item.completed ? 'line-through' : 'none',
+              }}
+            >
+              {item.ingredient.name}
+            </Typography>
+            <Chip
+              label={item.ingredient.category}
+              size="small"
+              sx={{
+                backgroundColor: categoryColor.main,
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: categoryColor.dark,
+                },
+              }}
+            />
+          </Box>
+        }
+        secondary={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+            <Typography variant="body2" color="text.secondary">
+              {item.quantity} {item.unit}
+            </Typography>
+            {item.recipe && (
+              <Typography variant="body2" color="text.secondary">
+                • From: {item.recipe.name}
+              </Typography>
+            )}
+          </Box>
+        }
+      />
+      <ListItemSecondaryAction>
+        <IconButton
+          edge="end"
+          aria-label="toggle complete"
+          onClick={() => onToggleComplete(item._id)}
+          sx={{ mr: 1 }}
+        >
+          <CheckCircleIcon color={item.completed ? 'success' : 'action'} />
+        </IconButton>
+        <IconButton
+          edge="end"
+          aria-label="add to pantry"
+          onClick={() => onAddToPantry(item)}
+          sx={{ mr: 1 }}
+        >
+          <AddShoppingCartIcon />
+        </IconButton>
+        <IconButton
+          edge="end"
+          aria-label="delete"
+          onClick={() => onDelete(item._id)}
+        >
+          <DeleteIcon />
+        </IconButton>
+      </ListItemSecondaryAction>
+    </ListItem>
   );
 };
 

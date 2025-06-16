@@ -24,11 +24,15 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Paper,
+  CircularProgress,
+  useTheme
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import api from '../services/api';
+import { getCategoryColor } from '../utils/categoryColors';
 
 const UNITS = [
   'g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'
@@ -133,6 +137,8 @@ const Ingredients = () => {
     }
   };
 
+  const theme = useTheme();
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 4, mb: 4 }}>
@@ -166,46 +172,12 @@ const Ingredients = () => {
               <CardContent>
                 <List>
                   {ingredients.map((ingredient) => (
-                    <ListItem key={ingredient._id}>
-                      <ListItemText
-                        primary={ingredient.name}
-                        secondary={
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">
-                              {ingredient.description}
-                            </Typography>
-                            <Box sx={{ mt: 1 }}>
-                              <Chip
-                                label={ingredient.category}
-                                size="small"
-                                sx={{ mr: 0.5 }}
-                              />
-                              <Chip
-                                label={`Default: ${ingredient.defaultUnit}`}
-                                size="small"
-                              />
-                            </Box>
-                          </Box>
-                        }
-                      />
-                      <ListItemSecondaryAction>
-                        <IconButton
-                          edge="end"
-                          aria-label="edit"
-                          onClick={() => handleOpenDialog(ingredient)}
-                          sx={{ mr: 1 }}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          edge="end"
-                          aria-label="delete"
-                          onClick={() => handleDeleteIngredient(ingredient._id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </ListItemSecondaryAction>
-                    </ListItem>
+                    <IngredientItem
+                      key={ingredient._id}
+                      ingredient={ingredient}
+                      onDelete={handleDeleteIngredient}
+                      onEdit={handleOpenDialog}
+                    />
                   ))}
                 </List>
               </CardContent>
@@ -284,6 +256,70 @@ const Ingredients = () => {
         </DialogActions>
       </Dialog>
     </Container>
+  );
+};
+
+const IngredientItem = ({ ingredient, onDelete, onEdit }) => {
+  const theme = useTheme();
+  const categoryColor = getCategoryColor(ingredient.category);
+  const isDarkMode = theme.palette.mode === 'dark';
+
+  return (
+    <ListItem
+      sx={{
+        mb: 1,
+        borderRadius: 1,
+        backgroundColor: isDarkMode ? 'background.paper' : 'background.default',
+        '&:hover': {
+          backgroundColor: isDarkMode ? 'action.hover' : 'action.hover',
+        },
+      }}
+    >
+      <ListItemText
+        primary={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+              {ingredient.name}
+            </Typography>
+            <Chip
+              label={ingredient.category}
+              size="small"
+              sx={{
+                backgroundColor: categoryColor.main,
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: categoryColor.dark,
+                },
+              }}
+            />
+          </Box>
+        }
+        secondary={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+            <Typography variant="body2" color="text.secondary">
+              {ingredient.description || 'No description'}
+            </Typography>
+          </Box>
+        }
+      />
+      <ListItemSecondaryAction>
+        <IconButton
+          edge="end"
+          aria-label="edit"
+          onClick={() => onEdit(ingredient)}
+          sx={{ mr: 1 }}
+        >
+          <EditIcon />
+        </IconButton>
+        <IconButton
+          edge="end"
+          aria-label="delete"
+          onClick={() => onDelete(ingredient._id)}
+        >
+          <DeleteIcon />
+        </IconButton>
+      </ListItemSecondaryAction>
+    </ListItem>
   );
 };
 
