@@ -9,6 +9,7 @@ import {
   Alert,
   Paper,
 } from '@mui/material';
+import PasswordField from '../components/PasswordField';
 import api from '../services/api';
 
 const Login = () => {
@@ -91,13 +92,9 @@ const Login = () => {
               value={email}
               onChange={onChange}
             />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
+            <PasswordField
               name="password"
               label="Password"
-              type="password"
               id="password"
               autoComplete="current-password"
               value={password}

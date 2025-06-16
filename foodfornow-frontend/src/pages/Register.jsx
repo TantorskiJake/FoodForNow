@@ -18,6 +18,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
 } from '@mui/icons-material';
+import PasswordField from '../components/PasswordField';
 import api from '../services/api';
 
 const Register = () => {
@@ -177,13 +178,9 @@ const Register = () => {
               value={formData.email}
               onChange={handleChange}
             />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
+            <PasswordField
               name="password"
               label="Password"
-              type="password"
               id="password"
               autoComplete="new-password"
               value={formData.password}
@@ -257,13 +254,9 @@ const Register = () => {
                 </List>
               </Box>
             )}
-            <TextField
-              margin="normal"
-              required
-              fullWidth
+            <PasswordField
               name="confirmPassword"
               label="Confirm Password"
-              type="password"
               id="confirmPassword"
               autoComplete="new-password"
               value={formData.confirmPassword}
