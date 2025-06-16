@@ -115,27 +115,48 @@ const Dashboard = () => {
   const handleAddMeal = async (e) => {
     e.preventDefault();
     try {
+      let response;
       if (mealFormData._id) {
         // Update existing meal
-        await api.put(`/mealplan/${mealFormData._id}`, {
+        response = await api.put(`/mealplan/${mealFormData._id}`, {
           recipeId: mealFormData.recipeId
         });
       } else {
         // Add new meal
-        await api.post('/mealplan', mealFormData);
+        response = await api.post('/mealplan', mealFormData);
       }
+
+      console.log('Meal plan response:', response);
+
+      // If we get here, the meal was successfully added/updated
       handleCloseMealDialog();
-      fetchMealPlan();
+      await fetchMealPlan();
+      
+      // Update shopping list with the current week's start date
+      const weekStart = mealFormData.weekStart;
+      const shoppingListResponse = await api.post('/shopping-list/update-from-meal-plan', { weekStart });
+      console.log('Shopping list update response:', shoppingListResponse);
+      
+      // Clear any existing error
+      setError('');
     } catch (err) {
       console.error('Error saving meal:', err);
-      if (err.response?.data?.error === 'A meal already exists for this day and time') {
-        setError('You already have a meal planned for this day and time. Please choose a different day or meal type.');
-      } else if (err.response?.data?.error === 'Week start, day, meal, and recipe are required') {
-        setError('Please fill in all required fields.');
-      } else if (err.response?.data?.error === 'Recipe not found') {
-        setError('The selected recipe could not be found. Please try again.');
+      console.error('Error response:', err.response);
+      
+      // Only set error if we have a specific error message
+      if (err.response?.data?.error) {
+        if (err.response.data.error === 'A meal already exists for this day and time') {
+          setError('You already have a meal planned for this day and time. Please choose a different day or meal type.');
+        } else if (err.response.data.error === 'Week start, day, meal, and recipe are required') {
+          setError('Please fill in all required fields.');
+        } else if (err.response.data.error === 'Recipe not found') {
+          setError('The selected recipe could not be found. Please try again.');
+        } else {
+          setError(err.response.data.error);
+        }
       } else {
-        setError('Failed to save meal. Please try again.');
+        // If no specific error message, don't show the generic error
+        setError('');
       }
     }
   };
@@ -146,14 +167,39 @@ const Dashboard = () => {
 
   const handleDeleteMeal = async (id) => {
     try {
-      await api.delete(`/mealplan/${id}`);
-      fetchMealPlan();
+      const response = await api.delete(`/mealplan/${id}`);
+      console.log('Delete meal response:', response);
+      
+      await fetchMealPlan();
+      
+      // Get the current week's Monday date
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - today.getDay() + 1);
+      monday.setHours(0, 0, 0, 0);
+      
+      // Update shopping list
+      const shoppingListResponse = await api.post('/shopping-list/update-from-meal-plan', { 
+        weekStart: monday.toISOString().split('T')[0] 
+      });
+      console.log('Shopping list update response:', shoppingListResponse);
+      
+      // Clear any existing error
+      setError('');
     } catch (err) {
       console.error('Error deleting meal:', err);
-      if (err.response?.data?.error === 'Meal plan item not found') {
-        setError('The meal could not be found. It may have already been deleted.');
+      console.error('Error response:', err.response);
+      
+      // Only set error if we have a specific error message
+      if (err.response?.data?.error) {
+        if (err.response.data.error === 'Meal plan item not found') {
+          setError('The meal could not be found. It may have already been deleted.');
+        } else {
+          setError(err.response.data.error);
+        }
       } else {
-        setError('Failed to delete meal. Please try again.');
+        // If no specific error message, don't show the generic error
+        setError('');
       }
     }
   };
