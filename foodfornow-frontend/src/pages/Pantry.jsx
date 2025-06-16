@@ -93,7 +93,26 @@ const Pantry = () => {
     }
   };
 
-  const handleOpenDialog = () => {
+  const handleOpenDialog = (item = null) => {
+    if (item) {
+      setEditingItem(item);
+      setFormData({
+        ingredient: item.ingredient._id,
+        quantity: item.quantity,
+        unit: item.unit,
+        expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
+        notes: item.notes || '',
+      });
+    } else {
+      setEditingItem(null);
+      setFormData({
+        ingredient: '',
+        quantity: '',
+        unit: '',
+        expiryDate: '',
+        notes: '',
+      });
+    }
     setOpenDialog(true);
   };
 
@@ -133,19 +152,50 @@ const Pantry = () => {
       }
 
       console.log('Submitting pantry item:', submitData);
+      console.log('Editing item:', editingItem);
 
+      let response;
       if (editingItem) {
-        await api.put(`/pantry/${editingItem._id}`, submitData);
+        console.log('Updating existing item with ID:', editingItem._id);
+        response = await api.patch(`/pantry/items/${editingItem._id}`, submitData);
+        console.log('Update response:', response);
       } else {
-        await api.post('/pantry', submitData);
+        console.log('Creating new item');
+        response = await api.post('/pantry', submitData);
+        console.log('Create response:', response);
       }
       
-      handleCloseDialog();
-      await fetchPantryItems();
+      if (response && response.data) {
+        console.log('Successfully saved pantry item');
+        handleCloseDialog();
+        await fetchPantryItems();
+        setFormData({
+          ingredient: '',
+          quantity: '',
+          unit: '',
+          expiryDate: '',
+          notes: ''
+        });
+      } else {
+        throw new Error('No response data received');
+      }
       
     } catch (err) {
       console.error('Error saving pantry item:', err);
-      setError(err.response?.data?.error || 'Failed to save pantry item. Please try again.');
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else if (err.response?.status === 401) {
+        setError('Your session has expired. Please log in again.');
+        navigate('/login');
+      } else {
+        setError('Failed to save pantry item. Please try again.');
+      }
     }
   };
 
@@ -179,7 +229,7 @@ const Pantry = () => {
     }
   };
 
-  const PantryItem = ({ item, onDelete, onAddToShoppingList }) => {
+  const PantryItem = ({ item, onDelete, onEdit }) => {
     const categoryColor = getCategoryColor(item.ingredient.category);
     const isDarkMode = theme.palette.mode === 'dark';
 
@@ -234,11 +284,11 @@ const Pantry = () => {
         <ListItemSecondaryAction>
           <IconButton
             edge="end"
-            aria-label="add to shopping list"
-            onClick={() => onAddToShoppingList(item)}
+            aria-label="edit"
+            onClick={() => onEdit(item)}
             sx={{ mr: 1 }}
           >
-            <AddShoppingCartIcon />
+            <EditIcon />
           </IconButton>
           <IconButton
             edge="end"
@@ -262,7 +312,7 @@ const Pantry = () => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
+          onClick={() => handleOpenDialog()}
         >
           Add Item
         </Button>
@@ -281,7 +331,7 @@ const Pantry = () => {
               key={item._id}
               item={item}
               onDelete={handleDeleteItem}
-              onAddToShoppingList={handleAddToShoppingList}
+              onEdit={handleOpenDialog}
             />
           ))}
         </List>
@@ -355,17 +405,15 @@ const Pantry = () => {
               fullWidth
               multiline
               rows={2}
-              sx={{ mb: 2 }}
             />
-
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-              <Button onClick={handleCloseDialog}>Cancel</Button>
-              <Button type="submit" variant="contained" color="primary">
-                {editingItem ? 'Update' : 'Add'}
-              </Button>
-            </Box>
           </Box>
         </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained" color="primary">
+            {editingItem ? 'Save Changes' : 'Add Item'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Container>
   );

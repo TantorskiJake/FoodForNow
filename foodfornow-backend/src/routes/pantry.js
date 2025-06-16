@@ -45,22 +45,36 @@ router.get('/', authMiddleware, async (req, res) => {
 // Update item
 router.patch('/items/:itemId', authMiddleware, async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { ingredient, quantity, unit, expiryDate, notes } = req.body;
+    console.log('Updating pantry item:', { itemId: req.params.itemId, body: req.body });
+    
     const pantry = await Pantry.findOne({ user: req.userId });
-    if (!pantry) return res.status(404).json({ error: 'Pantry not found' });
-    
-    const item = pantry.items.id(req.params.itemId);
-    if (!item) return res.status(404).json({ error: 'Item not found' });
-    
-    item.amount = amount;
-    
-    if (item.amount <= 0) {
-      pantry.items = pantry.items.filter(i => i._id.toString() !== req.params.itemId);
+    if (!pantry) {
+      console.log('Pantry not found for user:', req.userId);
+      return res.status(404).json({ error: 'Pantry not found' });
     }
     
+    const item = pantry.items.id(req.params.itemId);
+    if (!item) {
+      console.log('Item not found:', req.params.itemId);
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    // Update all fields
+    if (ingredient) item.ingredient = ingredient;
+    if (quantity !== undefined) item.quantity = Number(quantity);
+    if (unit) item.unit = unit;
+    if (expiryDate) item.expiryDate = new Date(expiryDate);
+    if (notes !== undefined) item.notes = notes;
+    
+    console.log('Updated item:', item);
     await pantry.save();
+    
+    // Populate ingredient details before sending response
+    await pantry.populate('items.ingredient');
     res.json(pantry);
   } catch (error) {
+    console.error('Error updating pantry item:', error);
     res.status(400).json({ error: 'Failed to update item' });
   }
 });
