@@ -33,6 +33,7 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [openMealDialog, setOpenMealDialog] = useState(false);
   const [mealFormData, setMealFormData] = useState({
+    _id: '',
     weekStart: '',
     day: '',
     meal: '',
@@ -91,6 +92,7 @@ const Dashboard = () => {
     monday.setHours(0, 0, 0, 0);
 
     setMealFormData({
+      _id: existingMeal?._id || '',
       weekStart: existingMeal?.weekStart || monday.toISOString().split('T')[0],
       day: day || existingMeal?.day || '',
       meal: mealType || existingMeal?.meal || '',
@@ -102,6 +104,7 @@ const Dashboard = () => {
   const handleCloseMealDialog = () => {
     setOpenMealDialog(false);
     setMealFormData({
+      _id: '',
       weekStart: '',
       day: '',
       meal: '',
@@ -112,11 +115,19 @@ const Dashboard = () => {
   const handleAddMeal = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/mealplan', mealFormData);
+      if (mealFormData._id) {
+        // Update existing meal
+        await api.put(`/mealplan/${mealFormData._id}`, {
+          recipeId: mealFormData.recipeId
+        });
+      } else {
+        // Add new meal
+        await api.post('/mealplan', mealFormData);
+      }
       handleCloseMealDialog();
       fetchMealPlan();
     } catch (err) {
-      console.error('Error adding meal:', err);
+      console.error('Error saving meal:', err);
       if (err.response?.data?.error === 'A meal already exists for this day and time') {
         setError('You already have a meal planned for this day and time. Please choose a different day or meal type.');
       } else if (err.response?.data?.error === 'Week start, day, meal, and recipe are required') {
@@ -124,7 +135,7 @@ const Dashboard = () => {
       } else if (err.response?.data?.error === 'Recipe not found') {
         setError('The selected recipe could not be found. Please try again.');
       } else {
-        setError('Failed to add meal. Please try again.');
+        setError('Failed to save meal. Please try again.');
       }
     }
   };
@@ -215,9 +226,11 @@ const Dashboard = () => {
 
       <Dialog open={openMealDialog} onClose={handleCloseMealDialog}>
         <DialogTitle>
-          {mealFormData.day && mealFormData.meal 
-            ? `Add ${mealFormData.meal} for ${mealFormData.day}`
-            : 'Add Meal to Plan'}
+          {mealFormData._id 
+            ? `Edit ${mealFormData.meal} for ${mealFormData.day}`
+            : mealFormData.day && mealFormData.meal 
+              ? `Add ${mealFormData.meal} for ${mealFormData.day}`
+              : 'Add Meal to Plan'}
         </DialogTitle>
         <DialogContent>
           <Box component="form" onSubmit={handleAddMeal} sx={{ mt: 2 }}>
@@ -281,7 +294,7 @@ const Dashboard = () => {
             color="primary"
             disabled={!mealFormData.day || !mealFormData.meal || !mealFormData.recipeId}
           >
-            Add Meal
+            {mealFormData._id ? 'Update Meal' : 'Add Meal'}
           </Button>
         </DialogActions>
       </Dialog>
