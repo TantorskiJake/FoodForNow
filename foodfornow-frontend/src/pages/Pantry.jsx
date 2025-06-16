@@ -25,7 +25,8 @@ import {
   FormControl,
   InputLabel,
   Paper,
-  useTheme
+  useTheme,
+  CircularProgress
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -53,6 +54,7 @@ const Pantry = () => {
   const [ingredients, setIngredients] = useState([]);
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
   const theme = useTheme();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -80,6 +82,8 @@ const Pantry = () => {
     } catch (err) {
       console.error('Error fetching pantry items:', err);
       setError('Failed to fetch pantry items. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -229,84 +233,87 @@ const Pantry = () => {
     }
   };
 
-  const PantryItem = ({ item, onDelete, onEdit }) => {
-    const categoryColor = getCategoryColor(item.ingredient.category);
-    const isDarkMode = theme.palette.mode === 'dark';
-
+  const PantryItem = ({ item, onEdit, onDelete }) => {
+    const theme = useTheme();
+    
     return (
       <ListItem
         sx={{
-          mb: 1,
-          borderRadius: 1,
-          backgroundColor: isDarkMode ? 'background.paper' : 'background.default',
-          '&:hover': {
-            backgroundColor: isDarkMode ? 'action.hover' : 'action.hover',
-          },
+          py: 2,
+          px: 3,
         }}
       >
         <ListItemText
           primary={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                {item.ingredient.name}
-              </Typography>
-              <Chip
-                label={item.ingredient.category}
-                size="small"
-                sx={{
-                  backgroundColor: categoryColor.main,
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: categoryColor.dark,
-                  },
-                }}
-              />
-            </Box>
+            <Typography variant="h6" component="div" sx={{ fontWeight: 'medium' }}>
+              {item.ingredient.name}
+            </Typography>
           }
           secondary={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-              <Typography variant="body2" color="text.secondary">
-                {item.quantity} {item.unit}
-              </Typography>
-              {item.expiryDate && (
+            <Box sx={{ mt: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Chip
+                  label={item.ingredient.category}
+                  size="small"
+                  sx={{
+                    backgroundColor: getCategoryColor(item.ingredient.category),
+                    color: 'white',
+                  }}
+                />
                 <Typography variant="body2" color="text.secondary">
-                  • Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                  {item.quantity} {item.unit}
                 </Typography>
-              )}
+              </Box>
               {item.notes && (
                 <Typography variant="body2" color="text.secondary">
-                  • {item.notes}
+                  {item.notes}
+                </Typography>
+              )}
+              {item.expiryDate && (
+                <Typography variant="body2" color="text.secondary">
+                  Expires: {new Date(item.expiryDate).toLocaleDateString()}
                 </Typography>
               )}
             </Box>
           }
         />
-        <ListItemSecondaryAction>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton
             edge="end"
             aria-label="edit"
-            onClick={() => onEdit(item)}
-            sx={{ mr: 1 }}
+            onClick={onEdit}
+            sx={{
+              color: theme.palette.primary.main,
+              '&:hover': {
+                backgroundColor: theme.palette.primary.main + '20',
+              },
+            }}
           >
             <EditIcon />
           </IconButton>
           <IconButton
             edge="end"
             aria-label="delete"
-            onClick={() => onDelete(item._id)}
+            onClick={onDelete}
+            sx={{
+              color: theme.palette.error.main,
+              '&:hover': {
+                backgroundColor: theme.palette.error.main + '20',
+              },
+            }}
           >
             <DeleteIcon />
           </IconButton>
-        </ListItemSecondaryAction>
+        </Box>
       </ListItem>
     );
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          My Pantry
+        <Typography variant="h4" component="h1" gutterBottom>
+          Pantry
         </Typography>
         <Button
           variant="contained"
@@ -324,23 +331,37 @@ const Pantry = () => {
         </Alert>
       )}
 
-      {pantryItems && pantryItems.length > 0 ? (
-        <List>
-          {pantryItems.map((item) => (
-            <PantryItem
-              key={item._id}
-              item={item}
-              onDelete={handleDeleteItem}
-              onEdit={handleOpenDialog}
-            />
-          ))}
-        </List>
-      ) : (
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : pantryItems.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
-            Your pantry is empty. Add some ingredients to get started!
+            No items in your pantry. Add your first item!
           </Typography>
         </Paper>
+      ) : (
+        <List>
+          {pantryItems.map((item) => (
+            <Paper
+              key={item._id}
+              elevation={1}
+              sx={{
+                mb: 2,
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                },
+              }}
+            >
+              <PantryItem
+                item={item}
+                onDelete={() => handleDeleteItem(item._id)}
+                onEdit={() => handleOpenDialog(item)}
+              />
+            </Paper>
+          ))}
+        </List>
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>

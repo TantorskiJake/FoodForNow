@@ -55,6 +55,7 @@ const Ingredients = () => {
     description: '',
     notes: '',
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -80,6 +81,8 @@ const Ingredients = () => {
       } else {
         setError('Failed to fetch ingredients. Please try again.');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -140,51 +143,59 @@ const Ingredients = () => {
   const theme = useTheme();
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 4, mb: 4 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Box display="flex" justifyContent="space-between" alignItems="center">
-              <Typography variant="h4" component="h1">
-                Ingredients
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenDialog()}
-              >
-                Add Ingredient
-              </Button>
-            </Box>
-          </Grid>
-
-          {error && (
-            <Grid item xs={12}>
-              <Alert severity="error" onClose={() => setError('')}>
-                {error}
-              </Alert>
-            </Grid>
-          )}
-
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <List>
-                  {ingredients.map((ingredient) => (
-                    <IngredientItem
-                      key={ingredient._id}
-                      ingredient={ingredient}
-                      onDelete={handleDeleteIngredient}
-                      onEdit={handleOpenDialog}
-                    />
-                  ))}
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Ingredients
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+        >
+          Add Ingredient
+        </Button>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : ingredients.length === 0 ? (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary">
+            No ingredients found. Add your first ingredient!
+          </Typography>
+        </Paper>
+      ) : (
+        <List>
+          {ingredients.map((ingredient) => (
+            <Paper
+              key={ingredient._id}
+              elevation={1}
+              sx={{
+                mb: 2,
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                },
+              }}
+            >
+              <IngredientItem
+                ingredient={ingredient}
+                onEdit={() => handleOpenDialog(ingredient)}
+                onDelete={() => handleDeleteIngredient(ingredient._id)}
+              />
+            </Paper>
+          ))}
+        </List>
+      )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
@@ -259,66 +270,70 @@ const Ingredients = () => {
   );
 };
 
-const IngredientItem = ({ ingredient, onDelete, onEdit }) => {
+const IngredientItem = ({ ingredient, onEdit, onDelete }) => {
   const theme = useTheme();
-  const categoryColor = getCategoryColor(ingredient.category);
-  const isDarkMode = theme.palette.mode === 'dark';
-
+  
   return (
     <ListItem
       sx={{
-        mb: 1,
-        borderRadius: 1,
-        backgroundColor: isDarkMode ? 'background.paper' : 'background.default',
-        '&:hover': {
-          backgroundColor: isDarkMode ? 'action.hover' : 'action.hover',
-        },
+        py: 2,
+        px: 3,
       }}
     >
       <ListItemText
         primary={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-              {ingredient.name}
-            </Typography>
-            <Chip
-              label={ingredient.category}
-              size="small"
-              sx={{
-                backgroundColor: categoryColor.main,
-                color: 'white',
-                '&:hover': {
-                  backgroundColor: categoryColor.dark,
-                },
-              }}
-            />
-          </Box>
+          <Typography variant="h6" component="div" sx={{ fontWeight: 'medium' }}>
+            {ingredient.name}
+          </Typography>
         }
         secondary={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-            <Typography variant="body2" color="text.secondary">
-              {ingredient.description || 'No description'}
-            </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Chip
+                label={ingredient.category}
+                size="small"
+                sx={{
+                  backgroundColor: getCategoryColor(ingredient.category),
+                  color: 'white',
+                }}
+              />
+            </Box>
+            {ingredient.description && (
+              <Typography variant="body2" color="text.secondary">
+                {ingredient.description}
+              </Typography>
+            )}
           </Box>
         }
       />
-      <ListItemSecondaryAction>
+      <Box sx={{ display: 'flex', gap: 1 }}>
         <IconButton
           edge="end"
           aria-label="edit"
-          onClick={() => onEdit(ingredient)}
-          sx={{ mr: 1 }}
+          onClick={onEdit}
+          sx={{
+            color: theme.palette.primary.main,
+            '&:hover': {
+              backgroundColor: theme.palette.primary.main + '20',
+            },
+          }}
         >
           <EditIcon />
         </IconButton>
         <IconButton
           edge="end"
           aria-label="delete"
-          onClick={() => onDelete(ingredient._id)}
+          onClick={onDelete}
+          sx={{
+            color: theme.palette.error.main,
+            '&:hover': {
+              backgroundColor: theme.palette.error.main + '20',
+            },
+          }}
         >
           <DeleteIcon />
         </IconButton>
-      </ListItemSecondaryAction>
+      </Box>
     </ListItem>
   );
 };

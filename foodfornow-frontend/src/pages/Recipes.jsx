@@ -24,11 +24,99 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Paper,
+  CircularProgress,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
+import TimerIcon from '@mui/icons-material/Timer';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
 import api from '../services/api';
+import { useTheme } from '@mui/material/styles';
+
+const RecipeItem = ({ recipe, onEdit, onDelete }) => {
+  const theme = useTheme();
+  
+  return (
+    <ListItem
+      sx={{
+        py: 2,
+        px: 3,
+      }}
+    >
+      <ListItemText
+        primary={
+          <Typography variant="h6" component="div" sx={{ fontWeight: 'medium' }}>
+            {recipe.name}
+          </Typography>
+        }
+        secondary={
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {recipe.description}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <TimerIcon fontSize="small" color="action" />
+                <Typography variant="body2" color="text.secondary">
+                  {recipe.prepTime + recipe.cookTime} mins
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <RestaurantIcon fontSize="small" color="action" />
+                <Typography variant="body2" color="text.secondary">
+                  {recipe.servings} servings
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {recipe.tags.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={tag}
+                  size="small"
+                  sx={{
+                    backgroundColor: theme.palette.primary.main,
+                    color: theme.palette.primary.contrastText,
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+        }
+      />
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <IconButton
+          edge="end"
+          aria-label="edit"
+          onClick={onEdit}
+          sx={{
+            color: theme.palette.primary.main,
+            '&:hover': {
+              backgroundColor: theme.palette.primary.main + '20',
+            },
+          }}
+        >
+          <EditIcon />
+        </IconButton>
+        <IconButton
+          edge="end"
+          aria-label="delete"
+          onClick={onDelete}
+          sx={{
+            color: theme.palette.error.main,
+            '&:hover': {
+              backgroundColor: theme.palette.error.main + '20',
+            },
+          }}
+        >
+          <DeleteIcon />
+        </IconButton>
+      </Box>
+    </ListItem>
+  );
+};
 
 const Recipes = () => {
   const navigate = useNavigate();
@@ -47,6 +135,8 @@ const Recipes = () => {
     servings: '',
     tags: '',
   });
+  const theme = useTheme();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -88,6 +178,8 @@ const Recipes = () => {
       } else {
         setError('Failed to fetch recipes. Please try again.');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -181,84 +273,59 @@ const Recipes = () => {
   };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 4, mb: 4 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Box display="flex" justifyContent="space-between" alignItems="center">
-              <Typography variant="h4" component="h1">
-                My Recipes
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenDialog()}
-              >
-                Add Recipe
-              </Button>
-            </Box>
-          </Grid>
-
-          {error && (
-            <Grid item xs={12}>
-              <Alert severity="error" onClose={() => setError('')}>
-                {error}
-              </Alert>
-            </Grid>
-          )}
-
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <List>
-                  {recipes.map((recipe) => (
-                    <ListItem key={recipe._id}>
-                      <ListItemText
-                        primary={recipe.name}
-                        secondary={
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">
-                              {recipe.description}
-                            </Typography>
-                            <Box sx={{ mt: 1 }}>
-                              {recipe.tags.map((tag) => (
-                                <Chip
-                                  key={tag}
-                                  label={tag}
-                                  size="small"
-                                  sx={{ mr: 0.5, mb: 0.5 }}
-                                />
-                              ))}
-                            </Box>
-                          </Box>
-                        }
-                      />
-                      <ListItemSecondaryAction>
-                        <IconButton
-                          edge="end"
-                          aria-label="edit"
-                          onClick={() => handleOpenDialog(recipe)}
-                          sx={{ mr: 1 }}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          edge="end"
-                          aria-label="delete"
-                          onClick={() => handleDeleteRecipe(recipe._id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Recipes
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+        >
+          Add Recipe
+        </Button>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : recipes.length === 0 ? (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary">
+            No recipes found. Add your first recipe!
+          </Typography>
+        </Paper>
+      ) : (
+        <List>
+          {recipes.map((recipe) => (
+            <Paper
+              key={recipe._id}
+              elevation={1}
+              sx={{
+                mb: 2,
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                },
+              }}
+            >
+              <RecipeItem
+                recipe={recipe}
+                onEdit={() => handleOpenDialog(recipe)}
+                onDelete={() => handleDeleteRecipe(recipe._id)}
+              />
+            </Paper>
+          ))}
+        </List>
+      )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
