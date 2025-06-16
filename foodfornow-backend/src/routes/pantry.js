@@ -3,6 +3,7 @@ const Pantry = require("../models/pantry");
 const Ingredient = require("../models/ingredient");
 const authMiddleware = require("../middleware/auth");
 const mongoose = require("mongoose");
+const ShoppingListItem = require("../models/shopping-list-item");
 
 const router = express.Router();
 
@@ -228,6 +229,68 @@ router.delete("/", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Error clearing pantry:", err.message);
     res.status(500).json({ error: "Failed to clear pantry" });
+  }
+});
+
+// Add all shopping list items to pantry
+router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.userId;
+    console.log('Adding all shopping list items to pantry for user:', userId);
+
+    // Get all uncompleted shopping list items
+    const shoppingItems = await ShoppingListItem.find({ user: userId, completed: false })
+      .populate('ingredient');
+
+    if (!shoppingItems.length) {
+      return res.status(200).json({ message: 'No items to add to pantry' });
+    }
+
+    // Get or create pantry
+    let pantry = await Pantry.findOne({ user: userId });
+    if (!pantry) {
+      pantry = new Pantry({ user: userId, items: [] });
+    }
+
+    // Add each item to pantry and mark as completed
+    for (const item of shoppingItems) {
+      if (!item.ingredient) {
+        console.log('Skipping item with no ingredient:', item);
+        continue;
+      }
+
+      const existingItem = pantry.items.find(
+        pItem => pItem.ingredient.toString() === item.ingredient._id.toString()
+      );
+
+      if (existingItem) {
+        existingItem.quantity += item.quantity;
+      } else {
+        pantry.items.push({
+          ingredient: item.ingredient._id,
+          quantity: item.quantity,
+          unit: item.unit
+        });
+      }
+
+      // Mark shopping list item as completed
+      item.completed = true;
+      await item.save();
+    }
+
+    await pantry.save();
+
+    // Delete all completed shopping list items
+    await ShoppingListItem.deleteMany({ user: userId, completed: true });
+
+    // Get updated pantry with populated ingredients
+    const updatedPantry = await Pantry.findOne({ user: userId })
+      .populate('items.ingredient');
+
+    res.json(updatedPantry);
+  } catch (error) {
+    console.error('Error adding items to pantry:', error);
+    res.status(500).json({ error: 'Failed to add items to pantry' });
   }
 });
 

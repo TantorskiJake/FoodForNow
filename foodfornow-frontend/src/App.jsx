@@ -11,10 +11,12 @@ import ShoppingList from './pages/ShoppingList';
 import PrivateRoute from './components/PrivateRoute';
 import Navbar from './components/Navbar';
 import { ThemeProvider } from './context/ThemeContext';
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
     <ThemeProvider>
+      <Toaster position="top-right" />
       <Router>
         <Navbar />
         <Routes>
