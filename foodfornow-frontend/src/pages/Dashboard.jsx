@@ -20,16 +20,21 @@ import {
   List,
   ListItem,
   ListItemText,
+  Chip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import api from '../services/api';
 import MealPlanGrid from '../components/MealPlanGrid';
+import { getCategoryColor } from '../utils/categoryColors';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [openMealDialog, setOpenMealDialog] = useState(false);
   const [mealFormData, setMealFormData] = useState({
     _id: '',
@@ -45,6 +50,7 @@ const Dashboard = () => {
         await api.get('/auth/me');
         fetchRecipes();
         fetchMealPlan();
+        fetchIngredients();
       } catch {
         navigate('/login');
       }
@@ -69,6 +75,33 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Error fetching meal plan:', err);
       setError('Failed to fetch meal plan. Please try again.');
+    }
+  };
+
+  const fetchIngredients = async () => {
+    try {
+      const response = await api.get('/mealplan/ingredients');
+      console.log('Ingredients response:', response.data);
+      setIngredients(response.data);
+    } catch (err) {
+      console.error('Error fetching ingredients:', err);
+      setError('Failed to fetch ingredients. Please try again.');
+    }
+  };
+
+  const handleAddAllToShoppingList = async () => {
+    try {
+      setLoading(true);
+      const response = await api.post('/shopping-list/update-from-meal-plan');
+      console.log('Added ingredients to shopping list:', response.data);
+      setError(null);
+      // Refresh the ingredients list after adding to shopping list
+      await fetchIngredients();
+    } catch (err) {
+      console.error('Error adding ingredients to shopping list:', err);
+      setError('Failed to add ingredients to shopping list');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -232,6 +265,54 @@ const Dashboard = () => {
                   onDeleteMeal={handleDeleteMeal}
                   onEditMeal={handleEditMeal}
                 />
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h5">Ingredients Needed</Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<ShoppingCartIcon />}
+                    onClick={handleAddAllToShoppingList}
+                    disabled={ingredients.length === 0 || loading}
+                  >
+                    {loading ? 'Adding...' : 'Add All to Shopping List'}
+                  </Button>
+                </Box>
+                {ingredients.length > 0 ? (
+                  <List>
+                    {ingredients.map((ingredient) => (
+                      <ListItem key={ingredient._id}>
+                        <ListItemText
+                          primary={
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="body1">
+                                {ingredient.quantity} {ingredient.unit} {ingredient.name}
+                              </Typography>
+                              <Chip
+                                label={ingredient.category}
+                                size="small"
+                                sx={{
+                                  backgroundColor: getCategoryColor(ingredient.category),
+                                  color: 'white',
+                                }}
+                              />
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography variant="body1" color="text.secondary">
+                    No ingredients needed for this week's recipes
+                  </Typography>
+                )}
               </CardContent>
             </Card>
           </Grid>
