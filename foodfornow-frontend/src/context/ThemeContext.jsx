@@ -20,14 +20,14 @@ export const ThemeProvider = ({ children }) => {
     palette: {
       mode: darkMode ? 'dark' : 'light',
       primary: {
-        main: '#1976d2',
-        light: '#42a5f5',
-        dark: '#1565c0',
+        main: '#2e7d32',
+        light: '#4caf50',
+        dark: '#1b5e20',
       },
       secondary: {
-        main: '#9c27b0',
-        light: '#ba68c8',
-        dark: '#7b1fa2',
+        main: '#ff9800',
+        light: '#ffb74d',
+        dark: '#f57c00',
       },
       background: {
         default: darkMode ? '#121212' : '#f5f5f5',
