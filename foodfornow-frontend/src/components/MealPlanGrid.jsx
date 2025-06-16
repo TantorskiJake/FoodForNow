@@ -97,10 +97,28 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
                       }}
                       onClick={(e) => meal ? handleMealClick(meal, e) : onAddMeal(day, mealType)}
                     >
-                      <CardContent>
+                      <CardContent sx={{ 
+                        p: 1.5,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative'
+                      }}>
                         {meal ? (
                           <>
-                            <Typography variant="body2" noWrap>
+                            <Typography 
+                              variant="body2" 
+                              sx={{
+                                wordBreak: 'break-word',
+                                overflow: 'hidden',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical',
+                                lineHeight: 1.2,
+                                fontSize: '0.875rem',
+                                pt: 2 // Add padding top to account for delete button
+                              }}
+                            >
                               {meal.recipe && meal.recipe.name ? meal.recipe.name : 'No Recipe'}
                             </Typography>
                             <IconButton
@@ -109,13 +127,28 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
                                 e.stopPropagation();
                                 onDeleteMeal(meal._id);
                               }}
-                              sx={{ position: 'absolute', top: 0, right: 0 }}
+                              sx={{ 
+                                position: 'absolute', 
+                                top: 0, 
+                                right: 0,
+                                p: 0.5
+                              }}
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </>
                         ) : (
-                          <Typography variant="body2" color="text.secondary" align="center">
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary" 
+                            align="center"
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              height: '100%'
+                            }}
+                          >
                             Click to add meal
                           </Typography>
                         )}
