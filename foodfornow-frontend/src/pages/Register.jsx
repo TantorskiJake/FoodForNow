@@ -8,6 +8,7 @@ import {
   Typography,
   Box,
   Alert,
+  LinearProgress,
 } from '@mui/material';
 import api from '../services/api';
 
@@ -162,19 +163,47 @@ const Register = () => {
               onChange={handleChange}
             />
             {passwordStrength && (
-              <Typography
-                variant="body2"
-                sx={{
-                  color:
+              <Box sx={{ mt: 1, width: '100%' }}>
+                <LinearProgress
+                  variant="determinate"
+                  value={
                     passwordStrength === 'strong'
-                      ? 'green'
+                      ? 100
                       : passwordStrength === 'medium'
-                      ? 'orange'
-                      : 'red',
-                }}
-              >
-                Password strength: {passwordStrength}
-              </Typography>
+                      ? 60
+                      : 30
+                  }
+                  sx={{
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: '#e0e0e0',
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor:
+                        passwordStrength === 'strong'
+                          ? 'green'
+                          : passwordStrength === 'medium'
+                          ? 'orange'
+                          : 'red',
+                    },
+                  }}
+                />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    mt: 0.5,
+                    color:
+                      passwordStrength === 'strong'
+                        ? 'green'
+                        : passwordStrength === 'medium'
+                        ? 'orange'
+                        : 'red',
+                  }}
+                >
+                  {passwordStrength.charAt(0).toUpperCase() +
+                    passwordStrength.slice(1)}{' '}
+                  password
+                </Typography>
+              </Box>
             )}
             <TextField
               margin="normal"
