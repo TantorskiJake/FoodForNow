@@ -11,6 +11,7 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  useTheme
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -18,6 +19,7 @@ import RestaurantIcon from '@mui/icons-material/Restaurant';
 
 const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -89,11 +91,12 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
                       sx={{ 
                         height: '100%',
                         minHeight: 100,
-                        bgcolor: meal ? 'primary.light' : 'grey.100',
+                        bgcolor: meal ? 'primary.light' : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100',
                         '&:hover': {
-                          bgcolor: meal ? 'primary.main' : 'grey.200',
+                          bgcolor: meal ? 'primary.main' : theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200',
                           cursor: 'pointer'
-                        }
+                        },
+                        border: theme.palette.mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : 'none'
                       }}
                       onClick={(e) => meal ? handleMealClick(meal, e) : onAddMeal(day, mealType)}
                     >
@@ -116,7 +119,8 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
                                 WebkitBoxOrient: 'vertical',
                                 lineHeight: 1.2,
                                 fontSize: '0.875rem',
-                                pt: 2 // Add padding top to account for delete button
+                                pt: 2, // Add padding top to account for delete button
+                                color: 'white'
                               }}
                             >
                               {meal.recipe && meal.recipe.name ? meal.recipe.name : 'No Recipe'}
@@ -131,7 +135,8 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
                                 position: 'absolute', 
                                 top: 0, 
                                 right: 0,
-                                p: 0.5
+                                p: 0.5,
+                                color: 'white'
                               }}
                             >
                               <DeleteIcon fontSize="small" />
