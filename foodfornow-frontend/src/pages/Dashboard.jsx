@@ -29,7 +29,6 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
-  const [popularRecipes, setPopularRecipes] = useState([]);
   const [error, setError] = useState('');
   const [openMealDialog, setOpenMealDialog] = useState(false);
   const [mealFormData, setMealFormData] = useState({
@@ -46,7 +45,6 @@ const Dashboard = () => {
         await api.get('/auth/me');
         fetchRecipes();
         fetchMealPlan();
-        fetchPopularRecipes();
       } catch {
         navigate('/login');
       }
@@ -71,16 +69,6 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Error fetching meal plan:', err);
       setError('Failed to fetch meal plan. Please try again.');
-    }
-  };
-
-  const fetchPopularRecipes = async () => {
-    try {
-      const response = await api.get('/recipes/popular');
-      setPopularRecipes(response.data);
-    } catch (err) {
-      console.error('Error fetching popular recipes:', err);
-      setError('Failed to fetch popular recipes. Please try again.');
     }
   };
 
@@ -244,26 +232,6 @@ const Dashboard = () => {
                   onDeleteMeal={handleDeleteMeal}
                   onEditMeal={handleEditMeal}
                 />
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>
-                  Popular Recipes
-                </Typography>
-                <List>
-                  {popularRecipes.map((recipe) => (
-                    <ListItem key={recipe._id}>
-                      <ListItemText
-                        primary={recipe.name}
-                        secondary={`${recipe.ingredients.length} ingredients`}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
               </CardContent>
             </Card>
           </Grid>
