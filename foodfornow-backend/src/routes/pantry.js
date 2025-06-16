@@ -242,6 +242,8 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
     const shoppingItems = await ShoppingListItem.find({ user: userId, completed: false })
       .populate('ingredient');
 
+    console.log('Found shopping items:', shoppingItems);
+
     if (!shoppingItems.length) {
       return res.status(200).json({ message: 'No items to add to pantry' });
     }
@@ -259,13 +261,16 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
         continue;
       }
 
+      // Check if ingredient already exists in pantry
       const existingItem = pantry.items.find(
-        pItem => pItem.ingredient.toString() === item.ingredient._id.toString()
+        pItem => pItem.ingredient.toString() === item.ingredient._id.toString() && pItem.unit === item.unit
       );
 
       if (existingItem) {
+        // Update quantity if item exists
         existingItem.quantity += item.quantity;
       } else {
+        // Add new item to pantry
         pantry.items.push({
           ingredient: item.ingredient._id,
           quantity: item.quantity,
@@ -278,10 +283,13 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
       await item.save();
     }
 
+    // Save the updated pantry
     await pantry.save();
+    console.log('Updated pantry:', pantry);
 
     // Delete all completed shopping list items
     await ShoppingListItem.deleteMany({ user: userId, completed: true });
+    console.log('Deleted completed shopping list items');
 
     // Get updated pantry with populated ingredients
     const updatedPantry = await Pantry.findOne({ user: userId })

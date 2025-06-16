@@ -131,12 +131,24 @@ const ShoppingList = () => {
 
   const handleAddAllToPantry = async () => {
     try {
+      setLoading(true);
       const response = await api.post('/pantry/add-all-from-shopping-list');
-      fetchShoppingList();
+      console.log('Add to pantry response:', response.data);
+      
+      // Refresh both shopping list and pantry
+      await Promise.all([
+        fetchShoppingList(),
+        api.get('/pantry').then(res => {
+          console.log('Updated pantry:', res.data);
+        })
+      ]);
+      
       toast.success('Added all items to pantry');
     } catch (err) {
       console.error('Error adding all to pantry:', err);
       toast.error('Failed to add items to pantry');
+    } finally {
+      setLoading(false);
     }
   };
 

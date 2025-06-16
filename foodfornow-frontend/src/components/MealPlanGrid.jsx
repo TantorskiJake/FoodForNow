@@ -58,9 +58,6 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal }) =>
 
   return (
     <Box sx={{ mt: 4 }}>
-      <Typography variant="h5" gutterBottom>
-        Weekly Meal Plan
-      </Typography>
       <Grid container spacing={2}>
         {/* Header row with days */}
         <Grid item xs={12}>
