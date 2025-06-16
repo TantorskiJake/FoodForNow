@@ -97,7 +97,20 @@ const Register = () => {
         email: formData.email,
         password: formData.password,
       });
-      
+
+      if (window.PasswordCredential && 'credentials' in navigator) {
+        try {
+          const cred = new window.PasswordCredential({
+            id: formData.email,
+            password: formData.password,
+            name: formData.name,
+          });
+          navigator.credentials.store(cred);
+        } catch (credErr) {
+          console.error('Credential store failed:', credErr);
+        }
+      }
+
       navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
@@ -269,6 +282,13 @@ const Register = () => {
               sx={{ mt: 3, mb: 2 }}
             >
               Register
+            </Button>
+            <Button
+              fullWidth
+              variant="text"
+              onClick={() => navigate('/login')}
+            >
+              Back to Login
             </Button>
           </Box>
         </Paper>

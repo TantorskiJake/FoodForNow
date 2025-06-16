@@ -34,7 +34,20 @@ const Login = () => {
         email,
         password,
       });
-      
+
+      if (window.PasswordCredential && 'credentials' in navigator) {
+        try {
+          const cred = new window.PasswordCredential({
+            id: email,
+            password,
+            name: email,
+          });
+          navigator.credentials.store(cred);
+        } catch (credErr) {
+          console.error('Credential store failed:', credErr);
+        }
+      }
+
       // No token in response; rely on cookie
       navigate('/dashboard');
     } catch (err) {
