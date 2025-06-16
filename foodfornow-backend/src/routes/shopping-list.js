@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const ShoppingListItem = require('../models/shopping-list-item');
 const Recipe = require('../models/recipe');
 const PantryItem = require('../models/pantry');
+const Ingredient = require('../models/ingredient');
 
 // Get shopping list
 router.get('/', authMiddleware, async (req, res) => {
@@ -17,6 +18,47 @@ router.get('/', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Error fetching shopping list:', err);
     res.status(500).json({ message: 'Error fetching shopping list' });
+  }
+});
+
+// Add item to shopping list
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    console.log('Adding item to shopping list:', req.body);
+    const { ingredient, quantity, unit } = req.body;
+
+    // Validate required fields
+    if (!ingredient || !quantity || !unit) {
+      return res.status(400).json({ error: 'Ingredient, quantity, and unit are required' });
+    }
+
+    // Validate unit
+    const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+    if (!validUnits.includes(unit)) {
+      return res.status(400).json({ error: `Invalid unit. Must be one of: ${validUnits.join(', ')}` });
+    }
+
+    // Validate ingredient exists
+    const validIngredient = await Ingredient.findById(ingredient);
+    if (!validIngredient) {
+      return res.status(400).json({ error: 'Invalid ingredient ID' });
+    }
+
+    // Create a new shopping list item
+    const shoppingListItem = new ShoppingListItem({
+      user: req.userId,
+      ingredient: ingredient,
+      quantity: Number(quantity),
+      unit: unit,
+      completed: false
+    });
+
+    await shoppingListItem.save();
+    await shoppingListItem.populate('ingredient');
+    res.status(201).json(shoppingListItem);
+  } catch (err) {
+    console.error('Error adding item to shopping list:', err);
+    res.status(500).json({ error: 'Failed to add item to shopping list' });
   }
 });
 

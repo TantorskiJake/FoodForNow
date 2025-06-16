@@ -13,8 +13,7 @@ const shoppingListItemSchema = new mongoose.Schema({
   },
   recipe: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Recipe',
-    required: true
+    ref: 'Recipe'
   },
   quantity: {
     type: Number,
