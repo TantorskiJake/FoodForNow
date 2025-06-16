@@ -1,7 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -12,22 +10,11 @@ import Ingredients from './pages/Ingredients';
 import ShoppingList from './pages/ShoppingList';
 import PrivateRoute from './components/PrivateRoute';
 import Navbar from './components/Navbar';
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#2e7d32',
-    },
-    secondary: {
-      main: '#ff9800',
-    },
-  },
-});
+import { ThemeProvider } from './context/ThemeContext';
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ThemeProvider>
       <Router>
         <Navbar />
         <Routes>

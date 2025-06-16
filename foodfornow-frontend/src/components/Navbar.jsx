@@ -17,6 +17,7 @@ import KitchenIcon from '@mui/icons-material/Kitchen';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
+import ThemeToggle from './ThemeToggle';
 import api from '../services/api';
 
 const pages = [
@@ -100,6 +101,8 @@ const Navbar = () => {
               {page.name}
             </Button>
           ))}
+
+          <ThemeToggle />
 
           <IconButton
             size="large"
