@@ -30,13 +30,10 @@ const Login = () => {
     e.preventDefault();
     try {
       setError('');
-      console.log('Attempting login...');
       const response = await api.post('/auth/login', {
         email,
         password,
       });
-
-      console.log('Login response:', response.data);
       
       // No token in response; rely on cookie
       navigate('/dashboard');
