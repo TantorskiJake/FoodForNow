@@ -3,7 +3,6 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const RefreshToken = require("../models/refreshToken");
-const validateRequest = require("../middleware/validateRequest");
 const auth = require('../middleware/auth');
 
 const router = express.Router();
