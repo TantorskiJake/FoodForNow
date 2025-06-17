@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const Ingredient = require('../models/ingredient');
+const Recipe = require('../models/recipe');
 
 // Get all ingredients with search
 router.get('/', authMiddleware, async (req, res) => {
@@ -120,13 +121,26 @@ router.put('/:id', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     console.log('Deleting ingredient:', req.params.id);
-    const ingredient = await Ingredient.findOneAndDelete({
+
+    // Verify the ingredient exists and belongs to the user
+    const ingredient = await Ingredient.findOne({
       _id: req.params.id,
       user: req.userId
     });
     if (!ingredient) {
       return res.status(404).json({ message: 'Ingredient not found' });
     }
+
+    // Check if the ingredient is referenced by any of the user's recipes
+    const inUse = await Recipe.findOne({
+      createdBy: req.userId,
+      'ingredients.ingredient': req.params.id
+    });
+    if (inUse) {
+      return res.status(400).json({ message: 'Cannot delete ingredient: it is used in a recipe' });
+    }
+
+    await ingredient.deleteOne();
     res.json({ message: 'Ingredient deleted' });
   } catch (err) {
     console.error('Error deleting ingredient:', err);
