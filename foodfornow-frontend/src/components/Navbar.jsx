@@ -9,6 +9,8 @@ import {
   IconButton,
   Menu,
   MenuItem,
+  Avatar,
+  useTheme,
 } from '@mui/material';
 import AccountCircle from '@mui/icons-material/AccountCircle';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
@@ -30,10 +32,11 @@ const pages = [
 ];
 
 const Navbar = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const { authenticated, loading, refreshAuth } = useAuth();
+  const { authenticated, loading, refreshAuth, user } = useAuth();
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -52,6 +55,8 @@ const Navbar = () => {
   if (loading || !authenticated) {
     return null;
   }
+
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '';
 
   return (
     <AppBar position="static">
@@ -97,8 +102,25 @@ const Navbar = () => {
             aria-haspopup="true"
             onClick={handleMenu}
             color="inherit"
+            sx={{
+              width: 40,
+              height: 40,
+              '& .MuiAvatar-root': {
+                width: 40,
+                height: 40,
+                fontSize: '1.2rem',
+                fontWeight: 600,
+                background: theme.palette.mode === 'dark'
+                  ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                  : '#228B22',
+              },
+            }}
           >
-            <AccountCircle />
+            {userInitial ? (
+              <Avatar>{userInitial}</Avatar>
+            ) : (
+              <AccountCircle />
+            )}
           </IconButton>
           <Menu
             id="menu-appbar"
