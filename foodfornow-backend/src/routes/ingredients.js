@@ -10,8 +10,8 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     console.log('Fetching all ingredients');
     const ingredients = await Ingredient.find({ archived: false }).sort({ name: 1 });
-    const owned = ingredients.filter(i => i.createdBy.toString() === req.userId.toString());
-    const global = ingredients.filter(i => i.createdBy.toString() !== req.userId.toString());
+    const owned = ingredients.filter(i => i.createdBy && i.createdBy.toString() === req.userId.toString());
+    const global = ingredients.filter(i => !i.createdBy || i.createdBy.toString() !== req.userId.toString());
     res.json({ owned, global });
   } catch (err) {
     console.error('Error fetching ingredients:', err);
@@ -44,7 +44,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Ingredient not found' });
     }
 
-    if (ingredient.createdBy.toString() !== req.userId.toString()) {
+    if (!ingredient.createdBy || ingredient.createdBy.toString() !== req.userId.toString()) {
       if (ingredient.archived) {
         return res.status(409).json({ message: 'Archived ingredient. Claim to modify', requiresClaim: true });
       }
@@ -74,7 +74,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     if (!ingredient) {
       return res.status(404).json({ message: 'Ingredient not found' });
     }
-    if (ingredient.createdBy.toString() !== req.userId.toString()) {
+    if (!ingredient.createdBy || ingredient.createdBy.toString() !== req.userId.toString()) {
       return res.status(403).json({ message: 'Only the creator can delete this ingredient' });
     }
     const recipeCount = await Recipe.countDocuments({ 'ingredients.ingredient': ingredient._id });
@@ -116,7 +116,7 @@ router.get('/change-requests', authMiddleware, async (req, res) => {
     const requests = await IngredientChangeRequest.find({ status: 'pending' })
       .populate('ingredient');
 
-    const filtered = requests.filter(r => r.ingredient.createdBy.toString() === req.userId.toString());
+    const filtered = requests.filter(r => r.ingredient.createdBy && r.ingredient.createdBy.toString() === req.userId.toString());
     res.json(filtered);
   } catch (err) {
     console.error('Error fetching change requests:', err);
@@ -131,7 +131,7 @@ router.post('/change-requests/:id/approve', authMiddleware, async (req, res) => 
     if (!request || request.status !== 'pending') {
       return res.status(404).json({ message: 'Change request not found' });
     }
-    if (request.ingredient.createdBy.toString() !== req.userId.toString()) {
+    if (!request.ingredient.createdBy || request.ingredient.createdBy.toString() !== req.userId.toString()) {
       return res.status(403).json({ message: 'Not authorized to approve this request' });
     }
     Object.assign(request.ingredient, request.proposedChanges);
@@ -152,7 +152,7 @@ router.post('/change-requests/:id/deny', authMiddleware, async (req, res) => {
     if (!request || request.status !== 'pending') {
       return res.status(404).json({ message: 'Change request not found' });
     }
-    if (request.ingredient.createdBy.toString() !== req.userId.toString()) {
+    if (!request.ingredient.createdBy || request.ingredient.createdBy.toString() !== req.userId.toString()) {
       return res.status(403).json({ message: 'Not authorized to deny this request' });
     }
     request.status = 'denied';
