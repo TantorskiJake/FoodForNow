@@ -304,4 +304,16 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Clear all shopping list items
+router.delete('/', authMiddleware, async (req, res) => {
+  try {
+    console.log('Clearing all shopping list items for user:', req.userId);
+    await ShoppingListItem.deleteMany({ user: req.userId });
+    res.json({ message: 'Shopping list cleared successfully' });
+  } catch (err) {
+    console.error('Error clearing shopping list:', err);
+    res.status(500).json({ error: 'Failed to clear shopping list' });
+  }
+});
+
 module.exports = router; 

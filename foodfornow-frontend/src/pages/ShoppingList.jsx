@@ -51,6 +51,7 @@ const ShoppingList = () => {
     quantity: '',
     unit: ''
   });
+  const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
 
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
 
@@ -182,6 +183,21 @@ const ShoppingList = () => {
     }
   };
 
+  const handleClearAll = async () => {
+    try {
+      setLoading(true);
+      await api.delete('/shopping-list');
+      setShoppingItems([]); // Immediately clear the items in the state
+      toast.success('All shopping list items cleared successfully');
+    } catch (err) {
+      console.error('Error clearing shopping list:', err);
+      toast.error('Failed to clear shopping list items');
+    } finally {
+      setLoading(false);
+      setOpenClearConfirmDialog(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
@@ -197,6 +213,16 @@ const ShoppingList = () => {
           Shopping List
         </Typography>
         <Box>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => setOpenClearConfirmDialog(true)}
+            startIcon={<DeleteIcon />}
+            sx={{ mr: 2 }}
+            disabled={loading || shoppingItems.length === 0}
+          >
+            Clear All
+          </Button>
           <Button
             variant="contained"
             color="primary"
@@ -222,7 +248,7 @@ const ShoppingList = () => {
             onClick={handleUpdateFromMealPlan}
             startIcon={<AddIcon />}
           >
-            Update from Meal Plan
+            Auto Update
           </Button>
         </Box>
       </Box>
@@ -317,6 +343,29 @@ const ShoppingList = () => {
           ))}
         </List>
       )}
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog
+        open={openClearConfirmDialog}
+        onClose={() => setOpenClearConfirmDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Clear All Shopping List Items</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to remove all items from your shopping list? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenClearConfirmDialog(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleClearAll} color="error" variant="contained">
+            Clear All
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
