@@ -24,10 +24,12 @@ import {
   CircularProgress,
   LinearProgress,
   Paper,
-  Divider
+  Divider,
+  IconButton
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../services/api';
 import MealPlanGrid from '../components/MealPlanGrid';
 import { getCategoryColor } from '../utils/categoryColors';
@@ -206,6 +208,14 @@ const Dashboard = () => {
     }
   };
 
+  const handleAddToPantry = () => {
+    // Implementation of adding to pantry
+  };
+
+  const handleDeletePantryItem = (id) => {
+    // Implementation of deleting pantry item
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -268,52 +278,68 @@ const Dashboard = () => {
                 </Button>
               </Box>
               {ingredients.length > 0 ? (
-                <List>
+                <Grid container spacing={2}>
                   {ingredients.map((ingredient) => (
-                    <ListItem key={ingredient._id}>
-                      <ListItemText
-                        primary={
-                          <Box>
-                            <Typography variant="subtitle1">
-                              {ingredient.name}
+                    <Grid item xs={12} sm={6} md={4} key={ingredient._id}>
+                      <Paper
+                        elevation={1}
+                        sx={{
+                          p: 2,
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          position: 'relative',
+                          '&:hover': {
+                            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                          },
+                        }}
+                      >
+                        <Box sx={{ flex: 1 }}>
+                          <Typography
+                            variant="subtitle1"
+                            sx={{
+                              fontWeight: 'medium',
+                              mb: 1
+                            }}
+                          >
+                            {ingredient.name}
+                          </Typography>
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Typography variant="body2" color="textSecondary">
+                              {ingredient.pantryQuantity > 0 ? `${ingredient.pantryQuantity}/${ingredient.quantity}` : ingredient.quantity} {ingredient.unit}
                             </Typography>
-                            <Box display="flex" alignItems="center" gap={1} mt={0.5}>
-                              <Typography variant="body2" color="textSecondary">
-                                {ingredient.pantryQuantity > 0 ? `${ingredient.pantryQuantity}/${ingredient.quantity}` : ingredient.quantity} {ingredient.unit}
-                              </Typography>
-                              {ingredient.pantryQuantity > 0 && (
-                                <Box sx={{ width: '30px', ml: 1 }}>
-                                  <LinearProgress
-                                    variant="determinate"
-                                    value={Math.min(100, (ingredient.pantryQuantity / ingredient.quantity) * 100)}
-                                    sx={{
-                                      height: 3,
-                                      borderRadius: 1.5,
-                                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                                      '& .MuiLinearProgress-bar': {
-                                        borderRadius: 1.5,
-                                        backgroundColor: (theme) => {
-                                          const percentage = (ingredient.pantryQuantity / ingredient.quantity) * 100;
-                                          if (percentage >= 100) return theme.palette.success.main;
-                                          if (percentage >= 50) return theme.palette.warning.main;
-                                          return theme.palette.error.main;
-                                        },
-                                      },
-                                    }}
-                                  />
-                                </Box>
-                              )}
+                            <Box sx={{ width: '100px', ml: 1 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Math.min(100, ((ingredient.pantryQuantity || 0) / ingredient.quantity) * 100)}
+                                sx={{
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                                  '& .MuiLinearProgress-bar': {
+                                    borderRadius: 4,
+                                    backgroundColor: (theme) => {
+                                      const percentage = ((ingredient.pantryQuantity || 0) / ingredient.quantity) * 100;
+                                      if (percentage >= 100) return theme.palette.success.main;
+                                      if (percentage >= 50) return theme.palette.warning.main;
+                                      return theme.palette.error.main;
+                                    },
+                                  },
+                                }}
+                              />
                             </Box>
                           </Box>
-                        }
-                      />
-                    </ListItem>
+                        </Box>
+                      </Paper>
+                    </Grid>
                   ))}
-                </List>
+                </Grid>
               ) : (
-                <Typography variant="body1" color="text.secondary">
-                  No ingredients needed for this week's recipes
-                </Typography>
+                <Paper sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No ingredients needed from your meal plan
+                  </Typography>
+                </Paper>
               )}
             </CardContent>
           </Card>

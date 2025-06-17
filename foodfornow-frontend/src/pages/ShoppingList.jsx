@@ -269,79 +269,93 @@ const ShoppingList = () => {
             Your shopping list is empty
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Click "Update from Meal Plan" to add ingredients from your meal plan
+            Click "Auto Update" to add ingredients from your meal plan
           </Typography>
         </Paper>
       ) : (
-        <List>
+        <Grid container spacing={2}>
           {shoppingItems.map((item) => (
-            <React.Fragment key={item._id}>
-              <ListItem>
-                <Checkbox
-                  checked={item.completed}
-                  onChange={() => handleToggleComplete(item)}
-                  color="primary"
-                  sx={{ mr: 1 }}
-                />
-                <ListItemText
-                  primary={
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'text.disabled' : 'text.primary' }}>
-                        {item.ingredient?.name || 'Unknown Ingredient'}
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1} mt={0.5}>
-                        <Typography variant="body2" color="textSecondary">
-                          {item.pantryQuantity > 0 ? `${item.pantryQuantity}/${item.quantity + item.pantryQuantity}` : item.quantity} {item.unit}
-                        </Typography>
-                        {item.pantryQuantity > 0 && (
-                          <Box sx={{ width: '30px', ml: 1 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={Math.min(100, (item.pantryQuantity / (item.quantity + item.pantryQuantity)) * 100)}
-                              sx={{
-                                height: 3,
-                                borderRadius: 1.5,
-                                backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                                '& .MuiLinearProgress-bar': {
-                                  borderRadius: 1.5,
-                                  backgroundColor: (theme) => {
-                                    const percentage = (item.pantryQuantity / (item.quantity + item.pantryQuantity)) * 100;
-                                    if (percentage >= 100) return theme.palette.success.main;
-                                    if (percentage >= 50) return theme.palette.warning.main;
-                                    return theme.palette.error.main;
-                                  },
-                                },
-                              }}
-                            />
-                          </Box>
-                        )}
-                      </Box>
-                    </Box>
-                  }
-                />
-                <ListItemSecondaryAction>
-                  <IconButton
-                    edge="end"
-                    aria-label="add to pantry"
-                    onClick={() => handleAddToPantry(item)}
+            <Grid item xs={12} sm={6} md={4} key={item._id}>
+              <Paper
+                elevation={1}
+                sx={{
+                  p: 2,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  '&:hover': {
+                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  },
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+                  <Checkbox
+                    checked={item.completed}
+                    onChange={() => handleToggleComplete(item)}
+                    color="primary"
                     sx={{ mr: 1 }}
+                  />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        textDecoration: item.completed ? 'line-through' : 'none',
+                        color: item.completed ? 'text.disabled' : 'text.primary',
+                        fontWeight: 'medium'
+                      }}
+                    >
+                      {item.ingredient?.name || 'Unknown Ingredient'}
+                    </Typography>
+                    <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                      <Typography variant="body2" color="textSecondary">
+                        {item.pantryQuantity > 0 ? `${item.pantryQuantity}/${item.quantity + item.pantryQuantity}` : item.quantity} {item.unit}
+                      </Typography>
+                      {item.pantryQuantity > 0 && (
+                        <Box sx={{ width: '30px', ml: 1 }}>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.min(100, (item.pantryQuantity / (item.quantity + item.pantryQuantity)) * 100)}
+                            sx={{
+                              height: 3,
+                              borderRadius: 1.5,
+                              backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                              '& .MuiLinearProgress-bar': {
+                                borderRadius: 1.5,
+                                backgroundColor: (theme) => {
+                                  const percentage = (item.pantryQuantity / (item.quantity + item.pantryQuantity)) * 100;
+                                  if (percentage >= 100) return theme.palette.success.main;
+                                  if (percentage >= 50) return theme.palette.warning.main;
+                                  return theme.palette.error.main;
+                                },
+                              },
+                            }}
+                          />
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 'auto', pt: 1 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleAddToPantry(item)}
                     disabled={!item.completed}
+                    sx={{ mr: 1 }}
                   >
                     <AddShoppingCartIcon />
                   </IconButton>
                   <IconButton
-                    edge="end"
-                    aria-label="delete"
+                    size="small"
                     onClick={() => handleDeleteItem(item._id)}
                   >
                     <DeleteIcon />
                   </IconButton>
-                </ListItemSecondaryAction>
-              </ListItem>
-              <Divider />
-            </React.Fragment>
+                </Box>
+              </Paper>
+            </Grid>
           ))}
-        </List>
+        </Grid>
       )}
 
       {/* Clear All Confirmation Dialog */}

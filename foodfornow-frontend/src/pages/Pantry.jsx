@@ -21,7 +21,8 @@ import {
   InputLabel,
   Paper,
   useTheme,
-  CircularProgress
+  CircularProgress,
+  Grid
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -370,26 +371,69 @@ const Pantry = () => {
           </Typography>
         </Paper>
       ) : (
-        <List>
+        <Grid container spacing={2}>
           {pantryItems.map((item) => (
-            <Paper
-              key={item._id}
-              elevation={1}
-              sx={{
-                mb: 2,
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                },
-              }}
-            >
-              <PantryItem
-                item={item}
-                onDelete={() => handleDeleteItem(item._id)}
-                onEdit={() => handleOpenDialog(item)}
-              />
-            </Paper>
+            <Grid item xs={12} sm={6} md={4} key={item._id}>
+              <Paper
+                elevation={1}
+                sx={{
+                  p: 2,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  '&:hover': {
+                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  },
+                }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 'medium',
+                      mb: 1
+                    }}
+                  >
+                    {item.ingredient.name}
+                  </Typography>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Chip
+                      label={item.ingredient.category}
+                      size="small"
+                      sx={{
+                        backgroundColor: getCategoryColor(item.ingredient.category).main,
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: getCategoryColor(item.ingredient.category).dark,
+                        },
+                      }}
+                    />
+                    <Typography variant="body2" color="textSecondary">
+                      {item.quantity} {item.unit}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleOpenDialog(item)}
+                    sx={{ color: 'primary.main' }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleDeleteItem(item._id)}
+                    sx={{ color: 'error.main' }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </Paper>
+            </Grid>
           ))}
-        </List>
+        </Grid>
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>

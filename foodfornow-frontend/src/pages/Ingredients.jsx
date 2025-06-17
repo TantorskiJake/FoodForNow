@@ -6,9 +6,6 @@ import {
   Box,
   TextField,
   IconButton,
-  List,
-  ListItem,
-  ListItemText,
   Alert,
   Dialog,
   DialogTitle,
@@ -24,7 +21,7 @@ import {
   useTheme,
   Tabs,
   Tab,
-  Pagination
+  Grid
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -55,9 +52,10 @@ const Ingredients = () => {
   });
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('mine');
-
   const [searchTerm, setSearchTerm] = useState('');
   const { authenticated } = useAuth();
+  const theme = useTheme();
+  const [myIngredients, setMyIngredients] = useState([]);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -68,7 +66,6 @@ const Ingredients = () => {
     } else {
       fetchSharedIngredients();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, searchTerm, authenticated]);
 
   const fetchIngredients = async () => {
@@ -77,6 +74,7 @@ const Ingredients = () => {
         params: { search: searchTerm },
       });
       setIngredients(response.data);
+      setMyIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
       setError('Failed to fetch ingredients. Please try again.');
@@ -104,6 +102,7 @@ const Ingredients = () => {
       await api.post(`/ingredients/${id}/duplicate`);
       setTab('mine');
       setLoading(true);
+      await fetchIngredients();
     } catch (err) {
       console.error('Error duplicating ingredient:', err);
       if (err.response?.status === 409) {
@@ -145,272 +144,266 @@ const Ingredients = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setLoading(true);
       if (editingIngredient) {
         await api.put(`/ingredients/${editingIngredient._id}`, formData);
       } else {
         await api.post('/ingredients', formData);
       }
       handleCloseDialog();
-      fetchIngredients();
+      await fetchIngredients();
+      setError('');
     } catch (err) {
       console.error('Error saving ingredient:', err);
       setError('Failed to save ingredient. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeleteIngredient = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this ingredient?')) return;
+
     try {
+      setLoading(true);
       await api.delete(`/ingredients/${id}`);
-      fetchIngredients();
+      await fetchIngredients();
+      setError('');
     } catch (err) {
       console.error('Error deleting ingredient:', err);
       setError('Failed to delete ingredient. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const theme = useTheme();
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Ingredients
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Ingredient
-        </Button>
-      </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Tabs
-        value={tab}
-        onChange={(e, newVal) => {
-          setTab(newVal);
-          setSearchTerm('');
-        }}
-        sx={{ mb: 2 }}
-      >
-        <Tab label="My Ingredients" value="mine" />
-        <Tab label="Shared Ingredients" value="shared" />
-      </Tabs>
-
-      <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
-        <TextField
-          label="Search"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          size="small"
-        />
-        <Button
-          variant="contained"
-          onClick={() => {
-            // No pagination, so just trigger search
-            // Optionally could re-call fetch, but searchTerm is already in dependency
-          }}
-        >
-          Search
-        </Button>
-      </Box>
-
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : ingredients.length === 0 ? (
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
-            No ingredients found. Add your first ingredient!
-          </Typography>
-        </Paper>
-      ) : (
-        <List>
-          {ingredients.map((ingredient) => (
-            <Paper
-              key={ingredient._id}
-              elevation={1}
-              sx={{
-                mb: 2,
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                },
-              }}
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">
+              Ingredients
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog()}
+              disabled={loading}
+              size="small"
             >
-              <IngredientItem
-                ingredient={ingredient}
-                onEdit={() => handleOpenDialog(ingredient)}
-                onDelete={() => handleDeleteIngredient(ingredient._id)}
-                onDuplicate={() => handleDuplicate(ingredient._id)}
-                isShared={tab === 'shared'}
-              />
+              Add Ingredient
+            </Button>
+          </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <Tabs
+            value={tab}
+            onChange={(e, newVal) => {
+              setTab(newVal);
+              setSearchTerm('');
+            }}
+            sx={{ mb: 2 }}
+          >
+            <Tab label="My Ingredients" value="mine" />
+            <Tab label="Shared Ingredients" value="shared" />
+          </Tabs>
+
+          <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+            <TextField
+              label="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              size="small"
+            />
+          </Box>
+
+          {ingredients.length > 0 ? (
+            <Grid container spacing={2}>
+              {ingredients.map((ingredient) => (
+                <Grid item xs={12} sm={6} md={4} key={ingredient._id}>
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      p: 2,
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      position: 'relative',
+                      '&:hover': {
+                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                      },
+                    }}
+                  >
+                    <Box sx={{ flex: 1 }}>
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 'medium',
+                          mb: 1
+                        }}
+                      >
+                        {ingredient.name}
+                      </Typography>
+                      <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                        <Chip
+                          label={ingredient.category}
+                          size="small"
+                          sx={{
+                            backgroundColor: getCategoryColor(ingredient.category).main,
+                            color: 'white',
+                            '&:hover': {
+                              backgroundColor: getCategoryColor(ingredient.category).dark,
+                            },
+                          }}
+                        />
+                        <Typography variant="body2" color="textSecondary">
+                          {ingredient.defaultUnit}
+                        </Typography>
+                      </Box>
+                      {ingredient.description && (
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          {ingredient.description}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                      {!tab === 'shared' ? (
+                        <>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog(ingredient)}
+                            sx={{ color: 'primary.main' }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteIngredient(ingredient._id)}
+                            sx={{ color: 'error.main' }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      ) : (
+                        !myIngredients.some(myIng => myIng.name.toLowerCase() === ingredient.name.toLowerCase()) && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => handleDuplicate(ingredient._id)}
+                          >
+                            Add
+                          </Button>
+                        )
+                      )}
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="body1" color="text.secondary">
+                No ingredients found
+              </Typography>
             </Paper>
-          ))}
-        </List>
-      )}
+          )}
+        </Grid>
+      </Grid>
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingIngredient ? 'Edit Ingredient' : 'Add New Ingredient'}
+          {editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}
         </DialogTitle>
-        <DialogContent>
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              label="Ingredient Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              margin="normal"
-              required
-            />
-            <FormControl fullWidth margin="normal" required>
-              <InputLabel>Category</InputLabel>
-              <Select
-                value={formData.category}
-                label="Category"
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                {CATEGORIES.map((category) => (
-                  <MenuItem key={category} value={category}>
-                    {category}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="normal" required>
-              <InputLabel>Default Unit</InputLabel>
-              <Select
-                value={formData.defaultUnit}
-                label="Default Unit"
-                onChange={(e) => setFormData({ ...formData, defaultUnit: e.target.value })}
-              >
-                {UNITS.map((unit) => (
-                  <MenuItem key={unit} value={unit}>
-                    {unit}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              fullWidth
-              label="Description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              margin="normal"
-              multiline
-              rows={2}
-            />
-            <TextField
-              fullWidth
-              label="Notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              margin="normal"
-              multiline
-              rows={2}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {editingIngredient ? 'Save Changes' : 'Add Ingredient'}
-          </Button>
-        </DialogActions>
+        <form onSubmit={handleSubmit}>
+          <DialogContent>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  label="Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth required>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={formData.category}
+                    label="Category"
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  >
+                    {CATEGORIES.map((category) => (
+                      <MenuItem key={category} value={category}>
+                        {category}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth required>
+                  <InputLabel>Default Unit</InputLabel>
+                  <Select
+                    value={formData.defaultUnit}
+                    label="Default Unit"
+                    onChange={(e) => setFormData({ ...formData, defaultUnit: e.target.value })}
+                  >
+                    {UNITS.map((unit) => (
+                      <MenuItem key={unit} value={unit}>
+                        {unit}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  fullWidth
+                  multiline
+                  rows={2}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  fullWidth
+                  multiline
+                  rows={2}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Cancel</Button>
+            <Button type="submit" variant="contained" color="primary" disabled={loading}>
+              {editingIngredient ? 'Update' : 'Add'}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
     </Container>
-  );
-};
-
-const IngredientItem = ({ ingredient, onEdit, onDelete, onDuplicate, isShared }) => {
-  const theme = useTheme();
-  
-  return (
-    <ListItem
-      sx={{
-        py: 2,
-        px: 3,
-      }}
-    >
-      <ListItemText
-        primary={
-          <Typography variant="h6" component="div" sx={{ fontWeight: 'medium' }}>
-            {ingredient.name}
-          </Typography>
-        }
-        secondary={
-          <Box sx={{ mt: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Chip
-                label={ingredient.category}
-                size="small"
-                sx={{
-                  backgroundColor: getCategoryColor(ingredient.category).main,
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: getCategoryColor(ingredient.category).dark,
-                  },
-                }}
-              />
-            </Box>
-            {ingredient.description && (
-              <Typography variant="body2" color="text.secondary">
-                {ingredient.description}
-              </Typography>
-            )}
-          </Box>
-        }
-      />
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        {!isShared && (
-          <>
-            <IconButton
-              edge="end"
-              aria-label="edit"
-              onClick={onEdit}
-              sx={{
-                color: theme.palette.primary.main,
-                '&:hover': {
-                  backgroundColor: theme.palette.primary.main + '20',
-                },
-              }}
-            >
-              <EditIcon />
-            </IconButton>
-            <IconButton
-              edge="end"
-              aria-label="delete"
-              onClick={onDelete}
-              sx={{
-                color: theme.palette.error.main,
-                '&:hover': {
-                  backgroundColor: theme.palette.error.main + '20',
-                },
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </>
-        )}
-        {isShared && (
-          <Button
-            variant="contained"
-            size="small"
-            onClick={onDuplicate}
-          >
-            Add
-          </Button>
-        )}
-      </Box>
-    </ListItem>
   );
 };
 

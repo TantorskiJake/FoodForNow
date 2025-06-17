@@ -7,9 +7,6 @@ import {
   Box,
   TextField,
   IconButton,
-  List,
-  ListItem,
-  ListItemText,
   Alert,
   Dialog,
   DialogTitle,
@@ -33,6 +30,7 @@ import RestaurantIcon from '@mui/icons-material/Restaurant';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
+import { getCategoryColor } from '../utils/categoryColors';
 
 const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
   const theme = useTheme();
@@ -227,7 +225,6 @@ const Recipes = () => {
     };
 
     fetchInitial();
-    // eslint-disable-next-line
   }, [authenticated]);
 
   // Fetch shared recipes when tab or searchTerm changes
@@ -240,36 +237,24 @@ const Recipes = () => {
       setLoading(true);
       fetchRecipes().finally(() => setLoading(false));
     }
-    // eslint-disable-next-line
   }, [tab, searchTerm, authenticated]);
-
-  const handleDuplicateRecipe = async (id) => {
-    try {
-      await api.post(`/recipes/${id}/duplicate`);
-      setTab('mine');
-      setLoading(true);
-      // Refresh both lists
-      fetchRecipes();
-      fetchIngredients(); // ensure ingredients list updated
-    } catch (err) {
-      console.error('Error duplicating recipe:', err);
-      setError(err.response?.data?.error || 'Failed to add recipe');
-    }
-  };
-
-  // fetchIngredients and fetchRecipes are now integrated into checkAuthAndFetch
 
   const handleOpenDialog = (recipe = null) => {
     if (recipe) {
       setEditingRecipe(recipe);
       setFormData({
-        ...recipe,
-        tags: recipe.tags.join(', '),
+        name: recipe.name,
+        description: recipe.description,
         ingredients: recipe.ingredients.map(ing => ({
           ingredient: ing.ingredient._id,
           quantity: ing.quantity,
           unit: ing.unit
-        }))
+        })),
+        instructions: recipe.instructions,
+        prepTime: recipe.prepTime,
+        cookTime: recipe.cookTime,
+        servings: recipe.servings,
+        tags: recipe.tags.join(', ')
       });
     } else {
       setEditingRecipe(null);
@@ -281,7 +266,7 @@ const Recipes = () => {
         prepTime: '',
         cookTime: '',
         servings: '',
-        tags: '',
+        tags: ''
       });
     }
     setOpenDialog(true);
@@ -300,8 +285,10 @@ const Recipes = () => {
   };
 
   const handleRemoveIngredient = (index) => {
-    const newIngredients = formData.ingredients.filter((_, i) => i !== index);
-    setFormData({ ...formData, ingredients: newIngredients });
+    setFormData({
+      ...formData,
+      ingredients: formData.ingredients.filter((_, i) => i !== index)
+    });
   };
 
   const handleAddInstruction = () => {
@@ -312,221 +299,311 @@ const Recipes = () => {
   };
 
   const handleRemoveInstruction = (index) => {
-    const newInstructions = formData.instructions.filter((_, i) => i !== index);
-    setFormData({ ...formData, instructions: newInstructions });
+    setFormData({
+      ...formData,
+      instructions: formData.instructions.filter((_, i) => i !== index)
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
-    const trimmedName = formData.name.trim();
-    const trimmedDescription = formData.description.trim();
-    const ingredients = formData.ingredients.filter(
-      (ing) => ing.ingredient && ing.quantity && ing.unit
-    );
-    const instructions = formData.instructions
-      .map((instruction) => instruction.trim())
-      .filter((instruction) => instruction);
-
-    if (
-      !trimmedName ||
-      !trimmedDescription ||
-      ingredients.length === 0 ||
-      instructions.length === 0 ||
-      !formData.prepTime ||
-      !formData.cookTime ||
-      !formData.servings
-    ) {
-      setError('Please fill in all required fields.');
-      return;
-    }
-
     try {
+      setLoading(true);
       const recipeData = {
         ...formData,
-        name: trimmedName,
-        description: trimmedDescription,
-        tags: formData.tags
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter((tag) => tag),
-        ingredients,
-        instructions,
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
       };
+
       if (editingRecipe) {
         await api.put(`/recipes/${editingRecipe._id}`, recipeData);
       } else {
         await api.post('/recipes', recipeData);
       }
+
       handleCloseDialog();
-      // After submit, refresh the recipes list
-      // This will only refresh recipes, not ingredients, which is fine for add/edit
-      try {
-        const response = await api.get('/recipes');
-        setRecipes(response.data);
-      } catch (err) {
-        const message = err.response?.data?.message || 'Failed to fetch recipes. Please try again.';
-        setError(message);
-      }
+      await fetchRecipes();
+      setError('');
     } catch (err) {
       console.error('Error saving recipe:', err);
-      const message = err.response?.data?.message || 'Failed to save recipe. Please try again.';
-      setError(message);
+      setError('Failed to save recipe. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeleteRecipe = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this recipe?')) return;
+
     try {
+      setLoading(true);
       await api.delete(`/recipes/${id}`);
-      fetchRecipes();
+      await fetchRecipes();
+      setError('');
     } catch (err) {
       console.error('Error deleting recipe:', err);
-      const message = err.response?.data?.message || 'Failed to delete recipe. Please try again.';
-      setError(message);
+      setError('Failed to delete recipe. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Recipes
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Recipe
-        </Button>
-      </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Tabs
-        value={tab}
-        onChange={(e, newVal) => {
-          setTab(newVal);
-          setSearchTerm('');
-        }}
-        sx={{ mb: 2 }}
-      >
-        <Tab label="My Recipes" value="mine" />
-        <Tab label="Shared Recipes" value="shared" />
-      </Tabs>
-      <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
-        <TextField
-          label="Search"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          size="small"
-        />
-        <Button
-          variant="contained"
-          onClick={() => {
-            // No pagination, so just trigger search
-            // searchTerm is in dependency of useEffect above
-          }}
-        >
-          Search
-        </Button>
-      </Box>
-
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : tab === 'mine' ? (
-        recipes.length === 0 ? (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="body1" color="text.secondary">
-              No recipes found. Add your first recipe!
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">
+              Recipes
             </Typography>
-          </Paper>
-        ) : (
-          <MemoizedRecipeList
-            recipes={recipes}
-            onEdit={handleOpenDialog}
-            onDelete={handleDeleteRecipe}
-            theme={theme}
-          />
-        )
-      ) : (
-        sharedRecipes.length === 0 ? (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="body1" color="text.secondary">
-              No shared recipes found.
-            </Typography>
-          </Paper>
-        ) : (
-          <List>
-            {sharedRecipes.map((recipe) => (
-              <Paper
-                key={recipe._id}
-                elevation={1}
-                sx={{
-                  mb: 2,
-                  '&:hover': {
-                    backgroundColor:
-                      theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.05)'
-                        : 'rgba(0, 0, 0, 0.02)',
-                  },
-                }}
-              >
-                <RecipeItem
-                  recipe={recipe}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                  onAdd={() => handleDuplicateRecipe(recipe._id)}
-                  isShared={true}
-                />
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog()}
+              disabled={loading}
+              size="small"
+            >
+              Add Recipe
+            </Button>
+          </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <Tabs
+            value={tab}
+            onChange={(e, newVal) => {
+              setTab(newVal);
+              setSearchTerm('');
+            }}
+            sx={{ mb: 2 }}
+          >
+            <Tab label="My Recipes" value="mine" />
+            <Tab label="Shared Recipes" value="shared" />
+          </Tabs>
+
+          <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+            <TextField
+              label="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              size="small"
+            />
+          </Box>
+
+          {tab === 'mine' ? (
+            recipes.length > 0 ? (
+              <Grid container spacing={2}>
+                {recipes.map((recipe) => (
+                  <Grid item xs={12} sm={6} md={4} key={recipe._id}>
+                    <Paper
+                      elevation={1}
+                      sx={{
+                        p: 2,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        '&:hover': {
+                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                        },
+                      }}
+                    >
+                      <Box sx={{ flex: 1 }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            fontWeight: 'medium',
+                            mb: 1
+                          }}
+                        >
+                          {recipe.name}
+                        </Typography>
+                        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                          {recipe.tags.map((tag) => (
+                            <Chip
+                              key={tag}
+                              label={tag}
+                              size="small"
+                              sx={{
+                                backgroundColor: getCategoryColor(tag).main,
+                                color: 'white',
+                                '&:hover': {
+                                  backgroundColor: getCategoryColor(tag).dark,
+                                },
+                              }}
+                            />
+                          ))}
+                        </Box>
+                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <TimerIcon fontSize="small" color="action" />
+                            <Typography variant="body2" color="textSecondary">
+                              {recipe.prepTime + recipe.cookTime} mins
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <RestaurantIcon fontSize="small" color="action" />
+                            <Typography variant="body2" color="textSecondary">
+                              {recipe.servings} servings
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                      <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenDialog(recipe)}
+                          sx={{ color: 'primary.main' }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteRecipe(recipe._id)}
+                          sx={{ color: 'error.main' }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Paper sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="body1" color="text.secondary">
+                  No recipes found
+                </Typography>
               </Paper>
-            ))}
-          </List>
-        )
-      )}
+            )
+          ) : (
+            sharedRecipes.length > 0 ? (
+              <Grid container spacing={2}>
+                {sharedRecipes.map((recipe) => (
+                  <Grid item xs={12} sm={6} md={4} key={recipe._id}>
+                    <Paper
+                      elevation={1}
+                      sx={{
+                        p: 2,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        '&:hover': {
+                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                        },
+                      }}
+                    >
+                      <Box sx={{ flex: 1 }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            fontWeight: 'medium',
+                            mb: 1
+                          }}
+                        >
+                          {recipe.name}
+                        </Typography>
+                        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                          {recipe.tags.map((tag) => (
+                            <Chip
+                              key={tag}
+                              label={tag}
+                              size="small"
+                              sx={{
+                                backgroundColor: getCategoryColor(tag).main,
+                                color: 'white',
+                                '&:hover': {
+                                  backgroundColor: getCategoryColor(tag).dark,
+                                },
+                              }}
+                            />
+                          ))}
+                        </Box>
+                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <TimerIcon fontSize="small" color="action" />
+                            <Typography variant="body2" color="textSecondary">
+                              {recipe.prepTime + recipe.cookTime} mins
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <RestaurantIcon fontSize="small" color="action" />
+                            <Typography variant="body2" color="textSecondary">
+                              {recipe.servings} servings
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                      <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() => handleDuplicateRecipe(recipe._id)}
+                        >
+                          Add
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Paper sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="body1" color="text.secondary">
+                  No shared recipes found
+                </Typography>
+              </Paper>
+            )
+          )}
+        </Grid>
+      </Grid>
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingRecipe ? 'Edit Recipe' : 'Add New Recipe'}
+          {editingRecipe ? 'Edit Recipe' : 'Add Recipe'}
         </DialogTitle>
-        <DialogContent>
-          <Box component="form" id="recipe-form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+        <form onSubmit={handleSubmit}>
+          <DialogContent>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
-                  fullWidth
-                  label="Recipe Name"
+                  label="Name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  fullWidth
                   required
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
-                  fullWidth
                   label="Description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  fullWidth
                   multiline
                   rows={2}
-                  required
                 />
               </Grid>
               <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="subtitle1" gutterBottom>
                   Ingredients
                 </Typography>
                 {formData.ingredients.map((ingredient, index) => (
-                  <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                    <FormControl fullWidth>
+                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                    <FormControl sx={{ flex: 2 }}>
                       <InputLabel>Ingredient</InputLabel>
                       <Select
                         value={ingredient.ingredient}
@@ -546,7 +623,6 @@ const Recipes = () => {
                     </FormControl>
                     <TextField
                       label="Quantity"
-                      type="number"
                       value={ingredient.quantity}
                       onChange={(e) => {
                         const newIngredients = [...formData.ingredients];
@@ -554,31 +630,19 @@ const Recipes = () => {
                         setFormData({ ...formData, ingredients: newIngredients });
                       }}
                       required
+                      sx={{ flex: 1 }}
                     />
-                    <FormControl sx={{ minWidth: 120 }}>
-                      <InputLabel>Unit</InputLabel>
-                      <Select
-                        value={ingredient.unit}
-                        onChange={(e) => {
-                          const newIngredients = [...formData.ingredients];
-                          newIngredients[index].unit = e.target.value;
-                          setFormData({ ...formData, ingredients: newIngredients });
-                        }}
-                        required
-                      >
-                        <MenuItem value="g">g</MenuItem>
-                        <MenuItem value="kg">kg</MenuItem>
-                        <MenuItem value="oz">oz</MenuItem>
-                        <MenuItem value="lb">lb</MenuItem>
-                        <MenuItem value="ml">ml</MenuItem>
-                        <MenuItem value="l">l</MenuItem>
-                        <MenuItem value="cup">cup</MenuItem>
-                        <MenuItem value="tbsp">tbsp</MenuItem>
-                        <MenuItem value="tsp">tsp</MenuItem>
-                        <MenuItem value="piece">piece</MenuItem>
-                        <MenuItem value="pinch">pinch</MenuItem>
-                      </Select>
-                    </FormControl>
+                    <TextField
+                      label="Unit"
+                      value={ingredient.unit}
+                      onChange={(e) => {
+                        const newIngredients = [...formData.ingredients];
+                        newIngredients[index].unit = e.target.value;
+                        setFormData({ ...formData, ingredients: newIngredients });
+                      }}
+                      required
+                      sx={{ flex: 1 }}
+                    />
                     <IconButton
                       onClick={() => handleRemoveIngredient(index)}
                       disabled={formData.ingredients.length === 1}
@@ -590,19 +654,18 @@ const Recipes = () => {
                 <Button
                   startIcon={<AddIcon />}
                   onClick={handleAddIngredient}
-                  sx={{ mb: 2 }}
+                  sx={{ mt: 1 }}
                 >
                   Add Ingredient
                 </Button>
               </Grid>
               <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="subtitle1" gutterBottom>
                   Instructions
                 </Typography>
                 {formData.instructions.map((instruction, index) => (
-                  <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
                     <TextField
-                      fullWidth
                       label={`Step ${index + 1}`}
                       value={instruction}
                       onChange={(e) => {
@@ -610,6 +673,7 @@ const Recipes = () => {
                         newInstructions[index] = e.target.value;
                         setFormData({ ...formData, instructions: newInstructions });
                       }}
+                      fullWidth
                       required
                     />
                     <IconButton
@@ -623,64 +687,58 @@ const Recipes = () => {
                 <Button
                   startIcon={<AddIcon />}
                   onClick={handleAddInstruction}
-                  sx={{ mb: 2 }}
+                  sx={{ mt: 1 }}
                 >
                   Add Step
                 </Button>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  fullWidth
                   label="Prep Time (minutes)"
                   type="number"
                   value={formData.prepTime}
                   onChange={(e) => setFormData({ ...formData, prepTime: e.target.value })}
+                  fullWidth
                   required
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  fullWidth
                   label="Cook Time (minutes)"
                   type="number"
                   value={formData.cookTime}
                   onChange={(e) => setFormData({ ...formData, cookTime: e.target.value })}
+                  fullWidth
                   required
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  fullWidth
                   label="Servings"
                   type="number"
                   value={formData.servings}
                   onChange={(e) => setFormData({ ...formData, servings: e.target.value })}
+                  fullWidth
                   required
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  fullWidth
                   label="Tags (comma-separated)"
                   value={formData.tags}
                   onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                  placeholder="e.g., vegetarian, quick, healthy"
+                  fullWidth
                 />
               </Grid>
             </Grid>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button
-            type="submit"
-            form="recipe-form"
-            variant="contained"
-            color="primary"
-          >
-            {editingRecipe ? 'Save Changes' : 'Add Recipe'}
-          </Button>
-        </DialogActions>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Cancel</Button>
+            <Button type="submit" variant="contained" color="primary" disabled={loading}>
+              {editingRecipe ? 'Update' : 'Add'}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
     </Container>
   );
