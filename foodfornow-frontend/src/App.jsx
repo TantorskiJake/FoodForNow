@@ -11,16 +11,18 @@ import ShoppingList from './pages/ShoppingList';
 import PrivateRoute from './components/PrivateRoute';
 import Navbar from './components/Navbar';
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import Profile from './pages/Profile';
 
 function App() {
   return (
     <ThemeProvider>
-      <Toaster position="top-right" />
-      <Router>
-        <Navbar />
-        <Routes>
+      <AuthProvider>
+        <Toaster position="top-right" />
+        <Router>
+          <Navbar />
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route
@@ -74,7 +76,8 @@ function App() {
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </Router>
+        </Router>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

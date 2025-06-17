@@ -18,9 +18,11 @@ import { toast } from 'react-hot-toast';
 import api from '../services/api';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { useAuth } from '../context/AuthContext';
 
 const Profile = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading, refreshAuth } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -55,24 +57,15 @@ const Profile = () => {
   }, [formData.newPassword, formData.confirmPassword]);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      const response = await api.get('/auth/me');
+    if (!authLoading && user) {
       setFormData(prev => ({
         ...prev,
-        name: response.data.user.name,
-        email: response.data.user.email
+        name: user.name,
+        email: user.email,
       }));
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-      setError('Failed to load profile information');
-    } finally {
       setLoading(false);
     }
-  };
+  }, [authLoading, user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -123,6 +116,7 @@ const Profile = () => {
       }));
 
       toast.success('Profile updated successfully');
+      refreshAuth();
     } catch (err) {
       console.error('Error updating profile:', err);
       setError(err.response?.data?.error || 'Failed to update profile');

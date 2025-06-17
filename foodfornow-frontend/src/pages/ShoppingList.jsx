@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -37,10 +36,11 @@ import {
 import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const ShoppingList = () => {
-  const navigate = useNavigate();
   const theme = useTheme();
+  const { authenticated } = useAuth();
   const [shoppingItems, setShoppingItems] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -56,17 +56,17 @@ const ShoppingList = () => {
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
 
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
+    if (!authenticated) return;
+    const fetchAll = async () => {
       try {
-        await api.get('/auth/me');
-        fetchShoppingList();
-        fetchIngredients();
-      } catch {
-        navigate('/login');
+        setLoading(true);
+        await Promise.all([fetchShoppingList(), fetchIngredients()]);
+      } finally {
+        setLoading(false);
       }
     };
-    checkAuthAndFetch();
-  }, [navigate]);
+    fetchAll();
+  }, [authenticated]);
 
   const fetchShoppingList = async () => {
     try {

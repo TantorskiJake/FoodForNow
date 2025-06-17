@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -19,6 +19,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
 import ThemeToggle from './ThemeToggle';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const pages = [
   { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
@@ -32,22 +33,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        await api.get('/auth/me');
-        setAuthenticated(true);
-      } catch {
-        setAuthenticated(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkAuth();
-  }, [location.pathname]);
+  const { authenticated, loading, refreshAuth } = useAuth();
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -59,7 +45,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     await api.post('/auth/logout');
-    setAuthenticated(false);
+    refreshAuth();
     navigate('/login');
   };
 
