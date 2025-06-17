@@ -282,7 +282,7 @@ const Ingredients = () => {
                       )}
                     </Box>
                     <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                      {!tab === 'shared' ? (
+                      {tab === 'mine' ? (
                         <>
                           <IconButton
                             size="small"
