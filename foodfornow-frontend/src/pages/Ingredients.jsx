@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
-  Grid,
-  Card,
-  CardContent,
   Typography,
   Button,
   Box,
@@ -13,7 +10,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Alert,
   Dialog,
   DialogTitle,
@@ -26,7 +22,10 @@ import {
   InputLabel,
   Paper,
   CircularProgress,
-  useTheme
+  useTheme,
+  Tabs,
+  Tab,
+  Pagination
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -56,6 +55,12 @@ const Ingredients = () => {
     notes: '',
   });
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('mine');
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const LIMIT = 10;
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -69,10 +74,24 @@ const Ingredients = () => {
     checkAuthAndFetch();
   }, [navigate]);
 
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    if (tab === 'mine') {
+      fetchIngredients();
+    } else {
+      fetchSharedIngredients();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, searchTerm, page]);
+
   const fetchIngredients = async () => {
     try {
-      const response = await api.get('/ingredients');
-      setIngredients(response.data);
+      const response = await api.get('/ingredients', {
+        params: { search: searchTerm, page, limit: LIMIT },
+      });
+      setIngredients(response.data.data);
+      setTotalPages(response.data.totalPages);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
       if (err.response?.status === 401) {
@@ -83,6 +102,36 @@ const Ingredients = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSharedIngredients = async () => {
+    try {
+      const response = await api.get('/ingredients/shared', {
+        params: { search: searchTerm, page, limit: LIMIT },
+      });
+      setIngredients(response.data.data);
+      setTotalPages(response.data.totalPages);
+    } catch (err) {
+      console.error('Error fetching shared ingredients:', err);
+      setError('Failed to fetch shared ingredients. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDuplicate = async (id) => {
+    try {
+      await api.post(`/ingredients/${id}/duplicate`);
+      setTab('mine');
+      setLoading(true);
+    } catch (err) {
+      console.error('Error duplicating ingredient:', err);
+      if (err.response?.status === 409) {
+        setError('You already have this ingredient in your collection.');
+      } else {
+        setError('Failed to add ingredient. Please try again.');
+      }
     }
   };
 
@@ -164,6 +213,41 @@ const Ingredients = () => {
         </Alert>
       )}
 
+      <Tabs
+        value={tab}
+        onChange={(e, newVal) => {
+          setTab(newVal);
+          setSearchTerm('');
+          setPage(1);
+        }}
+        sx={{ mb: 2 }}
+      >
+        <Tab label="My Ingredients" value="mine" />
+        <Tab label="Shared Ingredients" value="shared" />
+      </Tabs>
+
+      <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+        <TextField
+          label="Search"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setPage(1);
+            }
+          }}
+          size="small"
+        />
+        <Button
+          variant="contained"
+          onClick={() => {
+            setPage(1);
+          }}
+        >
+          Search
+        </Button>
+      </Box>
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <CircularProgress />
@@ -175,26 +259,41 @@ const Ingredients = () => {
           </Typography>
         </Paper>
       ) : (
-        <List>
-          {ingredients.map((ingredient) => (
-            <Paper
-              key={ingredient._id}
-              elevation={1}
-              sx={{
-                mb: 2,
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                },
-              }}
-            >
-              <IngredientItem
-                ingredient={ingredient}
-                onEdit={() => handleOpenDialog(ingredient)}
-                onDelete={() => handleDeleteIngredient(ingredient._id)}
+        <>
+          <List>
+            {ingredients.map((ingredient) => (
+              <Paper
+                key={ingredient._id}
+                elevation={1}
+                sx={{
+                  mb: 2,
+                  '&:hover': {
+                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  },
+                }}
+              >
+                <IngredientItem
+                  ingredient={ingredient}
+                  onEdit={() => handleOpenDialog(ingredient)}
+                  onDelete={() => handleDeleteIngredient(ingredient._id)}
+                  onDuplicate={() => handleDuplicate(ingredient._id)}
+                  isShared={tab === 'shared'}
+                />
+              </Paper>
+            ))}
+          </List>
+          {ingredients.length > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(e, value) => {
+                  setPage(value);
+                }}
               />
-            </Paper>
-          ))}
-        </List>
+            </Box>
+          )}
+        </>
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -270,7 +369,7 @@ const Ingredients = () => {
   );
 };
 
-const IngredientItem = ({ ingredient, onEdit, onDelete }) => {
+const IngredientItem = ({ ingredient, onEdit, onDelete, onDuplicate, isShared }) => {
   const theme = useTheme();
   
   return (
@@ -310,32 +409,45 @@ const IngredientItem = ({ ingredient, onEdit, onDelete }) => {
         }
       />
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <IconButton
-          edge="end"
-          aria-label="edit"
-          onClick={onEdit}
-          sx={{
-            color: theme.palette.primary.main,
-            '&:hover': {
-              backgroundColor: theme.palette.primary.main + '20',
-            },
-          }}
-        >
-          <EditIcon />
-        </IconButton>
-        <IconButton
-          edge="end"
-          aria-label="delete"
-          onClick={onDelete}
-          sx={{
-            color: theme.palette.error.main,
-            '&:hover': {
-              backgroundColor: theme.palette.error.main + '20',
-            },
-          }}
-        >
-          <DeleteIcon />
-        </IconButton>
+        {!isShared && (
+          <>
+            <IconButton
+              edge="end"
+              aria-label="edit"
+              onClick={onEdit}
+              sx={{
+                color: theme.palette.primary.main,
+                '&:hover': {
+                  backgroundColor: theme.palette.primary.main + '20',
+                },
+              }}
+            >
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              edge="end"
+              aria-label="delete"
+              onClick={onDelete}
+              sx={{
+                color: theme.palette.error.main,
+                '&:hover': {
+                  backgroundColor: theme.palette.error.main + '20',
+                },
+              }}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </>
+        )}
+        {isShared && (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={onDuplicate}
+          >
+            Add
+          </Button>
+        )}
       </Box>
     </ListItem>
   );
