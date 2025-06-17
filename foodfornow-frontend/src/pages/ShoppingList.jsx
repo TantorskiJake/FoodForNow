@@ -158,6 +158,30 @@ const ShoppingList = () => {
     }
   };
 
+  const handleCheckAll = async () => {
+    try {
+      setLoading(true);
+      // Check if all items are completed
+      const allCompleted = shoppingItems.every(item => item.completed);
+      
+      // Update all items in parallel
+      await Promise.all(
+        shoppingItems.map(item =>
+          api.patch(`/shopping-list/${item._id}`, { completed: !allCompleted })
+        )
+      );
+      
+      // Refresh the shopping list
+      await fetchShoppingList();
+      toast.success(allCompleted ? 'All items unchecked!' : 'All items checked!');
+    } catch (err) {
+      console.error('Error updating items:', err);
+      toast.error('Failed to update items');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
@@ -173,6 +197,16 @@ const ShoppingList = () => {
           Shopping List
         </Typography>
         <Box>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleCheckAll}
+            startIcon={<CheckCircleIcon />}
+            sx={{ mr: 2 }}
+            disabled={loading || shoppingItems.length === 0}
+          >
+            {shoppingItems.every(item => item.completed) ? 'Uncheck All' : 'Check All'}
+          </Button>
           <Button
             variant="contained"
             color="success"
