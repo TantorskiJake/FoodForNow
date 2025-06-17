@@ -281,20 +281,28 @@ const Dashboard = () => {
                               <Typography variant="body2" color="textSecondary">
                                 {ingredient.pantryQuantity > 0 ? `${ingredient.pantryQuantity}/${ingredient.quantity}` : ingredient.quantity} {ingredient.unit}
                               </Typography>
-                            </Box>
-                            <Box sx={{ width: '50%', mt: 0.5 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={Math.min(100, (ingredient.pantryQuantity / (ingredient.quantity + ingredient.pantryQuantity)) * 100)}
-                                sx={{
-                                  height: 4,
-                                  borderRadius: 2,
-                                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                                  '& .MuiLinearProgress-bar': {
-                                    borderRadius: 2,
-                                  },
-                                }}
-                              />
+                              {ingredient.pantryQuantity > 0 && (
+                                <Box sx={{ width: '30px', ml: 1 }}>
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={Math.min(100, (ingredient.pantryQuantity / ingredient.quantity) * 100)}
+                                    sx={{
+                                      height: 3,
+                                      borderRadius: 1.5,
+                                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                                      '& .MuiLinearProgress-bar': {
+                                        borderRadius: 1.5,
+                                        backgroundColor: (theme) => {
+                                          const percentage = (ingredient.pantryQuantity / ingredient.quantity) * 100;
+                                          if (percentage >= 100) return theme.palette.success.main;
+                                          if (percentage >= 50) return theme.palette.warning.main;
+                                          return theme.palette.error.main;
+                                        },
+                                      },
+                                    }}
+                                  />
+                                </Box>
+                              )}
                             </Box>
                           </Box>
                         }

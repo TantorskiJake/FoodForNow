@@ -25,7 +25,8 @@ import {
   Paper,
   CircularProgress,
   Chip,
-  useTheme
+  useTheme,
+  LinearProgress
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -232,6 +233,28 @@ const ShoppingList = () => {
                         <Typography variant="body2" color="textSecondary">
                           {item.pantryQuantity > 0 ? `${item.pantryQuantity}/${item.quantity + item.pantryQuantity}` : item.quantity} {item.unit}
                         </Typography>
+                        {item.pantryQuantity > 0 && (
+                          <Box sx={{ width: '30px', ml: 1 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.min(100, (item.pantryQuantity / (item.quantity + item.pantryQuantity)) * 100)}
+                              sx={{
+                                height: 3,
+                                borderRadius: 1.5,
+                                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                                '& .MuiLinearProgress-bar': {
+                                  borderRadius: 1.5,
+                                  backgroundColor: (theme) => {
+                                    const percentage = (item.pantryQuantity / (item.quantity + item.pantryQuantity)) * 100;
+                                    if (percentage >= 100) return theme.palette.success.main;
+                                    if (percentage >= 50) return theme.palette.warning.main;
+                                    return theme.palette.error.main;
+                                  },
+                                },
+                              }}
+                            />
+                          </Box>
+                        )}
                       </Box>
                     </Box>
                   }
