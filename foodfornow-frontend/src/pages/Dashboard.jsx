@@ -23,6 +23,9 @@ import {
   Chip,
   useTheme,
   CircularProgress,
+  LinearProgress,
+  Paper,
+  Divider
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
@@ -266,39 +269,33 @@ const Dashboard = () => {
               </Box>
               {ingredients.length > 0 ? (
                 <List>
-                  {ingredients.map((item, index) => (
-                    <ListItem key={item._id || index}>
+                  {ingredients.map((ingredient) => (
+                    <ListItem key={ingredient._id}>
                       <ListItemText
                         primary={
-                          <Box display="flex" alignItems="center" gap={1}>
+                          <Box>
                             <Typography variant="subtitle1">
-                              {item.name || 'Unknown Ingredient'}
+                              {ingredient.name}
                             </Typography>
-                            {item.category && (
-                              <Chip
-                                label={item.category}
-                                size="small"
+                            <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                              <Typography variant="body2" color="textSecondary">
+                                {ingredient.pantryQuantity > 0 ? `${ingredient.pantryQuantity}/${ingredient.quantity}` : ingredient.quantity} {ingredient.unit}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ width: '50%', mt: 0.5 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Math.min(100, (ingredient.pantryQuantity / (ingredient.quantity + ingredient.pantryQuantity)) * 100)}
                                 sx={{
-                                  backgroundColor: getCategoryColor(item.category).main,
-                                  color: 'white',
-                                  '&:hover': {
-                                    backgroundColor: getCategoryColor(item.category).dark,
+                                  height: 4,
+                                  borderRadius: 2,
+                                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                                  '& .MuiLinearProgress-bar': {
+                                    borderRadius: 2,
                                   },
                                 }}
                               />
-                            )}
-                          </Box>
-                        }
-                        secondary={
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">
-                              {`${item.quantity} ${item.unit}`}
-                            </Typography>
-                            {item.recipeName && (
-                              <Typography variant="caption" color="text.secondary">
-                                From: {item.recipeName}
-                              </Typography>
-                            )}
+                            </Box>
                           </Box>
                         }
                       />

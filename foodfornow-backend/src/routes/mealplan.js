@@ -139,12 +139,13 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
 
     console.log('Found meal plans:', mealPlans.length);
 
-    // Aggregate ingredients from all meal plans
+    // Aggregate needed ingredients (by ingredient+unit)
     const ingredients = new Map();
     mealPlans.forEach(mealPlan => {
       if (mealPlan.recipe && mealPlan.recipe.ingredients) {
         mealPlan.recipe.ingredients.forEach(ing => {
-          const key = ing.ingredient._id.toString();
+          if (!ing.ingredient) return;
+          const key = `${ing.ingredient._id.toString()}-${ing.unit}`;
           if (!ingredients.has(key)) {
             ingredients.set(key, {
               _id: ing.ingredient._id,
@@ -161,8 +162,30 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
       }
     });
 
-    console.log('Aggregated ingredients:', ingredients.size);
-    res.json(Array.from(ingredients.values()));
+    // Fetch pantry and create a map of ingredient+unit to quantity
+    const Pantry = require('../models/pantry');
+    const pantry = await Pantry.findOne({ user: req.userId }).populate('items.ingredient');
+    const pantryMap = new Map();
+    if (pantry && pantry.items) {
+      pantry.items.forEach(item => {
+        if (item.ingredient) {
+          const key = `${item.ingredient._id.toString()}-${item.unit}`;
+          pantryMap.set(key, item.quantity);
+        }
+      });
+    }
+
+    // Add pantryQuantity to each ingredient
+    const result = Array.from(ingredients.values()).map(ing => {
+      const key = `${ing._id.toString()}-${ing.unit}`;
+      return {
+        ...ing,
+        pantryQuantity: pantryMap.get(key) || 0
+      };
+    });
+
+    console.log('Aggregated ingredients:', result.length);
+    res.json(result);
   } catch (error) {
     console.error('Error fetching ingredients:', error);
     res.status(500).json({ error: 'Failed to fetch ingredients', details: error.message });

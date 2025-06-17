@@ -25,8 +25,7 @@ import {
   Paper,
   CircularProgress,
   Chip,
-  useTheme,
-  LinearProgress
+  useTheme
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -95,14 +94,12 @@ const ShoppingList = () => {
     }
   };
 
-  const handleToggleComplete = async (id) => {
+  const handleToggleComplete = async (item) => {
     try {
-      await api.put(`/shopping-list/${id}/toggle`);
-      const response = await api.get('/shopping-list');
-      setShoppingItems(response.data);
+      await api.patch(`/shopping-list/${item._id}`, { completed: !item.completed });
+      fetchShoppingList();
     } catch (err) {
-      console.error('Error toggling item:', err);
-      setError('Failed to update item');
+      toast.error('Failed to update item status');
     }
   };
 
@@ -137,20 +134,12 @@ const ShoppingList = () => {
   };
 
   const handleAddAllToPantry = async () => {
-    const completedItems = shoppingItems.filter(item => item.completed);
-    
-    if (completedItems.length === 0) {
-      toast.error('No checked items to add to pantry');
-      return;
-    }
-
     try {
       setLoading(true);
       await api.post('/pantry/add-all-from-shopping-list');
-      await fetchShoppingList();
-      toast.success('Added checked items to pantry');
+      fetchShoppingList();
+      toast.success('Checked items added to pantry!');
     } catch (err) {
-      console.error('Error adding all to pantry:', err);
       toast.error('Failed to add items to pantry');
     } finally {
       setLoading(false);
@@ -223,70 +212,53 @@ const ShoppingList = () => {
           </Typography>
         </Paper>
       ) : (
-        <Grid container spacing={2}>
+        <List>
           {shoppingItems.map((item) => (
-            <Grid item xs={12} key={item._id}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Box display="flex" alignItems="center">
-                      <Checkbox
-                        checked={item.completed}
-                        onChange={() => handleToggleComplete(item._id)}
-                        color="primary"
-                      />
-                      <Box ml={2}>
-                        <Typography 
-                          variant="h6" 
-                          sx={{ 
-                            textDecoration: item.completed ? 'line-through' : 'none',
-                            color: item.completed ? 'text.secondary' : 'text.primary'
-                          }}
-                        >
-                          {item.ingredient?.name || 'Unknown Ingredient'}
+            <React.Fragment key={item._id}>
+              <ListItem>
+                <Checkbox
+                  checked={item.completed}
+                  onChange={() => handleToggleComplete(item)}
+                  color="primary"
+                  sx={{ mr: 1 }}
+                />
+                <ListItemText
+                  primary={
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'text.disabled' : 'text.primary' }}>
+                        {item.ingredient?.name || 'Unknown Ingredient'}
+                      </Typography>
+                      <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                        <Typography variant="body2" color="textSecondary">
+                          {item.pantryQuantity > 0 ? `${item.pantryQuantity}/${item.quantity + item.pantryQuantity}` : item.quantity} {item.unit}
                         </Typography>
-                        <Box mt={1}>
-                          <Typography variant="body2" color="text.secondary">
-                            Needed: {item.quantity} {item.unit}
-                          </Typography>
-                          {item.pantryQuantity > 0 && (
-                            <Typography variant="body2" color="text.secondary">
-                              In pantry: {item.pantryQuantity} {item.unit}
-                            </Typography>
-                          )}
-                          <Box mt={1}>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={(item.pantryQuantity / (item.pantryQuantity + item.quantity)) * 100} 
-                              sx={{ height: 8, borderRadius: 4 }}
-                            />
-                          </Box>
-                        </Box>
                       </Box>
                     </Box>
-                    <Box>
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleAddToPantry(item)}
-                        title="Add to Pantry"
-                        disabled={!item.completed}
-                      >
-                        <AddShoppingCartIcon />
-                      </IconButton>
-                      <IconButton
-                        color="error"
-                        onClick={() => handleDeleteItem(item._id)}
-                        title="Delete"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
+                  }
+                />
+                <ListItemSecondaryAction>
+                  <IconButton
+                    edge="end"
+                    aria-label="add to pantry"
+                    onClick={() => handleAddToPantry(item)}
+                    sx={{ mr: 1 }}
+                    disabled={!item.completed}
+                  >
+                    <AddShoppingCartIcon />
+                  </IconButton>
+                  <IconButton
+                    edge="end"
+                    aria-label="delete"
+                    onClick={() => handleDeleteItem(item._id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </ListItemSecondaryAction>
+              </ListItem>
+              <Divider />
+            </React.Fragment>
           ))}
-        </Grid>
+        </List>
       )}
     </Container>
   );

@@ -198,7 +198,30 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       .populate('ingredient')
       .populate('recipe');
 
-    res.json(updatedList);
+    // Add pantry quantities to the response
+    const pantryItemsResponse = await PantryItem.find({ user: req.userId })
+      .populate('items.ingredient');
+
+    const pantryQuantitiesResponse = new Map();
+    pantryItemsResponse.forEach(pantry => {
+      pantry.items.forEach(item => {
+        if (item.ingredient) {
+          const key = `${item.ingredient._id}-${item.unit}`;
+          pantryQuantitiesResponse.set(key, item.quantity);
+        }
+      });
+    });
+
+    const responseWithPantryQuantities = updatedList.map(item => {
+      const key = `${item.ingredient._id}-${item.unit}`;
+      const pantryQuantity = pantryQuantitiesResponse.get(key) || 0;
+      return {
+        ...item.toObject(),
+        pantryQuantity
+      };
+    });
+
+    res.json(responseWithPantryQuantities);
   } catch (error) {
     console.error('Error updating shopping list:', error);
     res.status(500).json({ error: 'Failed to update shopping list' });
@@ -260,6 +283,24 @@ router.delete('/clear-completed', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Error clearing completed items:', err);
     res.status(500).json({ message: 'Error clearing completed items' });
+  }
+});
+
+// Update fields of a shopping list item
+router.patch('/:id', authMiddleware, async (req, res) => {
+  try {
+    const item = await ShoppingListItem.findOneAndUpdate(
+      { _id: req.params.id, user: req.userId },
+      req.body,
+      { new: true }
+    );
+    if (!item) {
+      return res.status(404).json({ message: 'Item not found' });
+    }
+    res.json(item);
+  } catch (err) {
+    console.error('Error updating shopping list item:', err);
+    res.status(500).json({ message: 'Error updating shopping list item' });
   }
 });
 
