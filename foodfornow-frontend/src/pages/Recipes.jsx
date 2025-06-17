@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Grid,
-  Card,
-  CardContent,
   Typography,
   Button,
   Box,
@@ -13,7 +11,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Alert,
   Dialog,
   DialogTitle,
@@ -118,6 +115,33 @@ const RecipeItem = ({ recipe, onEdit, onDelete }) => {
   );
 };
 
+// MemoizedRecipeList component
+const MemoizedRecipeList = React.memo(({ recipes, onEdit, onDelete, theme }) => (
+  <List>
+    {recipes.map((recipe) => (
+      <Paper
+        key={recipe._id}
+        elevation={1}
+        sx={{
+          mb: 2,
+          '&:hover': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'rgba(0, 0, 0, 0.02)',
+          },
+        }}
+      >
+        <RecipeItem
+          recipe={recipe}
+          onEdit={() => onEdit(recipe)}
+          onDelete={() => onDelete(recipe._id)}
+        />
+      </Paper>
+    ))}
+  </List>
+));
+
 const Recipes = () => {
   const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
@@ -142,46 +166,27 @@ const Recipes = () => {
     const checkAuthAndFetch = async () => {
       try {
         await api.get('/auth/me');
-        fetchRecipes();
-        fetchIngredients();
-      } catch {
-        navigate('/login');
+        const [recipesRes, ingredientsRes] = await Promise.all([
+          api.get('/recipes'),
+          api.get('/ingredients')
+        ]);
+        setRecipes(recipesRes.data);
+        setIngredients(ingredientsRes.data);
+      } catch (err) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          setError('Failed to fetch data. Please try again.');
+        }
+      } finally {
+        setLoading(false);
       }
     };
     checkAuthAndFetch();
   }, [navigate]);
 
-  const fetchIngredients = async () => {
-    try {
-      const response = await api.get('/ingredients');
-      setIngredients(response.data);
-    } catch (err) {
-      console.error('Error fetching ingredients:', err);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        setError('Failed to fetch ingredients. Please try again.');
-      }
-    }
-  };
-
-  const fetchRecipes = async () => {
-    try {
-      const response = await api.get('/recipes');
-      setRecipes(response.data);
-    } catch (err) {
-      console.error('Error fetching recipes:', err.response?.data || err.message);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        setError('Failed to fetch recipes. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  // fetchIngredients and fetchRecipes are now integrated into checkAuthAndFetch
 
   const handleOpenDialog = (recipe = null) => {
     if (recipe) {
@@ -284,10 +289,19 @@ const Recipes = () => {
         await api.post('/recipes', recipeData);
       }
       handleCloseDialog();
-      fetchRecipes();
+      // After submit, refresh the recipes list
+      // This will only refresh recipes, not ingredients, which is fine for add/edit
+      try {
+        const response = await api.get('/recipes');
+        setRecipes(response.data);
+      } catch (err) {
+        const message = err.response?.data?.message || 'Failed to fetch recipes. Please try again.';
+        setError(message);
+      }
     } catch (err) {
       console.error('Error saving recipe:', err);
-      setError('Failed to save recipe. Please try again.');
+      const message = err.response?.data?.message || 'Failed to save recipe. Please try again.';
+      setError(message);
     }
   };
 
@@ -297,7 +311,8 @@ const Recipes = () => {
       fetchRecipes();
     } catch (err) {
       console.error('Error deleting recipe:', err);
-      setError('Failed to delete recipe. Please try again.');
+      const message = err.response?.data?.message || 'Failed to delete recipe. Please try again.';
+      setError(message);
     }
   };
 
@@ -334,26 +349,12 @@ const Recipes = () => {
           </Typography>
         </Paper>
       ) : (
-        <List>
-          {recipes.map((recipe) => (
-            <Paper
-              key={recipe._id}
-              elevation={1}
-              sx={{
-                mb: 2,
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                },
-              }}
-            >
-              <RecipeItem
-                recipe={recipe}
-                onEdit={() => handleOpenDialog(recipe)}
-                onDelete={() => handleDeleteRecipe(recipe._id)}
-              />
-            </Paper>
-          ))}
-        </List>
+        <MemoizedRecipeList
+          recipes={recipes}
+          onEdit={handleOpenDialog}
+          onDelete={handleDeleteRecipe}
+          theme={theme}
+        />
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
