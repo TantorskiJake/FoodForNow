@@ -61,8 +61,12 @@ const Pantry = () => {
 
     const fetchAll = async () => {
       try {
+        console.log('Starting to fetch pantry data...');
         setLoading(true);
         await Promise.all([fetchPantryItems(), fetchIngredients()]);
+        console.log('Finished fetching pantry data');
+      } catch (error) {
+        console.error('Error in fetchAll:', error);
       } finally {
         setLoading(false);
       }
@@ -73,12 +77,15 @@ const Pantry = () => {
 
   const fetchPantryItems = async () => {
     try {
+      console.log('Fetching pantry items...');
       const response = await api.get('/pantry');
       console.log('Raw pantry response:', response.data);
       
       if (response.data && response.data.items) {
+        console.log('Setting pantry items:', response.data.items);
         setPantryItems(response.data.items);
       } else {
+        console.log('No items found, setting empty array');
         setPantryItems([]);
       }
     } catch (err) {
@@ -395,24 +402,36 @@ const Pantry = () => {
                       mb: 1
                     }}
                   >
-                    {item.ingredient.name}
+                    {item.ingredient?.name || 'Unknown Ingredient'}
                   </Typography>
                   <Box display="flex" alignItems="center" gap={1}>
-                    <Chip
-                      label={item.ingredient.category}
-                      size="small"
-                      sx={{
-                        backgroundColor: getCategoryColor(item.ingredient.category).main,
-                        color: 'white',
-                        '&:hover': {
-                          backgroundColor: getCategoryColor(item.ingredient.category).dark,
-                        },
-                      }}
-                    />
+                    {item.ingredient?.category && (
+                      <Chip
+                        label={item.ingredient.category}
+                        size="small"
+                        sx={{
+                          backgroundColor: getCategoryColor(item.ingredient.category).main,
+                          color: 'white',
+                          '&:hover': {
+                            backgroundColor: getCategoryColor(item.ingredient.category).dark,
+                          },
+                        }}
+                      />
+                    )}
                     <Typography variant="body2" color="textSecondary">
                       {item.quantity} {item.unit}
                     </Typography>
                   </Box>
+                  {item.notes && (
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                      {item.notes}
+                    </Typography>
+                  )}
+                  {item.expiryDate && (
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                      Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                    </Typography>
+                  )}
                 </Box>
                 <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                   <IconButton
@@ -509,7 +528,6 @@ const Pantry = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Clear All Confirmation Dialog */}
       <Dialog
         open={openClearConfirmDialog}
         onClose={() => setOpenClearConfirmDialog(false)}

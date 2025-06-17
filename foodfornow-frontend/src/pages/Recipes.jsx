@@ -347,6 +347,24 @@ const Recipes = () => {
     }
   };
 
+  const handleDuplicateRecipe = async (id) => {
+    try {
+      setLoading(true);
+      await api.post(`/recipes/${id}/duplicate`);
+      await fetchRecipes();
+      setError('');
+    } catch (err) {
+      console.error('Error duplicating recipe:', err);
+      if (err.response?.status === 409) {
+        setError('You already have this recipe in your collection.');
+      } else {
+        setError('Failed to add recipe. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
