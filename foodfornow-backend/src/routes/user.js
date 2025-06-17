@@ -1,5 +1,12 @@
 const express = require("express");
-const validator = require("validator");
+const escapeHTML = (str) => {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return str.replace(/[&<>"']/g, (m) => map[m]);
+};
+
+const normalizeEmail = (email) => email.trim().toLowerCase();
+
+const isEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const User = require("../models/user");
 const authMiddleware = require("../middleware/auth");
 
@@ -27,13 +34,13 @@ router.put("/profile", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Name and email are required" });
     }
 
-    if (!validator.isEmail(email)) {
+    if (!isEmail(email)) {
       return res.status(400).json({ error: "Invalid email format" });
     }
 
     const sanitizedData = {
-      name: validator.escape(name),
-      email: validator.normalizeEmail(email),
+      name: escapeHTML(name),
+      email: normalizeEmail(email),
     };
 
     const updatedUser = await User.findByIdAndUpdate(
