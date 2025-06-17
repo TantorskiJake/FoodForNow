@@ -5,10 +5,21 @@ const API_URL = 'http://localhost:3001/api';
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   withCredentials: true, // Send cookies with requests
+});
+
+// Add request interceptor to set Content-Type only when needed
+api.interceptors.request.use((config) => {
+  const method = config.method ? config.method.toLowerCase() : '';
+  if (['post', 'put', 'patch'].includes(method)) {
+    config.headers = {
+      ...config.headers,
+      'Content-Type': 'application/json',
+    };
+  } else if (config.headers) {
+    delete config.headers['Content-Type'];
+  }
+  return config;
 });
 
 // Global response interceptor to handle auth token refresh
