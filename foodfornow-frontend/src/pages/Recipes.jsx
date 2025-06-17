@@ -23,6 +23,8 @@ import {
   InputLabel,
   Paper,
   CircularProgress,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -32,9 +34,8 @@ import RestaurantIcon from '@mui/icons-material/Restaurant';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 
-const RecipeItem = ({ recipe, onEdit, onDelete }) => {
+const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
   const theme = useTheme();
-  
   return (
     <ListItem
       sx={{
@@ -84,32 +85,45 @@ const RecipeItem = ({ recipe, onEdit, onDelete }) => {
         }
       />
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <IconButton
-          edge="end"
-          aria-label="edit"
-          onClick={onEdit}
-          sx={{
-            color: theme.palette.primary.main,
-            '&:hover': {
-              backgroundColor: theme.palette.primary.main + '20',
-            },
-          }}
-        >
-          <EditIcon />
-        </IconButton>
-        <IconButton
-          edge="end"
-          aria-label="delete"
-          onClick={onDelete}
-          sx={{
-            color: theme.palette.error.main,
-            '&:hover': {
-              backgroundColor: theme.palette.error.main + '20',
-            },
-          }}
-        >
-          <DeleteIcon />
-        </IconButton>
+        {!isShared && (
+          <>
+            <IconButton
+              edge="end"
+              aria-label="edit"
+              onClick={onEdit}
+              sx={{
+                color: theme.palette.primary.main,
+                '&:hover': {
+                  backgroundColor: theme.palette.primary.main + '20',
+                },
+              }}
+            >
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              edge="end"
+              aria-label="delete"
+              onClick={onDelete}
+              sx={{
+                color: theme.palette.error.main,
+                '&:hover': {
+                  backgroundColor: theme.palette.error.main + '20',
+                },
+              }}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </>
+        )}
+        {isShared && (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={onAdd}
+          >
+            Add
+          </Button>
+        )}
       </Box>
     </ListItem>
   );
@@ -162,16 +176,58 @@ const Recipes = () => {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
 
+  // Shared recipes and tab state
+  const [tab, setTab] = useState('mine');
+  const [sharedRecipes, setSharedRecipes] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Fetch functions for recipes and ingredients
+  const fetchRecipes = async () => {
+    try {
+      const response = await api.get('/recipes', {
+        params: { search: tab === 'mine' ? searchTerm : undefined },
+      });
+      setRecipes(response.data);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError('Failed to fetch recipes. Please try again.');
+      }
+    }
+  };
+
+  const fetchIngredients = async () => {
+    try {
+      const response = await api.get('/ingredients');
+      setIngredients(response.data);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError('Failed to fetch ingredients. Please try again.');
+      }
+    }
+  };
+
+  const fetchSharedRecipes = async () => {
+    try {
+      const response = await api.get('/recipes/shared', { params: { search: searchTerm } });
+      setSharedRecipes(response.data);
+    } catch (err) {
+      console.error('Error fetching shared recipes:', err);
+      setError('Failed to fetch shared recipes');
+    }
+  };
+
   useEffect(() => {
     const checkAuthAndFetch = async () => {
       try {
         await api.get('/auth/me');
-        const [recipesRes, ingredientsRes] = await Promise.all([
-          api.get('/recipes'),
-          api.get('/ingredients')
-        ]);
-        setRecipes(recipesRes.data);
-        setIngredients(ingredientsRes.data);
+        fetchRecipes();
+        fetchIngredients();
       } catch (err) {
         if (err.response?.status === 401) {
           localStorage.removeItem('token');
@@ -184,7 +240,34 @@ const Recipes = () => {
       }
     };
     checkAuthAndFetch();
+    // eslint-disable-next-line
   }, [navigate]);
+
+  // Fetch shared recipes when tab or searchTerm changes
+  useEffect(() => {
+    if (tab === 'shared') {
+      setLoading(true);
+      fetchSharedRecipes().finally(() => setLoading(false));
+    } else if (tab === 'mine') {
+      setLoading(true);
+      fetchRecipes().finally(() => setLoading(false));
+    }
+    // eslint-disable-next-line
+  }, [tab, searchTerm]);
+
+  const handleDuplicateRecipe = async (id) => {
+    try {
+      await api.post(`/recipes/${id}/duplicate`);
+      setTab('mine');
+      setLoading(true);
+      // Refresh both lists
+      fetchRecipes();
+      fetchIngredients(); // ensure ingredients list updated
+    } catch (err) {
+      console.error('Error duplicating recipe:', err);
+      setError(err.response?.data?.error || 'Failed to add recipe');
+    }
+  };
 
   // fetchIngredients and fetchRecipes are now integrated into checkAuthAndFetch
 
@@ -338,23 +421,88 @@ const Recipes = () => {
         </Alert>
       )}
 
+      <Tabs
+        value={tab}
+        onChange={(e, newVal) => {
+          setTab(newVal);
+          setSearchTerm('');
+        }}
+        sx={{ mb: 2 }}
+      >
+        <Tab label="My Recipes" value="mine" />
+        <Tab label="Shared Recipes" value="shared" />
+      </Tabs>
+      <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+        <TextField
+          label="Search"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+        />
+        <Button
+          variant="contained"
+          onClick={() => {
+            // No pagination, so just trigger search
+            // searchTerm is in dependency of useEffect above
+          }}
+        >
+          Search
+        </Button>
+      </Box>
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <CircularProgress />
         </Box>
-      ) : recipes.length === 0 ? (
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
-            No recipes found. Add your first recipe!
-          </Typography>
-        </Paper>
+      ) : tab === 'mine' ? (
+        recipes.length === 0 ? (
+          <Paper sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              No recipes found. Add your first recipe!
+            </Typography>
+          </Paper>
+        ) : (
+          <MemoizedRecipeList
+            recipes={recipes}
+            onEdit={handleOpenDialog}
+            onDelete={handleDeleteRecipe}
+            theme={theme}
+          />
+        )
       ) : (
-        <MemoizedRecipeList
-          recipes={recipes}
-          onEdit={handleOpenDialog}
-          onDelete={handleDeleteRecipe}
-          theme={theme}
-        />
+        sharedRecipes.length === 0 ? (
+          <Paper sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              No shared recipes found.
+            </Typography>
+          </Paper>
+        ) : (
+          <List>
+            {sharedRecipes.map((recipe) => (
+              <Paper
+                key={recipe._id}
+                elevation={1}
+                sx={{
+                  mb: 2,
+                  '&:hover': {
+                    backgroundColor:
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'rgba(0, 0, 0, 0.02)',
+                  },
+                }}
+              >
+                <RecipeItem
+                  recipe={recipe}
+                  onEdit={() => {}}
+                  onDelete={() => {}}
+                  onAdd={() => handleDuplicateRecipe(recipe._id)}
+                  isShared={true}
+                />
+              </Paper>
+            ))}
+          </List>
+        )
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
