@@ -35,7 +35,7 @@ const Login = () => {
         password,
       });
 
-      if (window.PasswordCredential && 'credentials' in navigator) {
+      if ('PasswordCredential' in window && 'credentials' in navigator) {
         try {
           const cred = new window.PasswordCredential({
             id: email,
