@@ -65,7 +65,7 @@ const Ingredients = () => {
         await api.get('/auth/me');
         fetchIngredients();
       } catch {
-        navigate('/login');
+        // Redirect handled globally by interceptor
       }
     };
     checkAuthAndFetch();
@@ -90,12 +90,7 @@ const Ingredients = () => {
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        setError('Failed to fetch ingredients. Please try again.');
-      }
+      setError('Failed to fetch ingredients. Please try again.');
     } finally {
       setLoading(false);
     }
