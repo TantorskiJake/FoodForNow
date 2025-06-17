@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -37,24 +37,23 @@ const Register = () => {
     number: false,
     special: false,
   });
+  const [passwordInput, setPasswordInput] = useState('');
 
-  const evaluatePassword = (pwd) => {
-    const newStrength = {
-      length: pwd.length >= 8,
-      uppercase: /[A-Z]/.test(pwd),
-      lowercase: /[a-z]/.test(pwd),
-      number: /[0-9]/.test(pwd),
-      special: /[^A-Za-z0-9]/.test(pwd),
-    };
-    setPasswordStrength(newStrength);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const pwd = passwordInput;
+      const newStrength = {
+        length: pwd.length >= 8,
+        uppercase: /[A-Z]/.test(pwd),
+        lowercase: /[a-z]/.test(pwd),
+        number: /[0-9]/.test(pwd),
+        special: /[^A-Za-z0-9]/.test(pwd),
+      };
+      setPasswordStrength(newStrength);
+    }, 300); // debounce delay
 
-    // Calculate overall strength
-    const strengthCount = Object.values(newStrength).filter(Boolean).length;
-    if (strengthCount === 5) return 'strong';
-    if (strengthCount >= 3) return 'medium';
-    if (pwd) return 'weak';
-    return '';
-  };
+    return () => clearTimeout(timeout);
+  }, [passwordInput]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -63,7 +62,7 @@ const Register = () => {
       [name]: value,
     });
     if (name === 'password') {
-      evaluatePassword(value);
+      setPasswordInput(value);
     }
   };
 
@@ -92,7 +91,7 @@ const Register = () => {
     }
 
     try {
-      const response = await api.post('/auth/register', {
+      await api.post('/auth/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -105,7 +104,9 @@ const Register = () => {
             password: formData.password,
             name: formData.name,
           });
-          navigator.credentials.store(cred);
+          await navigator.credentials.store(cred).catch((e) =>
+            console.error('Credential store failed:', e)
+          );
         } catch (credErr) {
           console.error('Credential store failed:', credErr);
         }
@@ -207,7 +208,10 @@ const Register = () => {
                   sx={{
                     height: 10,
                     borderRadius: 5,
-                    backgroundColor: 'grey.200',
+                    backgroundColor: (theme) =>
+                      theme.palette.mode === 'dark'
+                        ? theme.palette.grey[800]
+                        : theme.palette.grey[200],
                     '& .MuiLinearProgress-bar': {
                       backgroundColor: getPasswordStrengthColor(),
                     },

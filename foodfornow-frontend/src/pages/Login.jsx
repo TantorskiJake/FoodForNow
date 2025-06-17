@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -30,7 +30,7 @@ const Login = () => {
     e.preventDefault();
     try {
       setError('');
-      const response = await api.post('/auth/login', {
+      await api.post('/auth/login', {
         email,
         password,
       });
@@ -42,7 +42,9 @@ const Login = () => {
             password,
             name: email,
           });
-          navigator.credentials.store(cred);
+          await navigator.credentials.store(cred).catch((e) =>
+            console.error('Credential store failed:', e)
+          );
         } catch (credErr) {
           console.error('Credential store failed:', credErr);
         }
@@ -97,7 +99,7 @@ const Login = () => {
               id="email"
               label="Email Address"
               name="email"
-              autoComplete="email"
+              autoComplete="username"
               autoFocus
               value={email}
               onChange={onChange}
