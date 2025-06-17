@@ -58,6 +58,12 @@ const recipeSchema = new mongoose.Schema({
 });
 
 // Create compound index for user and name to ensure unique recipes per user
-recipeSchema.index({ createdBy: 1, name: 1 }, { unique: true });
+recipeSchema.index(
+  { createdBy: 1, name: 1 },
+  {
+    unique: true,
+    collation: { locale: 'en', strength: 2 },
+  }
+);
 
 module.exports = mongoose.model("Recipe", recipeSchema);

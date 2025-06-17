@@ -34,7 +34,13 @@ const ingredientSchema = new mongoose.Schema({
 });
 
 // Create a compound index for user and name to ensure unique ingredients per user
-ingredientSchema.index({ user: 1, name: 1 }, { unique: true });
+ingredientSchema.index(
+  { user: 1, name: 1 },
+  {
+    unique: true,
+    collation: { locale: 'en', strength: 2 },
+  }
+);
 
 const Ingredient = mongoose.model('Ingredient', ingredientSchema);
 
