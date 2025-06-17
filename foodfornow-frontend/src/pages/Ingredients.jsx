@@ -110,20 +110,17 @@ const Ingredients = () => {
 
   const handleOpenDialog = (ingredient = null) => {
     if (ingredient) {
-      setEditingIngredient(ingredient);
-      setFormData({
+      setEditingIngredient({
+        id: ingredient._id,
         name: ingredient.name,
         category: ingredient.category,
-        unit: ingredient.unit,
-        quantity: ingredient.quantity,
+        description: ingredient.description || '',
       });
     } else {
-      setEditingIngredient(null);
-      setFormData({
+      setEditingIngredient({
         name: '',
         category: '',
-        unit: '',
-        quantity: '',
+        description: '',
       });
     }
     setOpenDialog(true);
@@ -140,16 +137,22 @@ const Ingredients = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSaveIngredient = async () => {
     try {
-      if (editingIngredient) {
-        await api.put(`/ingredients/${editingIngredient._id}`, formData);
+      const ingredientData = {
+        name: editingIngredient.name,
+        category: editingIngredient.category,
+        description: editingIngredient.description,
+      };
+
+      if (editingIngredient.id) {
+        await api.put(`/ingredients/${editingIngredient.id}`, ingredientData);
       } else {
-        await api.post('/ingredients', formData);
+        await api.post('/ingredients', ingredientData);
       }
+
+      setOpenDialog(false);
       fetchIngredients();
-      handleCloseDialog();
     } catch (error) {
       console.error('Error saving ingredient:', error);
     }
@@ -440,61 +443,39 @@ const Ingredients = () => {
           <DialogTitle>
             {editingIngredient ? 'Edit Ingredient' : 'Add New Ingredient'}
           </DialogTitle>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSaveIngredient}>
             <DialogContent>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth required>
-                    <InputLabel>Category</InputLabel>
-                    <Select
-                      value={formData.category}
-                      label="Category"
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    >
-                      {categories.map((category) => (
-                        <MenuItem key={category} value={category}>
-                          {category}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth required>
-                    <InputLabel>Unit</InputLabel>
-                    <Select
-                      value={formData.unit}
-                      label="Unit"
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    >
-                      {units.map((unit) => (
-                        <MenuItem key={unit} value={unit}>
-                          {unit}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    required
-                  />
-                </Grid>
-              </Grid>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <TextField
+                  label="Name"
+                  value={editingIngredient?.name}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, name: e.target.value })}
+                  fullWidth
+                  required
+                />
+                <FormControl fullWidth required>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={editingIngredient?.category}
+                    onChange={(e) => setEditingIngredient({ ...editingIngredient, category: e.target.value })}
+                    label="Category"
+                  >
+                    {categories.map((category) => (
+                      <MenuItem key={category} value={category}>
+                        {category}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  label="Description"
+                  value={editingIngredient?.description}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, description: e.target.value })}
+                  fullWidth
+                  multiline
+                  rows={3}
+                />
+              </Box>
             </DialogContent>
             <DialogActions>
               <Button onClick={handleCloseDialog}>Cancel</Button>
