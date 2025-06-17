@@ -16,6 +16,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const recipes = await Recipe.find(filter)
       .populate('ingredients.ingredient')
       .sort({ name: 1 });
+
     res.json(recipes);
   } catch (error) {
     console.error('Error getting recipes:', error);
@@ -61,7 +62,19 @@ router.get('/shared', authMiddleware, async (req, res) => {
     const recipes = await Recipe.find(filter)
       .populate('ingredients.ingredient')
       .sort({ name: 1 });
-    res.json(recipes);
+
+    // Deduplicate by recipe name (case-insensitive)
+    const deduped = [];
+    const seen = new Set();
+    for (const recipe of recipes) {
+      const key = recipe.name.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(recipe);
+      }
+    }
+
+    res.json(deduped);
   } catch (err) {
     console.error('Error fetching shared recipes:', err);
     res.status(500).json({ error: 'Failed to fetch shared recipes' });

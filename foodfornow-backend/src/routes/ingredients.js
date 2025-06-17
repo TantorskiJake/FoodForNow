@@ -47,7 +47,18 @@ router.get('/shared', authMiddleware, async (req, res) => {
 
     const sharedIngredients = await Ingredient.find(filter).sort({ name: 1 });
 
-    res.json(sharedIngredients);
+    // Deduplicate by ingredient name (case-insensitive)
+    const deduped = [];
+    const seen = new Set();
+    for (const ing of sharedIngredients) {
+      const key = ing.name.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(ing);
+      }
+    }
+
+    res.json(deduped);
   } catch (err) {
     console.error('Error fetching shared ingredients:', err);
     res.status(500).json({ message: 'Error fetching shared ingredients' });
