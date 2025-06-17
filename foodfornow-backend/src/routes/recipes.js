@@ -8,7 +8,12 @@ const router = express.Router();
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const recipes = await Recipe.find({ createdBy: req.userId })
+    const { search = '' } = req.query;
+    const filter = { createdBy: req.userId };
+    if (search) {
+      filter.name = { $regex: search, $options: 'i' };
+    }
+    const recipes = await Recipe.find(filter)
       .populate('ingredients.ingredient')
       .sort({ name: 1 });
     res.json(recipes);
