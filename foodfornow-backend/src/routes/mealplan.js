@@ -123,4 +123,50 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Get ingredients needed for meal plans
+router.get('/ingredients', authMiddleware, async (req, res) => {
+  try {
+    console.log('Fetching ingredients for user:', req.userId);
+    
+    // Get all meal plans for the user
+    const mealPlans = await MealPlan.find({ user: req.userId })
+      .populate({
+        path: 'recipe',
+        populate: {
+          path: 'ingredients.ingredient'
+        }
+      });
+
+    console.log('Found meal plans:', mealPlans.length);
+
+    // Aggregate ingredients from all meal plans
+    const ingredients = new Map();
+    mealPlans.forEach(mealPlan => {
+      if (mealPlan.recipe && mealPlan.recipe.ingredients) {
+        mealPlan.recipe.ingredients.forEach(ing => {
+          const key = ing.ingredient._id.toString();
+          if (!ingredients.has(key)) {
+            ingredients.set(key, {
+              _id: ing.ingredient._id,
+              name: ing.ingredient.name,
+              category: ing.ingredient.category,
+              quantity: ing.quantity,
+              unit: ing.unit
+            });
+          } else {
+            const existing = ingredients.get(key);
+            existing.quantity += ing.quantity;
+          }
+        });
+      }
+    });
+
+    console.log('Aggregated ingredients:', ingredients.size);
+    res.json(Array.from(ingredients.values()));
+  } catch (error) {
+    console.error('Error fetching ingredients:', error);
+    res.status(500).json({ error: 'Failed to fetch ingredients', details: error.message });
+  }
+});
+
 module.exports = router; 

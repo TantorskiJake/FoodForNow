@@ -25,7 +25,8 @@ import {
   FormControl,
   InputLabel,
   Paper,
-  useTheme
+  useTheme,
+  CircularProgress
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -53,6 +54,7 @@ const Pantry = () => {
   const [ingredients, setIngredients] = useState([]);
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
   const theme = useTheme();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -80,6 +82,8 @@ const Pantry = () => {
     } catch (err) {
       console.error('Error fetching pantry items:', err);
       setError('Failed to fetch pantry items. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -93,7 +97,26 @@ const Pantry = () => {
     }
   };
 
-  const handleOpenDialog = () => {
+  const handleOpenDialog = (item = null) => {
+    if (item) {
+      setEditingItem(item);
+      setFormData({
+        ingredient: item.ingredient._id,
+        quantity: item.quantity,
+        unit: item.unit,
+        expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
+        notes: item.notes || '',
+      });
+    } else {
+      setEditingItem(null);
+      setFormData({
+        ingredient: '',
+        quantity: '',
+        unit: '',
+        expiryDate: '',
+        notes: '',
+      });
+    }
     setOpenDialog(true);
   };
 
@@ -133,19 +156,50 @@ const Pantry = () => {
       }
 
       console.log('Submitting pantry item:', submitData);
+      console.log('Editing item:', editingItem);
 
+      let response;
       if (editingItem) {
-        await api.put(`/pantry/${editingItem._id}`, submitData);
+        console.log('Updating existing item with ID:', editingItem._id);
+        response = await api.patch(`/pantry/items/${editingItem._id}`, submitData);
+        console.log('Update response:', response);
       } else {
-        await api.post('/pantry', submitData);
+        console.log('Creating new item');
+        response = await api.post('/pantry', submitData);
+        console.log('Create response:', response);
       }
       
-      handleCloseDialog();
-      await fetchPantryItems();
+      if (response && response.data) {
+        console.log('Successfully saved pantry item');
+        handleCloseDialog();
+        await fetchPantryItems();
+        setFormData({
+          ingredient: '',
+          quantity: '',
+          unit: '',
+          expiryDate: '',
+          notes: ''
+        });
+      } else {
+        throw new Error('No response data received');
+      }
       
     } catch (err) {
       console.error('Error saving pantry item:', err);
-      setError(err.response?.data?.error || 'Failed to save pantry item. Please try again.');
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else if (err.response?.status === 401) {
+        setError('Your session has expired. Please log in again.');
+        navigate('/login');
+      } else {
+        setError('Failed to save pantry item. Please try again.');
+      }
     }
   };
 
@@ -179,90 +233,96 @@ const Pantry = () => {
     }
   };
 
-  const PantryItem = ({ item, onDelete, onAddToShoppingList }) => {
-    const categoryColor = getCategoryColor(item.ingredient.category);
-    const isDarkMode = theme.palette.mode === 'dark';
-
+  const PantryItem = ({ item, onEdit, onDelete }) => {
+    const theme = useTheme();
+    
     return (
       <ListItem
         sx={{
-          mb: 1,
-          borderRadius: 1,
-          backgroundColor: isDarkMode ? 'background.paper' : 'background.default',
-          '&:hover': {
-            backgroundColor: isDarkMode ? 'action.hover' : 'action.hover',
-          },
+          py: 2,
+          px: 3,
         }}
       >
         <ListItemText
           primary={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                {item.ingredient.name}
-              </Typography>
-              <Chip
-                label={item.ingredient.category}
-                size="small"
-                sx={{
-                  backgroundColor: categoryColor.main,
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: categoryColor.dark,
-                  },
-                }}
-              />
-            </Box>
+            <Typography variant="h6" component="div" sx={{ fontWeight: 'medium' }}>
+              {item.ingredient.name}
+            </Typography>
           }
           secondary={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-              <Typography variant="body2" color="text.secondary">
-                {item.quantity} {item.unit}
-              </Typography>
-              {item.expiryDate && (
+            <Box sx={{ mt: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Chip
+                  label={item.ingredient.category}
+                  size="small"
+                  sx={{
+                    backgroundColor: getCategoryColor(item.ingredient.category).main,
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: getCategoryColor(item.ingredient.category).dark,
+                    },
+                  }}
+                />
                 <Typography variant="body2" color="text.secondary">
-                  • Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                  {item.quantity} {item.unit}
                 </Typography>
-              )}
+              </Box>
               {item.notes && (
                 <Typography variant="body2" color="text.secondary">
-                  • {item.notes}
+                  {item.notes}
+                </Typography>
+              )}
+              {item.expiryDate && (
+                <Typography variant="body2" color="text.secondary">
+                  Expires: {new Date(item.expiryDate).toLocaleDateString()}
                 </Typography>
               )}
             </Box>
           }
         />
-        <ListItemSecondaryAction>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton
             edge="end"
-            aria-label="add to shopping list"
-            onClick={() => onAddToShoppingList(item)}
-            sx={{ mr: 1 }}
+            aria-label="edit"
+            onClick={onEdit}
+            sx={{
+              color: theme.palette.primary.main,
+              '&:hover': {
+                backgroundColor: theme.palette.primary.main + '20',
+              },
+            }}
           >
-            <AddShoppingCartIcon />
+            <EditIcon />
           </IconButton>
           <IconButton
             edge="end"
             aria-label="delete"
-            onClick={() => onDelete(item._id)}
+            onClick={onDelete}
+            sx={{
+              color: theme.palette.error.main,
+              '&:hover': {
+                backgroundColor: theme.palette.error.main + '20',
+              },
+            }}
           >
             <DeleteIcon />
           </IconButton>
-        </ListItemSecondaryAction>
+        </Box>
       </ListItem>
     );
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          My Pantry
+        <Typography variant="h4" component="h1" gutterBottom>
+          Pantry
         </Typography>
         <Button
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
+          onClick={() => handleOpenDialog()}
         >
           Add Item
         </Button>
@@ -274,23 +334,37 @@ const Pantry = () => {
         </Alert>
       )}
 
-      {pantryItems && pantryItems.length > 0 ? (
-        <List>
-          {pantryItems.map((item) => (
-            <PantryItem
-              key={item._id}
-              item={item}
-              onDelete={handleDeleteItem}
-              onAddToShoppingList={handleAddToShoppingList}
-            />
-          ))}
-        </List>
-      ) : (
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : pantryItems.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
-            Your pantry is empty. Add some ingredients to get started!
+            No items in your pantry. Add your first item!
           </Typography>
         </Paper>
+      ) : (
+        <List>
+          {pantryItems.map((item) => (
+            <Paper
+              key={item._id}
+              elevation={1}
+              sx={{
+                mb: 2,
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                },
+              }}
+            >
+              <PantryItem
+                item={item}
+                onDelete={() => handleDeleteItem(item._id)}
+                onEdit={() => handleOpenDialog(item)}
+              />
+            </Paper>
+          ))}
+        </List>
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -355,17 +429,15 @@ const Pantry = () => {
               fullWidth
               multiline
               rows={2}
-              sx={{ mb: 2 }}
             />
-
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-              <Button onClick={handleCloseDialog}>Cancel</Button>
-              <Button type="submit" variant="contained" color="primary">
-                {editingItem ? 'Update' : 'Add'}
-              </Button>
-            </Box>
           </Box>
         </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained" color="primary">
+            {editingItem ? 'Save Changes' : 'Add Item'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Container>
   );

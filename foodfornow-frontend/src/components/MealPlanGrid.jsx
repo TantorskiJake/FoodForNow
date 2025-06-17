@@ -17,7 +17,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 
-const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
+const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal }) => {
   const navigate = useNavigate();
   const theme = useTheme();
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -26,6 +26,7 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
 
   const handleMealClick = (meal, event) => {
+    if (!meal) return;
     setSelectedMeal(meal);
     setMenuAnchor(event.currentTarget);
   };
@@ -43,17 +44,20 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
   };
 
   const handleViewRecipe = () => {
-    if (selectedMeal) {
+    if (selectedMeal?.recipe?._id) {
       navigate(`/recipes/${selectedMeal.recipe._id}`);
     }
     handleMenuClose();
   };
 
+  const getMealName = (meal) => {
+    if (!meal) return 'No Recipe';
+    if (!meal.recipe) return 'Recipe not found';
+    return meal.recipe.name || 'Unnamed Recipe';
+  };
+
   return (
     <Box sx={{ mt: 4 }}>
-      <Typography variant="h5" gutterBottom>
-        Weekly Meal Plan
-      </Typography>
       <Grid container spacing={2}>
         {/* Header row with days */}
         <Grid item xs={12}>
@@ -83,7 +87,7 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
               {/* Meal slots for each day */}
               {days.map((day) => {
                 const meal = mealPlan.find(
-                  (m) => m.day.toLowerCase() === day.toLowerCase() && m.meal === mealType
+                  (m) => m?.day?.toLowerCase() === day.toLowerCase() && m?.meal === mealType
                 );
                 return (
                   <Grid item xs={1.5} key={`${day}-${mealType}`}>
@@ -119,17 +123,19 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
                                 WebkitBoxOrient: 'vertical',
                                 lineHeight: 1.2,
                                 fontSize: '0.875rem',
-                                pt: 2, // Add padding top to account for delete button
+                                pt: 2,
                                 color: 'white'
                               }}
                             >
-                              {meal.recipe && meal.recipe.name ? meal.recipe.name : 'No Recipe'}
+                              {getMealName(meal)}
                             </Typography>
                             <IconButton
                               size="small"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onDeleteMeal(meal._id);
+                                if (meal._id) {
+                                  onDeleteMeal(meal._id);
+                                }
                               }}
                               sx={{ 
                                 position: 'absolute', 
@@ -178,12 +184,14 @@ const MealPlanGrid = ({ mealPlan, onAddMeal, onDeleteMeal, onEditMeal }) => {
           </ListItemIcon>
           <ListItemText>Edit Meal</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleViewRecipe}>
-          <ListItemIcon>
-            <RestaurantIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>View Recipe</ListItemText>
-        </MenuItem>
+        {selectedMeal?.recipe?._id && (
+          <MenuItem onClick={handleViewRecipe}>
+            <ListItemIcon>
+              <RestaurantIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>View Recipe</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
     </Box>
   );
