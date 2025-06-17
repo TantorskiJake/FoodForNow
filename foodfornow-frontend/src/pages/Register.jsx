@@ -18,6 +18,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
 } from '@mui/icons-material';
+import PasswordField from '../components/PasswordField';
 import api from '../services/api';
 
 const Register = () => {
@@ -96,7 +97,20 @@ const Register = () => {
         email: formData.email,
         password: formData.password,
       });
-      
+
+      if ('PasswordCredential' in window && 'credentials' in navigator) {
+        try {
+          const cred = new window.PasswordCredential({
+            id: formData.email,
+            password: formData.password,
+            name: formData.name,
+          });
+          navigator.credentials.store(cred);
+        } catch (credErr) {
+          console.error('Credential store failed:', credErr);
+        }
+      }
+
       navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
@@ -177,13 +191,9 @@ const Register = () => {
               value={formData.email}
               onChange={handleChange}
             />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
+            <PasswordField
               name="password"
               label="Password"
-              type="password"
               id="password"
               autoComplete="new-password"
               value={formData.password}
@@ -257,13 +267,9 @@ const Register = () => {
                 </List>
               </Box>
             )}
-            <TextField
-              margin="normal"
-              required
-              fullWidth
+            <PasswordField
               name="confirmPassword"
               label="Confirm Password"
-              type="password"
               id="confirmPassword"
               autoComplete="new-password"
               value={formData.confirmPassword}
@@ -276,6 +282,13 @@ const Register = () => {
               sx={{ mt: 3, mb: 2 }}
             >
               Register
+            </Button>
+            <Button
+              fullWidth
+              variant="text"
+              onClick={() => navigate('/login')}
+            >
+              Back to Login
             </Button>
           </Box>
         </Paper>

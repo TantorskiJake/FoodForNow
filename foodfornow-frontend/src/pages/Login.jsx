@@ -9,6 +9,7 @@ import {
   Alert,
   Paper,
 } from '@mui/material';
+import PasswordField from '../components/PasswordField';
 import api from '../services/api';
 
 const Login = () => {
@@ -29,14 +30,24 @@ const Login = () => {
     e.preventDefault();
     try {
       setError('');
-      console.log('Attempting login...');
       const response = await api.post('/auth/login', {
         email,
         password,
       });
 
-      console.log('Login response:', response.data);
-      
+      if ('PasswordCredential' in window && 'credentials' in navigator) {
+        try {
+          const cred = new window.PasswordCredential({
+            id: email,
+            password,
+            name: email,
+          });
+          navigator.credentials.store(cred);
+        } catch (credErr) {
+          console.error('Credential store failed:', credErr);
+        }
+      }
+
       // No token in response; rely on cookie
       navigate('/dashboard');
     } catch (err) {
@@ -91,13 +102,9 @@ const Login = () => {
               value={email}
               onChange={onChange}
             />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
+            <PasswordField
               name="password"
               label="Password"
-              type="password"
               id="password"
               autoComplete="current-password"
               value={password}
