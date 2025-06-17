@@ -48,6 +48,8 @@ const Ingredients = () => {
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState(null);
+  const [changeRequests, setChangeRequests] = useState([]);
+  const [openRequestsDialog, setOpenRequestsDialog] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -62,6 +64,7 @@ const Ingredients = () => {
       try {
         await api.get('/auth/me');
         fetchIngredients();
+        fetchChangeRequests();
       } catch {
         navigate('/login');
       }
@@ -83,6 +86,16 @@ const Ingredients = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchChangeRequests = async () => {
+    try {
+      const response = await api.get('/ingredients/change-requests');
+      setChangeRequests(response.data);
+      setOpenRequestsDialog(response.data.length > 0);
+    } catch (err) {
+      console.error('Error fetching change requests:', err);
     }
   };
 
@@ -118,12 +131,16 @@ const Ingredients = () => {
     e.preventDefault();
     try {
       if (editingIngredient) {
-        await api.put(`/ingredients/${editingIngredient._id}`, formData);
+        const res = await api.put(`/ingredients/${editingIngredient._id}`, formData);
+        if (res.status === 202) {
+          alert('Change request submitted for approval');
+        }
       } else {
         await api.post('/ingredients', formData);
       }
       handleCloseDialog();
       fetchIngredients();
+      fetchChangeRequests();
     } catch (err) {
       console.error('Error saving ingredient:', err);
       setError('Failed to save ingredient. Please try again.');
@@ -137,6 +154,25 @@ const Ingredients = () => {
     } catch (err) {
       console.error('Error deleting ingredient:', err);
       setError('Failed to delete ingredient. Please try again.');
+    }
+  };
+
+  const handleApproveRequest = async (id) => {
+    try {
+      await api.post(`/ingredients/change-requests/${id}/approve`);
+      fetchIngredients();
+      fetchChangeRequests();
+    } catch (err) {
+      console.error('Error approving request:', err);
+    }
+  };
+
+  const handleDenyRequest = async (id) => {
+    try {
+      await api.post(`/ingredients/change-requests/${id}/deny`);
+      fetchChangeRequests();
+    } catch (err) {
+      console.error('Error denying request:', err);
     }
   };
 
@@ -264,6 +300,33 @@ const Ingredients = () => {
           <Button onClick={handleSubmit} variant="contained" color="primary">
             {editingIngredient ? 'Save Changes' : 'Add Ingredient'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={openRequestsDialog} onClose={() => setOpenRequestsDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Pending Change Requests</DialogTitle>
+        <DialogContent dividers>
+          {changeRequests.length === 0 ? (
+            <Typography>No change requests</Typography>
+          ) : (
+            <List>
+              {changeRequests.map((req) => (
+                <ListItem key={req._id} alignItems="flex-start">
+                  <ListItemText
+                    primary={req.ingredient.name}
+                    secondary={JSON.stringify(req.proposedChanges)}
+                  />
+                  <ListItemSecondaryAction>
+                    <Button onClick={() => handleApproveRequest(req._id)}>Approve</Button>
+                    <Button onClick={() => handleDenyRequest(req._id)} color="error">Deny</Button>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenRequestsDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Container>
