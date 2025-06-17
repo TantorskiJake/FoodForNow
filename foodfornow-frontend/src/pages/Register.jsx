@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
-  Paper,
+  Typography,
   TextField,
   Button,
-  Typography,
   Box,
   Alert,
+  Paper,
+  useTheme,
   LinearProgress,
   List,
   ListItem,
@@ -23,6 +24,7 @@ import api from '../services/api';
 
 const Register = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,6 +40,7 @@ const Register = () => {
     special: false,
   });
   const [passwordInput, setPasswordInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -50,7 +53,7 @@ const Register = () => {
         special: /[^A-Za-z0-9]/.test(pwd),
       };
       setPasswordStrength(newStrength);
-    }, 300); // debounce delay
+    }, 300);
 
     return () => clearTimeout(timeout);
   }, [passwordInput]);
@@ -68,22 +71,19 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(''); // Clear any previous errors
+    setError('');
 
-    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    // Validate password requirements
     const strengthCount = Object.values(passwordStrength).filter(Boolean).length;
     if (strengthCount < 3) {
       setError('Password does not meet minimum requirements');
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Please enter a valid email address');
@@ -91,6 +91,7 @@ const Register = () => {
     }
 
     try {
+      setIsLoading(true);
       await api.post('/auth/register', {
         name: formData.name,
         email: formData.email,
@@ -112,7 +113,7 @@ const Register = () => {
         }
       }
 
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Registration error:', err);
       if (err.response) {
@@ -125,14 +126,16 @@ const Register = () => {
         console.error('Error setting up request:', err.message);
         setError('An error occurred. Please try again.');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const getPasswordStrengthColor = () => {
     const strengthCount = Object.values(passwordStrength).filter(Boolean).length;
-    if (strengthCount === 5) return 'success.main';
-    if (strengthCount >= 3) return 'warning.main';
-    return 'error.main';
+    if (strengthCount === 5) return '#34C759';
+    if (strengthCount >= 3) return '#FF9500';
+    return '#FF3B30';
   };
 
   const getPasswordStrengthValue = () => {
@@ -141,163 +144,297 @@ const Register = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper
-          elevation={3}
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: theme.palette.mode === 'dark' 
+          ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
+          : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+        py: 4,
+      }}
+    >
+      <Container maxWidth="xs">
+        <Box
           sx={{
-            padding: 4,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            width: '100%',
+            gap: 3,
           }}
         >
-          <Typography component="h1" variant="h5">
-            Register
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              fontWeight: 600,
+              letterSpacing: '-0.5px',
+              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+              mb: 2,
+            }}
+          >
+            Create Account
           </Typography>
-          {error && (
-            <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="name"
-              label="Full Name"
-              name="name"
-              autoComplete="name"
-              autoFocus
-              value={formData.name}
-              onChange={handleChange}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              value={formData.email}
-              onChange={handleChange}
-            />
-            <PasswordField
-              name="password"
-              label="Password"
-              id="password"
-              autoComplete="new-password"
-              value={formData.password}
-              onChange={handleChange}
-            />
-            {formData.password && (
-              <Box sx={{ mt: 1, width: '100%' }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={getPasswordStrengthValue()}
-                  sx={{
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: (theme) =>
-                      theme.palette.mode === 'dark'
-                        ? theme.palette.grey[800]
-                        : theme.palette.grey[200],
-                    '& .MuiLinearProgress-bar': {
-                      backgroundColor: getPasswordStrengthColor(),
-                    },
-                  }}
-                />
-                <List dense sx={{ mt: 1 }}>
-                  <ListItem>
-                    <ListItemIcon>
-                      {passwordStrength.length ? (
-                        <CheckCircleIcon color="success" />
-                      ) : (
-                        <CancelIcon color="error" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText primary="At least 8 characters" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      {passwordStrength.uppercase ? (
-                        <CheckCircleIcon color="success" />
-                      ) : (
-                        <CancelIcon color="error" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText primary="At least one uppercase letter" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      {passwordStrength.lowercase ? (
-                        <CheckCircleIcon color="success" />
-                      ) : (
-                        <CancelIcon color="error" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText primary="At least one lowercase letter" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      {passwordStrength.number ? (
-                        <CheckCircleIcon color="success" />
-                      ) : (
-                        <CancelIcon color="error" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText primary="At least one number" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      {passwordStrength.special ? (
-                        <CheckCircleIcon color="success" />
-                      ) : (
-                        <CancelIcon color="error" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText primary="At least one special character" />
-                  </ListItem>
-                </List>
-              </Box>
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 4,
+              width: '100%',
+              borderRadius: 2,
+              background: theme.palette.mode === 'dark' 
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid',
+              borderColor: theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.1)'
+                : 'rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            {error && (
+              <Alert 
+                severity="error" 
+                sx={{ 
+                  mb: 2,
+                  borderRadius: 1,
+                  '& .MuiAlert-icon': {
+                    color: '#ff3b30',
+                  },
+                }}
+              >
+                {error}
+              </Alert>
             )}
-            <PasswordField
-              name="confirmPassword"
-              label="Confirm Password"
-              id="confirmPassword"
-              autoComplete="new-password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-            >
-              Register
-            </Button>
-            <Button
-              fullWidth
-              variant="text"
-              onClick={() => navigate('/login')}
-            >
-              Back to Login
-            </Button>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+
+            <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="name"
+                label="Full Name"
+                name="name"
+                autoComplete="name"
+                autoFocus
+                value={formData.name}
+                onChange={handleChange}
+                disabled={isLoading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                    '& fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.2)'
+                        : 'rgba(0, 0, 0, 0.2)',
+                    },
+                  },
+                }}
+              />
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="email"
+                label="Email Address"
+                name="email"
+                autoComplete="email"
+                value={formData.email}
+                onChange={handleChange}
+                disabled={isLoading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                    '& fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.2)'
+                        : 'rgba(0, 0, 0, 0.2)',
+                    },
+                  },
+                }}
+              />
+              <PasswordField
+                name="password"
+                label="Password"
+                id="password"
+                autoComplete="new-password"
+                value={formData.password}
+                onChange={handleChange}
+                disabled={isLoading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                    '& fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.2)'
+                        : 'rgba(0, 0, 0, 0.2)',
+                    },
+                  },
+                }}
+              />
+              {formData.password && (
+                <Box sx={{ mt: 1, width: '100%' }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={getPasswordStrengthValue()}
+                    sx={{
+                      height: 4,
+                      borderRadius: 2,
+                      backgroundColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: getPasswordStrengthColor(),
+                      },
+                    }}
+                  />
+                  <List dense sx={{ mt: 1 }}>
+                    <ListItem sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        {passwordStrength.length ? (
+                          <CheckCircleIcon sx={{ color: '#34C759' }} />
+                        ) : (
+                          <CancelIcon sx={{ color: '#FF3B30' }} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText primary="At least 8 characters" />
+                    </ListItem>
+                    <ListItem sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        {passwordStrength.uppercase ? (
+                          <CheckCircleIcon sx={{ color: '#34C759' }} />
+                        ) : (
+                          <CancelIcon sx={{ color: '#FF3B30' }} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText primary="At least one uppercase letter" />
+                    </ListItem>
+                    <ListItem sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        {passwordStrength.lowercase ? (
+                          <CheckCircleIcon sx={{ color: '#34C759' }} />
+                        ) : (
+                          <CancelIcon sx={{ color: '#FF3B30' }} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText primary="At least one lowercase letter" />
+                    </ListItem>
+                    <ListItem sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        {passwordStrength.number ? (
+                          <CheckCircleIcon sx={{ color: '#34C759' }} />
+                        ) : (
+                          <CancelIcon sx={{ color: '#FF3B30' }} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText primary="At least one number" />
+                    </ListItem>
+                    <ListItem sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        {passwordStrength.special ? (
+                          <CheckCircleIcon sx={{ color: '#34C759' }} />
+                        ) : (
+                          <CancelIcon sx={{ color: '#FF3B30' }} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText primary="At least one special character" />
+                    </ListItem>
+                  </List>
+                </Box>
+              )}
+              <PasswordField
+                name="confirmPassword"
+                label="Confirm Password"
+                id="confirmPassword"
+                autoComplete="new-password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                disabled={isLoading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                    '& fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.2)'
+                        : 'rgba(0, 0, 0, 0.2)',
+                    },
+                  },
+                }}
+              />
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={isLoading}
+                sx={{
+                  mt: 3,
+                  mb: 2,
+                  py: 1.5,
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                    : '#228B22',
+                  '&:hover': {
+                    background: theme.palette.mode === 'dark'
+                      ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                      : '#1B6B1B',
+                  },
+                  '&.Mui-disabled': {
+                    background: theme.palette.mode === 'dark'
+                      ? 'rgba(34, 139, 34, 0.5)'
+                      : 'rgba(34, 139, 34, 0.5)',
+                  },
+                }}
+              >
+                Create Account
+              </Button>
+              <Button
+                fullWidth
+                variant="text"
+                onClick={() => navigate('/login')}
+                disabled={isLoading}
+                sx={{
+                  textTransform: 'none',
+                  color: theme.palette.mode === 'dark' ? '#228B22' : '#1B6B1B',
+                  '&:hover': {
+                    background: theme.palette.mode === 'dark'
+                      ? 'rgba(34, 139, 34, 0.1)'
+                      : 'rgba(34, 139, 34, 0.1)',
+                  },
+                }}
+              >
+                Already have an account? Sign in
+              </Button>
+            </Box>
+          </Paper>
+        </Box>
+      </Container>
+    </Box>
   );
 };
 
