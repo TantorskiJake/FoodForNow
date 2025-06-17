@@ -238,14 +238,14 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
     const userId = req.userId;
     console.log('Adding all shopping list items to pantry for user:', userId);
 
-    // Get all uncompleted shopping list items
-    const shoppingItems = await ShoppingListItem.find({ user: userId, completed: false })
+    // Get all completed shopping list items
+    const shoppingItems = await ShoppingListItem.find({ user: userId, completed: true })
       .populate('ingredient');
 
     console.log('Found shopping items:', shoppingItems);
 
     if (!shoppingItems.length) {
-      return res.status(200).json({ message: 'No items to add to pantry' });
+      return res.status(200).json({ message: 'No completed items to add to pantry' });
     }
 
     // Get or create pantry
@@ -254,7 +254,7 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
       pantry = new Pantry({ user: userId, items: [] });
     }
 
-    // Add each item to pantry and mark as completed
+    // Add each item to pantry
     for (const item of shoppingItems) {
       if (!item.ingredient) {
         console.log('Skipping item with no ingredient:', item);
@@ -277,10 +277,6 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
           unit: item.unit
         });
       }
-
-      // Mark shopping list item as completed
-      item.completed = true;
-      await item.save();
     }
 
     // Save the updated pantry

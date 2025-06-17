@@ -97,7 +97,8 @@ const ShoppingList = () => {
   const handleToggleComplete = async (id) => {
     try {
       await api.put(`/shopping-list/${id}/toggle`);
-      fetchShoppingList();
+      const response = await api.get('/shopping-list');
+      setShoppingItems(response.data);
     } catch (err) {
       console.error('Error toggling item:', err);
       setError('Failed to update item');
@@ -115,13 +116,18 @@ const ShoppingList = () => {
   };
 
   const handleAddToPantry = async (item) => {
+    if (!item.completed) {
+      toast.error('Please check off the item first to indicate it has been purchased');
+      return;
+    }
+
     try {
       await api.post('/pantry', {
         ingredient: item.ingredient._id,
         quantity: item.quantity,
         unit: item.unit
       });
-      handleDeleteItem(item._id);
+      await handleDeleteItem(item._id);
       toast.success('Added to pantry');
     } catch (err) {
       console.error('Error adding to pantry:', err);
@@ -130,20 +136,18 @@ const ShoppingList = () => {
   };
 
   const handleAddAllToPantry = async () => {
+    const completedItems = shoppingItems.filter(item => item.completed);
+    
+    if (completedItems.length === 0) {
+      toast.error('No checked items to add to pantry');
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await api.post('/pantry/add-all-from-shopping-list');
-      console.log('Add to pantry response:', response.data);
-      
-      // Refresh both shopping list and pantry
-      await Promise.all([
-        fetchShoppingList(),
-        api.get('/pantry').then(res => {
-          console.log('Updated pantry:', res.data);
-        })
-      ]);
-      
-      toast.success('Added all items to pantry');
+      await api.post('/pantry/add-all-from-shopping-list');
+      await fetchShoppingList();
+      toast.success('Added checked items to pantry');
     } catch (err) {
       console.error('Error adding all to pantry:', err);
       toast.error('Failed to add items to pantry');
@@ -225,10 +229,22 @@ const ShoppingList = () => {
                         onChange={() => handleToggleComplete(item._id)}
                       />
                       <Box ml={2}>
-                        <Typography variant="h6">
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            textDecoration: item.completed ? 'line-through' : 'none',
+                            color: item.completed ? 'text.secondary' : 'text.primary'
+                          }}
+                        >
                           {item.ingredient?.name || 'Unknown Ingredient'}
                         </Typography>
-                        <Typography variant="body2" color="textSecondary">
+                        <Typography 
+                          variant="body2" 
+                          color="textSecondary"
+                          sx={{ 
+                            textDecoration: item.completed ? 'line-through' : 'none'
+                          }}
+                        >
                           {item.quantity} {item.unit}
                         </Typography>
                       </Box>
@@ -238,6 +254,7 @@ const ShoppingList = () => {
                         color="primary"
                         onClick={() => handleAddToPantry(item)}
                         title="Add to Pantry"
+                        disabled={item.completed}
                       >
                         <AddShoppingCartIcon />
                       </IconButton>
