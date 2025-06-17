@@ -170,6 +170,7 @@ const Recipes = () => {
     servings: '',
     tags: '',
   });
+  const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
 
@@ -650,17 +651,25 @@ const Recipes = () => {
                       required
                       sx={{ flex: 1 }}
                     />
-                    <TextField
-                      label="Unit"
-                      value={ingredient.unit}
-                      onChange={(e) => {
-                        const newIngredients = [...formData.ingredients];
-                        newIngredients[index].unit = e.target.value;
-                        setFormData({ ...formData, ingredients: newIngredients });
-                      }}
-                      required
-                      sx={{ flex: 1 }}
-                    />
+                    <FormControl sx={{ flex: 1 }}>
+                      <InputLabel>Unit</InputLabel>
+                      <Select
+                        value={ingredient.unit}
+                        onChange={(e) => {
+                          const newIngredients = [...formData.ingredients];
+                          newIngredients[index].unit = e.target.value;
+                          setFormData({ ...formData, ingredients: newIngredients });
+                        }}
+                        required
+                        label="Unit"
+                      >
+                        {validUnits.map((unit) => (
+                          <MenuItem key={unit} value={unit}>
+                            {unit}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                     <IconButton
                       onClick={() => handleRemoveIngredient(index)}
                       disabled={formData.ingredients.length === 1}
