@@ -86,7 +86,7 @@ const RecipeDetail = () => {
           />
           <Chip
             icon={<RestaurantIcon />}
-            label={recipe.cuisine}
+            label={`${recipe.servings} servings`}
             sx={{ mr: 1 }}
           />
         </Box>
@@ -99,14 +99,14 @@ const RecipeDetail = () => {
               Ingredients
             </Typography>
             <List>
-              {recipe.ingredients.map((ingredient, index) => (
+              {recipe.ingredients.map((item, index) => (
                 <ListItem key={index}>
                   <ListItemIcon>
                     <RestaurantIcon />
                   </ListItemIcon>
                   <ListItemText
-                    primary={ingredient.name}
-                    secondary={`${ingredient.quantity} ${ingredient.unit}`}
+                    primary={item.ingredient.name}
+                    secondary={`${item.quantity} ${item.unit}`}
                   />
                 </ListItem>
               ))}
@@ -130,14 +130,14 @@ const RecipeDetail = () => {
           </Grid>
         </Grid>
 
-        {recipe.notes && (
+        {recipe.description && (
           <>
             <Divider sx={{ my: 3 }} />
             <Typography variant="h6" gutterBottom>
-              Notes
+              Description
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              {recipe.notes}
+              {recipe.description}
             </Typography>
           </>
         )}
