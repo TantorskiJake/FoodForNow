@@ -242,12 +242,41 @@ const Recipes = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
+    const trimmedName = formData.name.trim();
+    const trimmedDescription = formData.description.trim();
+    const ingredients = formData.ingredients.filter(
+      (ing) => ing.ingredient && ing.quantity && ing.unit
+    );
+    const instructions = formData.instructions
+      .map((instruction) => instruction.trim())
+      .filter((instruction) => instruction);
+
+    if (
+      !trimmedName ||
+      !trimmedDescription ||
+      ingredients.length === 0 ||
+      instructions.length === 0 ||
+      !formData.prepTime ||
+      !formData.cookTime ||
+      !formData.servings
+    ) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
     try {
       const recipeData = {
         ...formData,
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-        ingredients: formData.ingredients.filter(ing => ing.ingredient && ing.quantity && ing.unit),
-        instructions: formData.instructions.filter(instruction => instruction.trim())
+        name: trimmedName,
+        description: trimmedDescription,
+        tags: formData.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag),
+        ingredients,
+        instructions,
       };
       if (editingRecipe) {
         await api.put(`/recipes/${editingRecipe._id}`, recipeData);
@@ -332,7 +361,7 @@ const Recipes = () => {
           {editingRecipe ? 'Edit Recipe' : 'Add New Recipe'}
         </DialogTitle>
         <DialogContent>
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+          <Box component="form" id="recipe-form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
@@ -506,7 +535,12 @@ const Recipes = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
+          <Button
+            type="submit"
+            form="recipe-form"
+            variant="contained"
+            color="primary"
+          >
             {editingRecipe ? 'Save Changes' : 'Add Recipe'}
           </Button>
         </DialogActions>
