@@ -33,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
+import { toast } from 'react-hot-toast';
 
 const Pantry = () => {
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ const Pantry = () => {
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
+  const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -229,6 +231,21 @@ const Pantry = () => {
     }
   };
 
+  const handleClearAll = async () => {
+    try {
+      setLoading(true);
+      await api.delete('/pantry');
+      setPantryItems([]);
+      toast.success('All pantry items cleared successfully');
+    } catch (err) {
+      console.error('Error clearing pantry:', err);
+      toast.error('Failed to clear pantry items');
+    } finally {
+      setLoading(false);
+      setOpenClearConfirmDialog(false);
+    }
+  };
+
   const PantryItem = ({ item, onEdit, onDelete }) => {
     const theme = useTheme();
     
@@ -309,19 +326,31 @@ const Pantry = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Pantry
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Item
-        </Button>
+        <Box>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => setOpenClearConfirmDialog(true)}
+            startIcon={<DeleteIcon />}
+            sx={{ mr: 2 }}
+            disabled={loading || pantryItems.length === 0}
+          >
+            Clear All
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add Item
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -432,6 +461,29 @@ const Pantry = () => {
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained" color="primary">
             {editingItem ? 'Save Changes' : 'Add Item'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog
+        open={openClearConfirmDialog}
+        onClose={() => setOpenClearConfirmDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Clear All Pantry Items</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to remove all items from your pantry? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenClearConfirmDialog(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleClearAll} color="error" variant="contained">
+            Clear All
           </Button>
         </DialogActions>
       </Dialog>
