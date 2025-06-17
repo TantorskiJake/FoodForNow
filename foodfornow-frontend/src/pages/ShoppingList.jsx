@@ -25,7 +25,8 @@ import {
   Paper,
   CircularProgress,
   Chip,
-  useTheme
+  useTheme,
+  LinearProgress
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -208,25 +209,31 @@ const ShoppingList = () => {
         </Alert>
       )}
 
-      <Grid container spacing={3}>
-        {shoppingItems.length === 0 ? (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="h6" color="textSecondary">
-                Your shopping list is empty
-              </Typography>
-            </Paper>
-          </Grid>
-        ) : (
-          shoppingItems.map((item) => (
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+          <CircularProgress />
+        </Box>
+      ) : shoppingItems.length === 0 ? (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Your shopping list is empty
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Click "Update from Meal Plan" to add ingredients from your meal plan
+          </Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={2}>
+          {shoppingItems.map((item) => (
             <Grid item xs={12} key={item._id}>
               <Card>
                 <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Box display="flex" alignItems="center">
                       <Checkbox
                         checked={item.completed}
                         onChange={() => handleToggleComplete(item._id)}
+                        color="primary"
                       />
                       <Box ml={2}>
                         <Typography 
@@ -238,15 +245,23 @@ const ShoppingList = () => {
                         >
                           {item.ingredient?.name || 'Unknown Ingredient'}
                         </Typography>
-                        <Typography 
-                          variant="body2" 
-                          color="textSecondary"
-                          sx={{ 
-                            textDecoration: item.completed ? 'line-through' : 'none'
-                          }}
-                        >
-                          {item.quantity} {item.unit}
-                        </Typography>
+                        <Box mt={1}>
+                          <Typography variant="body2" color="text.secondary">
+                            Needed: {item.quantity} {item.unit}
+                          </Typography>
+                          {item.pantryQuantity > 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                              In pantry: {item.pantryQuantity} {item.unit}
+                            </Typography>
+                          )}
+                          <Box mt={1}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={(item.pantryQuantity / (item.pantryQuantity + item.quantity)) * 100} 
+                              sx={{ height: 8, borderRadius: 4 }}
+                            />
+                          </Box>
+                        </Box>
                       </Box>
                     </Box>
                     <Box>
@@ -254,7 +269,7 @@ const ShoppingList = () => {
                         color="primary"
                         onClick={() => handleAddToPantry(item)}
                         title="Add to Pantry"
-                        disabled={item.completed}
+                        disabled={!item.completed}
                       >
                         <AddShoppingCartIcon />
                       </IconButton>
@@ -270,9 +285,9 @@ const ShoppingList = () => {
                 </CardContent>
               </Card>
             </Grid>
-          ))
-        )}
-      </Grid>
+          ))}
+        </Grid>
+      )}
     </Container>
   );
 };

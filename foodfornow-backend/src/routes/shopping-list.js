@@ -68,13 +68,14 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
   try {
     console.log('Updating shopping list from meal plan for user:', req.userId);
     
-    // Get all meal plans for the user with populated recipe ingredients
+    // Step 1: Get all meal plans for the user with populated recipe ingredients
     const mealPlans = await MealPlan.find({ user: req.userId })
       .populate({
         path: 'recipe',
         populate: {
           path: 'ingredients.ingredient',
-          model: 'Ingredient'
+          model: 'Ingredient',
+          select: 'name category'
         }
       });
 
@@ -84,20 +85,37 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       return res.json([]);
     }
 
-    // Get current pantry items
-    const pantryItems = await PantryItem.find({ user: req.userId });
-
-    console.log('Found pantry items:', pantryItems.length);
-
-    // Create a map of current pantry quantities
-    const pantryQuantities = new Map();
-    pantryItems.forEach(item => {
-      if (item.ingredient) {
-        pantryQuantities.set(item.ingredient.toString(), item.quantity);
+    // Debug log for recipe ingredients
+    mealPlans.forEach(mealPlan => {
+      if (mealPlan.recipe && mealPlan.recipe.ingredients) {
+        console.log('Recipe:', mealPlan.recipe.name);
+        console.log('Ingredients:', JSON.stringify(mealPlan.recipe.ingredients, null, 2));
       }
     });
 
-    // Calculate needed ingredients
+    // Step 2: Get current pantry items
+    const pantryItems = await PantryItem.find({ user: req.userId })
+      .populate({
+        path: 'items.ingredient',
+        model: 'Ingredient',
+        select: 'name category'
+      });
+
+    console.log('Found pantry items:', pantryItems.length);
+
+    // Step 3: Create a map of current pantry quantities
+    const pantryQuantities = new Map();
+    pantryItems.forEach(pantry => {
+      pantry.items.forEach(item => {
+        if (item.ingredient) {
+          const key = `${item.ingredient._id}-${item.unit}`;
+          pantryQuantities.set(key, item.quantity);
+          console.log(`Pantry item: ${item.ingredient.name}, Quantity: ${item.quantity} ${item.unit}`);
+        }
+      });
+    });
+
+    // Step 4: Calculate needed ingredients
     const neededIngredients = new Map();
     mealPlans.forEach(mealPlan => {
       if (!mealPlan.recipe || !mealPlan.recipe.ingredients) {
@@ -106,7 +124,6 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       }
 
       console.log('Processing recipe:', mealPlan.recipe.name);
-      console.log('Recipe ingredients:', JSON.stringify(mealPlan.recipe.ingredients, null, 2));
 
       mealPlan.recipe.ingredients.forEach(ing => {
         if (!ing.ingredient) {
@@ -120,53 +137,71 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
           return;
         }
 
-        const key = ingredientId.toString();
-        const currentQuantity = pantryQuantities.get(key) || 0;
-        const neededQuantity = ing.quantity - currentQuantity;
+        console.log(`Processing ingredient: ${ing.ingredient.name}, Quantity: ${ing.quantity} ${ing.unit}`);
+
+        const key = `${ingredientId}-${ing.unit}`;
+        const pantryQuantity = pantryQuantities.get(key) || 0;
+        const neededQuantity = ing.quantity;
         
-        if (neededQuantity > 0) {
-          if (!neededIngredients.has(key)) {
-            neededIngredients.set(key, {
-              ingredient: ingredientId,
-              quantity: neededQuantity,
-              unit: ing.unit,
-              recipe: mealPlan.recipe._id
-            });
-          } else {
-            const existing = neededIngredients.get(key);
-            existing.quantity += neededQuantity;
-          }
+        console.log(`Pantry quantity: ${pantryQuantity}, Needed quantity: ${neededQuantity}`);
+        
+        if (!neededIngredients.has(key)) {
+          neededIngredients.set(key, {
+            ingredient: ingredientId,
+            quantity: neededQuantity,
+            unit: ing.unit,
+            recipe: mealPlan.recipe._id,
+            pantryQuantity: pantryQuantity,
+            totalNeeded: neededQuantity
+          });
+        } else {
+          const existing = neededIngredients.get(key);
+          existing.quantity += neededQuantity;
+          existing.totalNeeded += neededQuantity;
         }
       });
     });
 
     console.log('Calculated needed ingredients:', neededIngredients.size);
-    console.log('Needed ingredients:', Array.from(neededIngredients.entries()));
+    console.log('Needed ingredients details:', Array.from(neededIngredients.entries()).map(([key, value]) => ({
+      key,
+      ...value
+    })));
 
-    // Update shopping list
+    // Step 5: Update shopping list
     await ShoppingListItem.deleteMany({ user: req.userId });
     
-    const shoppingListItems = Array.from(neededIngredients.values()).map(item => ({
-      user: req.userId,
-      ingredient: item.ingredient,
-      quantity: item.quantity,
-      unit: item.unit,
-      recipe: item.recipe,
-      completed: false
-    }));
+    const shoppingListItems = Array.from(neededIngredients.values())
+      .map(item => {
+        // Subtract pantry quantity from total needed
+        const remainingNeeded = Math.max(0, item.quantity - item.pantryQuantity);
+        return {
+          user: req.userId,
+          ingredient: item.ingredient,
+          quantity: remainingNeeded,
+          unit: item.unit,
+          recipe: item.recipe,
+          completed: false
+        };
+      })
+      .filter(item => item.quantity > 0); // Only include items that still need to be bought
 
     console.log('Creating shopping list items:', shoppingListItems.length);
-    console.log('Shopping list items:', JSON.stringify(shoppingListItems, null, 2));
+    console.log('Shopping list items:', shoppingListItems);
 
     if (shoppingListItems.length > 0) {
       await ShoppingListItem.insertMany(shoppingListItems);
     }
 
-    // Return success response
-    res.json({ message: 'Shopping list updated successfully', count: shoppingListItems.length });
-  } catch (err) {
-    console.error('Error updating shopping list:', err);
-    res.status(500).json({ message: 'Error updating shopping list' });
+    // Step 6: Return updated shopping list
+    const updatedList = await ShoppingListItem.find({ user: req.userId })
+      .populate('ingredient')
+      .populate('recipe');
+
+    res.json(updatedList);
+  } catch (error) {
+    console.error('Error updating shopping list:', error);
+    res.status(500).json({ error: 'Failed to update shopping list' });
   }
 });
 
