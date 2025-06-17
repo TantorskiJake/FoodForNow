@@ -44,7 +44,8 @@ const CATEGORIES = [
 
 const Ingredients = () => {
   const navigate = useNavigate();
-  const [ingredients, setIngredients] = useState([]);
+  const [ownedIngredients, setOwnedIngredients] = useState([]);
+  const [globalIngredients, setGlobalIngredients] = useState([]);
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState(null);
@@ -75,7 +76,8 @@ const Ingredients = () => {
   const fetchIngredients = async () => {
     try {
       const response = await api.get('/ingredients');
-      setIngredients(response.data);
+      setOwnedIngredients(response.data.owned);
+      setGlobalIngredients(response.data.global);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
       if (err.response?.status === 401) {
@@ -142,6 +144,23 @@ const Ingredients = () => {
       fetchIngredients();
       fetchChangeRequests();
     } catch (err) {
+      if (err.response?.status === 409 && err.response.data.requiresClaim) {
+        if (window.confirm('This ingredient is archived. Claim it to modify?')) {
+          try {
+            await api.post(`/ingredients/${editingIngredient._id}/claim`);
+            const res2 = await api.put(`/ingredients/${editingIngredient._id}`, formData);
+            if (res2.status === 202) {
+              alert('Change request submitted for approval');
+            }
+            handleCloseDialog();
+            fetchIngredients();
+            fetchChangeRequests();
+            return;
+          } catch (claimErr) {
+            console.error('Error claiming ingredient:', claimErr);
+          }
+        }
+      }
       console.error('Error saving ingredient:', err);
       setError('Failed to save ingredient. Please try again.');
     }
@@ -205,33 +224,69 @@ const Ingredients = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <CircularProgress />
         </Box>
-      ) : ingredients.length === 0 ? (
+      ) : ownedIngredients.length === 0 && globalIngredients.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
             No ingredients found. Add your first ingredient!
           </Typography>
         </Paper>
       ) : (
-        <List>
-          {ingredients.map((ingredient) => (
-            <Paper
-              key={ingredient._id}
-              elevation={1}
-              sx={{
-                mb: 2,
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                },
-              }}
-            >
-              <IngredientItem
-                ingredient={ingredient}
-                onEdit={() => handleOpenDialog(ingredient)}
-                onDelete={() => handleDeleteIngredient(ingredient._id)}
-              />
-            </Paper>
-          ))}
-        </List>
+        <>
+          {ownedIngredients.length > 0 && (
+            <>
+              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
+                Your Ingredients
+              </Typography>
+              <List>
+                {ownedIngredients.map((ingredient) => (
+                  <Paper
+                    key={ingredient._id}
+                    elevation={1}
+                    sx={{
+                      mb: 2,
+                      '&:hover': {
+                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                      },
+                    }}
+                  >
+                    <IngredientItem
+                      ingredient={ingredient}
+                      owned
+                      onEdit={() => handleOpenDialog(ingredient)}
+                      onDelete={() => handleDeleteIngredient(ingredient._id)}
+                    />
+                  </Paper>
+                ))}
+              </List>
+            </>
+          )}
+          {globalIngredients.length > 0 && (
+            <>
+              <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+                Global Ingredients
+              </Typography>
+              <List>
+                {globalIngredients.map((ingredient) => (
+                  <Paper
+                    key={ingredient._id}
+                    elevation={1}
+                    sx={{
+                      mb: 2,
+                      '&:hover': {
+                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                      },
+                    }}
+                  >
+                    <IngredientItem
+                      ingredient={ingredient}
+                      onEdit={() => handleOpenDialog(ingredient)}
+                    />
+                  </Paper>
+                ))}
+              </List>
+            </>
+          )}
+        </>
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -334,7 +389,7 @@ const Ingredients = () => {
   );
 };
 
-const IngredientItem = ({ ingredient, onEdit, onDelete }) => {
+const IngredientItem = ({ ingredient, onEdit, onDelete, owned }) => {
   const theme = useTheme();
   
   return (
@@ -387,19 +442,21 @@ const IngredientItem = ({ ingredient, onEdit, onDelete }) => {
         >
           <EditIcon />
         </IconButton>
-        <IconButton
-          edge="end"
-          aria-label="delete"
-          onClick={onDelete}
-          sx={{
-            color: theme.palette.error.main,
-            '&:hover': {
-              backgroundColor: theme.palette.error.main + '20',
-            },
-          }}
-        >
-          <DeleteIcon />
-        </IconButton>
+        {owned && (
+          <IconButton
+            edge="end"
+            aria-label="delete"
+            onClick={onDelete}
+            sx={{
+              color: theme.palette.error.main,
+              '&:hover': {
+                backgroundColor: theme.palette.error.main + '20',
+              },
+            }}
+          >
+            <DeleteIcon />
+          </IconButton>
+        )}
       </Box>
     </ListItem>
   );

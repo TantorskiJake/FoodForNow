@@ -10,7 +10,9 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     console.log('Fetching all ingredients');
     const ingredients = await Ingredient.find({ archived: false }).sort({ name: 1 });
-    res.json(ingredients);
+    const owned = ingredients.filter(i => i.createdBy.toString() === req.userId.toString());
+    const global = ingredients.filter(i => i.createdBy.toString() !== req.userId.toString());
+    res.json({ owned, global });
   } catch (err) {
     console.error('Error fetching ingredients:', err);
     res.status(500).json({ message: 'Error fetching ingredients' });
@@ -42,8 +44,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Ingredient not found' });
     }
 
-    // If current user is not the creator, create a change request
     if (ingredient.createdBy.toString() !== req.userId.toString()) {
+      if (ingredient.archived) {
+        return res.status(409).json({ message: 'Archived ingredient. Claim to modify', requiresClaim: true });
+      }
       const changeRequest = new IngredientChangeRequest({
         ingredient: ingredient._id,
         requestedBy: req.userId,
@@ -86,6 +90,23 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Error deleting ingredient:', err);
     res.status(500).json({ message: 'Error deleting ingredient' });
+  }
+});
+
+// Claim an archived ingredient
+router.post('/:id/claim', authMiddleware, async (req, res) => {
+  try {
+    const ingredient = await Ingredient.findById(req.params.id);
+    if (!ingredient || !ingredient.archived) {
+      return res.status(404).json({ message: 'Archived ingredient not found' });
+    }
+    ingredient.archived = false;
+    ingredient.createdBy = req.userId;
+    await ingredient.save();
+    res.json({ message: 'Ingredient claimed', ingredient });
+  } catch (err) {
+    console.error('Error claiming ingredient:', err);
+    res.status(500).json({ message: 'Error claiming ingredient' });
   }
 });
 
