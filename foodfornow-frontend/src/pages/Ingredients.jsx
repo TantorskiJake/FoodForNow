@@ -149,7 +149,8 @@ const Ingredients = () => {
 
   const handleDeleteIngredient = async (id) => {
     try {
-      await api.delete(`/ingredients/${id}`);
+      const res = await api.delete(`/ingredients/${id}`);
+      alert(res.data.message);
       fetchIngredients();
     } catch (err) {
       console.error('Error deleting ingredient:', err);

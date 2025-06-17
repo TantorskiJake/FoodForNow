@@ -3,12 +3,13 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const Ingredient = require('../models/ingredient');
 const IngredientChangeRequest = require('../models/ingredientChangeRequest');
+const Recipe = require('../models/recipe');
 
 // Get all ingredients
 router.get('/', authMiddleware, async (req, res) => {
   try {
     console.log('Fetching all ingredients');
-    const ingredients = await Ingredient.find().sort({ name: 1 });
+    const ingredients = await Ingredient.find({ archived: false }).sort({ name: 1 });
     res.json(ingredients);
   } catch (err) {
     console.error('Error fetching ingredients:', err);
@@ -72,6 +73,14 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     if (ingredient.createdBy.toString() !== req.userId.toString()) {
       return res.status(403).json({ message: 'Only the creator can delete this ingredient' });
     }
+    const recipeCount = await Recipe.countDocuments({ 'ingredients.ingredient': ingredient._id });
+
+    if (recipeCount > 0) {
+      ingredient.archived = true;
+      await ingredient.save();
+      return res.json({ message: 'Ingredient archived because it is used in recipes' });
+    }
+
     await ingredient.deleteOne();
     res.json({ message: 'Ingredient deleted' });
   } catch (err) {
