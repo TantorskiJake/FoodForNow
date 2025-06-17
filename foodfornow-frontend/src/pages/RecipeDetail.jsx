@@ -19,6 +19,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TimerIcon from '@mui/icons-material/Timer';
 import api from '../services/api';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const RecipeDetail = () => {
   const { id } = useParams();
@@ -33,7 +34,7 @@ const RecipeDetail = () => {
         setRecipe(response.data);
       } catch (err) {
         console.error('Error fetching recipe:', err);
-        setError('Failed to fetch recipe details. Please try again.');
+        setError(getErrorMessage(err, 'Failed to fetch recipe details. Please try again.'));
       }
     };
 

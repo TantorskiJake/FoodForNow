@@ -33,6 +33,7 @@ import RestaurantIcon from '@mui/icons-material/Restaurant';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
   const theme = useTheme();
@@ -189,7 +190,7 @@ const Recipes = () => {
       });
       setRecipes(response.data);
     } catch (err) {
-      setError('Failed to fetch recipes. Please try again.');
+      setError(getErrorMessage(err, 'Failed to fetch recipes. Please try again.'));
     }
   };
 
@@ -198,7 +199,7 @@ const Recipes = () => {
       const response = await api.get('/ingredients');
       setIngredients(response.data);
     } catch (err) {
-      setError('Failed to fetch ingredients. Please try again.');
+      setError(getErrorMessage(err, 'Failed to fetch ingredients. Please try again.'));
     }
   };
 
@@ -208,7 +209,7 @@ const Recipes = () => {
       setSharedRecipes(response.data);
     } catch (err) {
       console.error('Error fetching shared recipes:', err);
-      setError('Failed to fetch shared recipes');
+      setError(getErrorMessage(err, 'Failed to fetch shared recipes'));
     }
   };
 
@@ -220,7 +221,7 @@ const Recipes = () => {
         setLoading(true);
         await Promise.all([fetchRecipes(), fetchIngredients()]);
       } catch (err) {
-        setError('Failed to fetch data. Please try again.');
+        setError(getErrorMessage(err, 'Failed to fetch data. Please try again.'));
       } finally {
         setLoading(false);
       }
@@ -253,7 +254,7 @@ const Recipes = () => {
       fetchIngredients(); // ensure ingredients list updated
     } catch (err) {
       console.error('Error duplicating recipe:', err);
-      setError(err.response?.data?.error || 'Failed to add recipe');
+      setError(getErrorMessage(err, 'Failed to add recipe'));
     }
   };
 
@@ -366,13 +367,11 @@ const Recipes = () => {
         const response = await api.get('/recipes');
         setRecipes(response.data);
       } catch (err) {
-        const message = err.response?.data?.message || 'Failed to fetch recipes. Please try again.';
-        setError(message);
+        setError(getErrorMessage(err, 'Failed to fetch recipes. Please try again.'));
       }
     } catch (err) {
       console.error('Error saving recipe:', err);
-      const message = err.response?.data?.message || 'Failed to save recipe. Please try again.';
-      setError(message);
+      setError(getErrorMessage(err, 'Failed to save recipe. Please try again.'));
     }
   };
 
@@ -382,8 +381,7 @@ const Recipes = () => {
       fetchRecipes();
     } catch (err) {
       console.error('Error deleting recipe:', err);
-      const message = err.response?.data?.message || 'Failed to delete recipe. Please try again.';
-      setError(message);
+      setError(getErrorMessage(err, 'Failed to delete recipe. Please try again.'));
     }
   };
 

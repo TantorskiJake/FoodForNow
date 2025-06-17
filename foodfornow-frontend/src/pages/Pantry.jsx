@@ -34,6 +34,7 @@ import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const Pantry = () => {
   const [pantryItems, setPantryItems] = useState([]);
@@ -82,7 +83,7 @@ const Pantry = () => {
       }
     } catch (err) {
       console.error('Error fetching pantry items:', err);
-      setError('Failed to fetch pantry items. Please try again.');
+      setError(getErrorMessage(err, 'Failed to fetch pantry items. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -94,7 +95,7 @@ const Pantry = () => {
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
-      setError('Failed to fetch ingredients. Please try again.');
+      setError(getErrorMessage(err, 'Failed to fetch ingredients. Please try again.'));
     }
   };
 
@@ -193,11 +194,7 @@ const Pantry = () => {
         status: err.response?.status
       });
       
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Failed to save pantry item. Please try again.');
-      }
+      setError(getErrorMessage(err, 'Failed to save pantry item. Please try again.'));
     }
   };
 
@@ -207,7 +204,7 @@ const Pantry = () => {
       fetchPantryItems();
     } catch (err) {
       console.error('Error deleting pantry item:', err);
-      setError('Failed to delete pantry item. Please try again.');
+      setError(getErrorMessage(err, 'Failed to delete pantry item. Please try again.'));
     }
   };
 
@@ -217,7 +214,7 @@ const Pantry = () => {
       fetchPantryItems();
     } catch (err) {
       console.error('Error updating quantity:', err);
-      setError('Failed to update quantity. Please try again.');
+      setError(getErrorMessage(err, 'Failed to update quantity. Please try again.'));
     }
   };
 
@@ -227,7 +224,7 @@ const Pantry = () => {
       fetchPantryItems();
     } catch (err) {
       console.error('Error adding to shopping list:', err);
-      setError('Failed to add to shopping list. Please try again.');
+      setError(getErrorMessage(err, 'Failed to add to shopping list. Please try again.'));
     }
   };
 

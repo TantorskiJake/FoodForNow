@@ -30,6 +30,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import api from '../services/api';
+import { getErrorMessage } from '../utils/errorHandler';
 import { getCategoryColor } from '../utils/categoryColors';
 import { useAuth } from '../context/AuthContext';
 
@@ -77,12 +78,12 @@ const Ingredients = () => {
         params: { search: searchTerm },
       });
       setIngredients(response.data);
-    } catch (err) {
-      console.error('Error fetching ingredients:', err);
-      setError('Failed to fetch ingredients. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+      } catch (err) {
+        console.error('Error fetching ingredients:', err);
+        setError(getErrorMessage(err, 'Failed to fetch ingredients. Please try again.'));
+      } finally {
+        setLoading(false);
+      }
   };
 
   const fetchSharedIngredients = async () => {
@@ -91,12 +92,12 @@ const Ingredients = () => {
         params: { search: searchTerm },
       });
       setIngredients(response.data);
-    } catch (err) {
-      console.error('Error fetching shared ingredients:', err);
-      setError('Failed to fetch shared ingredients. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+      } catch (err) {
+        console.error('Error fetching shared ingredients:', err);
+        setError(getErrorMessage(err, 'Failed to fetch shared ingredients. Please try again.'));
+      } finally {
+        setLoading(false);
+      }
   };
 
   const handleDuplicate = async (id) => {
@@ -104,14 +105,14 @@ const Ingredients = () => {
       await api.post(`/ingredients/${id}/duplicate`);
       setTab('mine');
       setLoading(true);
-    } catch (err) {
-      console.error('Error duplicating ingredient:', err);
-      if (err.response?.status === 409) {
-        setError('You already have this ingredient in your collection.');
-      } else {
-        setError('Failed to add ingredient. Please try again.');
+      } catch (err) {
+        console.error('Error duplicating ingredient:', err);
+        if (err.response?.status === 409) {
+          setError('You already have this ingredient in your collection.');
+        } else {
+          setError(getErrorMessage(err, 'Failed to add ingredient. Please try again.'));
+        }
       }
-    }
   };
 
   const handleOpenDialog = (ingredient = null) => {
@@ -152,20 +153,20 @@ const Ingredients = () => {
       }
       handleCloseDialog();
       fetchIngredients();
-    } catch (err) {
-      console.error('Error saving ingredient:', err);
-      setError('Failed to save ingredient. Please try again.');
-    }
+      } catch (err) {
+        console.error('Error saving ingredient:', err);
+        setError(getErrorMessage(err, 'Failed to save ingredient. Please try again.'));
+      }
   };
 
   const handleDeleteIngredient = async (id) => {
     try {
       await api.delete(`/ingredients/${id}`);
       fetchIngredients();
-    } catch (err) {
-      console.error('Error deleting ingredient:', err);
-      setError('Failed to delete ingredient. Please try again.');
-    }
+      } catch (err) {
+        console.error('Error deleting ingredient:', err);
+        setError(getErrorMessage(err, 'Failed to delete ingredient. Please try again.'));
+      }
   };
 
   const theme = useTheme();

@@ -37,6 +37,7 @@ import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const ShoppingList = () => {
   const theme = useTheme();
@@ -80,7 +81,7 @@ const ShoppingList = () => {
       }
     } catch (err) {
       console.error('Error fetching shopping list:', err);
-      setError('Failed to fetch shopping list');
+      setError(getErrorMessage(err, 'Failed to fetch shopping list'));
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ const ShoppingList = () => {
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
-      setError('Failed to load ingredients');
+      setError(getErrorMessage(err, 'Failed to load ingredients'));
     }
   };
 
@@ -111,7 +112,7 @@ const ShoppingList = () => {
       fetchShoppingList();
     } catch (err) {
       console.error('Error deleting item:', err);
-      setError('Failed to delete item');
+      setError(getErrorMessage(err, 'Failed to delete item'));
     }
   };
 

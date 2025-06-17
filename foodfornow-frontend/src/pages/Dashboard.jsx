@@ -29,6 +29,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import api from '../services/api';
+import { getErrorMessage } from '../utils/errorHandler';
 import MealPlanGrid from '../components/MealPlanGrid';
 import { getCategoryColor } from '../utils/categoryColors';
 import { useAuth } from '../context/AuthContext';
@@ -76,7 +77,7 @@ const Dashboard = () => {
       setRecipes(response.data || []);
     } catch (err) {
       console.error('Error fetching recipes:', err);
-      setError('Failed to fetch recipes. Please try again.');
+      setError(getErrorMessage(err, 'Failed to fetch recipes. Please try again.'));
     }
   };
 
@@ -86,7 +87,7 @@ const Dashboard = () => {
       setMealPlan(response.data || []);
     } catch (err) {
       console.error('Error fetching meal plan:', err);
-      setError('Failed to fetch meal plan. Please try again.');
+      setError(getErrorMessage(err, 'Failed to fetch meal plan. Please try again.'));
     }
   };
 
@@ -107,7 +108,7 @@ const Dashboard = () => {
       }
     } catch (err) {
       console.error('Error fetching ingredients:', err);
-      setError('Failed to fetch ingredients. Please try again.');
+      setError(getErrorMessage(err, 'Failed to fetch ingredients. Please try again.'));
       setIngredients([]);
     }
   };
@@ -121,7 +122,7 @@ const Dashboard = () => {
       await fetchIngredients();
     } catch (err) {
       console.error('Error adding ingredients to shopping list:', err);
-      setError('Failed to add ingredients to shopping list');
+      setError(getErrorMessage(err, 'Failed to add ingredients to shopping list'));
     } finally {
       setLoading(false);
     }
@@ -176,11 +177,7 @@ const Dashboard = () => {
       setError('');
     } catch (err) {
       console.error('Error saving meal:', err);
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Failed to save meal. Please try again.');
-      }
+      setError(getErrorMessage(err, 'Failed to save meal. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -200,7 +197,7 @@ const Dashboard = () => {
       ]);
     } catch (err) {
       console.error('Error deleting meal:', err);
-      setError('Failed to delete meal. Please try again.');
+      setError(getErrorMessage(err, 'Failed to delete meal. Please try again.'));
     } finally {
       setLoading(false);
     }
