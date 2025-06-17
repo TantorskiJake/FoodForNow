@@ -78,7 +78,10 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
     for (const ing of original.ingredients) {
       const origIng = ing.ingredient;
       // Case-insensitive search by name
-      let userIng = await Ingredient.findOne({ user: req.userId, name: origIng.name });
+      let userIng = await Ingredient.findOne({
+        user: req.userId,
+        name: origIng.name
+      }).collation({ locale: 'en', strength: 2 });
       if (!userIng) {
         userIng = new Ingredient({
           name: origIng.name,
