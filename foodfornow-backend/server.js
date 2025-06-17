@@ -28,9 +28,9 @@ app.use(cors({
   credentials: true
 }));
 
-
-// Body parsing
+// Body parsing and cookies
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Routes - all routes now have /api prefix
@@ -67,7 +67,12 @@ process.on('uncaughtException', (err) => {
 const startServer = async () => {
   try {
     // Connect to MongoDB Atlas
-    const MONGODB_URI = process.env.MONGO_URI || "mongodb+srv://JakeTantorski:JakeTantorski@ffn-cluster.bsetl.mongodb.net/foodfornow";
+    const MONGODB_URI = process.env.MONGO_URI;
+    
+    if (!MONGODB_URI) {
+      throw new Error('MONGO_URI environment variable is required');
+    }
+
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,

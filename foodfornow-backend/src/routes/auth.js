@@ -10,7 +10,11 @@ const router = express.Router();
 // Token expiration durations
 const ACCESS_TOKEN_EXPIRATION = "1h";
 const REFRESH_TOKEN_EXPIRATION = "7d";
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
 
 // Calculate expiration times
 const getExpirationTime = (duration) => {
