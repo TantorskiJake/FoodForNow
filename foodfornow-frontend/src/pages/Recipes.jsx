@@ -189,12 +189,7 @@ const Recipes = () => {
       });
       setRecipes(response.data);
     } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        setError('Failed to fetch recipes. Please try again.');
-      }
+      setError('Failed to fetch recipes. Please try again.');
     }
   };
 
@@ -203,12 +198,7 @@ const Recipes = () => {
       const response = await api.get('/ingredients');
       setIngredients(response.data);
     } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        setError('Failed to fetch ingredients. Please try again.');
-      }
+      setError('Failed to fetch ingredients. Please try again.');
     }
   };
 
@@ -229,12 +219,7 @@ const Recipes = () => {
         fetchRecipes();
         fetchIngredients();
       } catch (err) {
-        if (err.response?.status === 401) {
-          localStorage.removeItem('token');
-          navigate('/login');
-        } else {
-          setError('Failed to fetch data. Please try again.');
-        }
+        setError('Failed to fetch data. Please try again.');
       } finally {
         setLoading(false);
       }

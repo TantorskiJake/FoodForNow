@@ -61,7 +61,7 @@ const Pantry = () => {
         fetchPantryItems();
         fetchIngredients();
       } catch {
-        navigate('/login');
+        // Redirect handled globally by interceptor
       }
     };
     checkAuthAndFetch();
@@ -192,9 +192,6 @@ const Pantry = () => {
       
       if (err.response?.data?.error) {
         setError(err.response.data.error);
-      } else if (err.response?.status === 401) {
-        setError('Your session has expired. Please log in again.');
-        navigate('/login');
       } else {
         setError('Failed to save pantry item. Please try again.');
       }
