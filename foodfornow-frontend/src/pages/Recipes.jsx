@@ -31,9 +31,11 @@ import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryColor } from '../utils/categoryColors';
+import { useNavigate } from 'react-router-dom';
 
 const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
   return (
     <ListItem
       sx={{
@@ -179,6 +181,7 @@ const Recipes = () => {
   const [sharedRecipes, setSharedRecipes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const { authenticated } = useAuth();
+  const navigate = useNavigate();
 
   // Fetch functions for recipes and ingredients
   const fetchRecipes = async () => {
@@ -427,17 +430,31 @@ const Recipes = () => {
                 {recipes.map((recipe) => (
                   <Grid item xs={12} sm={6} md={4} key={recipe._id}>
                     <Paper
-                      elevation={1}
+                      elevation={0}
                       sx={{
-                        p: 2,
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
-                        position: 'relative',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                        background: theme.palette.mode === 'dark' 
+                          ? 'rgba(255, 255, 255, 0.05)'
+                          : 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid',
+                        borderColor: theme.palette.mode === 'dark'
+                          ? 'rgba(255, 255, 255, 0.1)'
+                          : 'rgba(0, 0, 0, 0.1)',
                         '&:hover': {
-                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                          transform: 'translateY(-4px)',
+                          boxShadow: theme.palette.mode === 'dark'
+                            ? '0 8px 24px rgba(0, 0, 0, 0.3)'
+                            : '0 8px 24px rgba(0, 0, 0, 0.1)',
                         },
                       }}
+                      onClick={() => navigate(`/recipes/${recipe._id}`)}
                     >
                       <Box sx={{ flex: 1 }}>
                         <Typography
@@ -483,14 +500,20 @@ const Recipes = () => {
                       <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <IconButton
                           size="small"
-                          onClick={() => handleOpenDialog(recipe)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDialog(recipe);
+                          }}
                           sx={{ color: 'primary.main' }}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteRecipe(recipe._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRecipe(recipe._id);
+                          }}
                           sx={{ color: 'error.main' }}
                         >
                           <DeleteIcon fontSize="small" />
@@ -513,17 +536,31 @@ const Recipes = () => {
                 {sharedRecipes.map((recipe) => (
                   <Grid item xs={12} sm={6} md={4} key={recipe._id}>
                     <Paper
-                      elevation={1}
+                      elevation={0}
                       sx={{
-                        p: 2,
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
-                        position: 'relative',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                        background: theme.palette.mode === 'dark' 
+                          ? 'rgba(255, 255, 255, 0.05)'
+                          : 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid',
+                        borderColor: theme.palette.mode === 'dark'
+                          ? 'rgba(255, 255, 255, 0.1)'
+                          : 'rgba(0, 0, 0, 0.1)',
                         '&:hover': {
-                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                          transform: 'translateY(-4px)',
+                          boxShadow: theme.palette.mode === 'dark'
+                            ? '0 8px 24px rgba(0, 0, 0, 0.3)'
+                            : '0 8px 24px rgba(0, 0, 0, 0.1)',
                         },
                       }}
+                      onClick={() => navigate(`/recipes/${recipe._id}`)}
                     >
                       <Box sx={{ flex: 1 }}>
                         <Typography
@@ -570,7 +607,10 @@ const Recipes = () => {
                         <Button
                           variant="contained"
                           size="small"
-                          onClick={() => handleDuplicateRecipe(recipe._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateRecipe(recipe._id);
+                          }}
                         >
                           Add
                         </Button>

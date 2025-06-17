@@ -2,28 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
-  Paper,
   Typography,
-  Grid,
+  Box,
+  Paper,
+  Chip,
+  Button,
+  CircularProgress,
+  Divider,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
-  Box,
-  Button,
-  Chip,
-  Divider,
-  Alert,
+  useTheme,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
-import TimerIcon from '@mui/icons-material/Timer';
 import api from '../services/api';
 
 const RecipeDetail = () => {
+  const theme = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
   const [recipe, setRecipe] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -33,116 +34,217 @@ const RecipeDetail = () => {
         setRecipe(response.data);
       } catch (err) {
         console.error('Error fetching recipe:', err);
-        setError('Failed to fetch recipe details. Please try again.');
+        setError('Failed to load recipe');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchRecipe();
   }, [id]);
 
-  if (error) {
+  if (loading) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Alert severity="error">{error}</Alert>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(-1)}
-          sx={{ mt: 2 }}
-        >
-          Go Back
-        </Button>
-      </Container>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: theme.palette.mode === 'dark' 
+            ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
+            : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+        }}
+      >
+        <CircularProgress />
+      </Box>
     );
   }
 
-  if (!recipe) {
+  if (error || !recipe) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Typography>Loading recipe details...</Typography>
-      </Container>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: theme.palette.mode === 'dark' 
+            ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
+            : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+          gap: 2,
+        }}
+      >
+        <Typography variant="h5" color="error">
+          {error || 'Recipe not found'}
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/recipes')}
+          sx={{
+            textTransform: 'none',
+            background: theme.palette.mode === 'dark'
+              ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+              : '#228B22',
+            '&:hover': {
+              background: theme.palette.mode === 'dark'
+                ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                : '#1B6B1B',
+            },
+          }}
+        >
+          Back to Recipes
+        </Button>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => navigate(-1)}
-        sx={{ mb: 2 }}
-      >
-        Go Back
-      </Button>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: theme.palette.mode === 'dark' 
+          ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
+          : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+        py: 4,
+      }}
+    >
+      <Container maxWidth="md">
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/recipes')}
+          sx={{
+            mb: 3,
+            color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+            textTransform: 'none',
+            '&:hover': {
+              background: 'transparent',
+              color: '#228B22',
+            },
+          }}
+        >
+          Back to Recipes
+        </Button>
 
-      <Paper elevation={3} sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          {recipe.name}
-        </Typography>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            borderRadius: 2,
+            background: theme.palette.mode === 'dark' 
+              ? 'rgba(255, 255, 255, 0.05)'
+              : 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid',
+            borderColor: theme.palette.mode === 'dark'
+              ? 'rgba(255, 255, 255, 0.1)'
+              : 'rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              fontWeight: 700,
+              letterSpacing: '-0.5px',
+              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+              mb: 2,
+            }}
+          >
+            {recipe.name}
+          </Typography>
 
-        <Box sx={{ mb: 3 }}>
-          <Chip
-            icon={<TimerIcon />}
-            label={`${recipe.cookTime} minutes`}
-            sx={{ mr: 1 }}
-          />
-          <Chip
-            icon={<RestaurantIcon />}
-            label={`${recipe.servings} servings`}
-            sx={{ mr: 1 }}
-          />
-        </Box>
+          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            <Chip
+              icon={<AccessTimeIcon />}
+              label={`${recipe.cookTime} mins`}
+              sx={{
+                background: theme.palette.mode === 'dark'
+                  ? 'rgba(34, 139, 34, 0.2)'
+                  : 'rgba(34, 139, 34, 0.1)',
+                color: '#228B22',
+              }}
+            />
+            <Chip
+              icon={<RestaurantIcon />}
+              label={recipe.difficulty || 'Medium'}
+              sx={{
+                background: theme.palette.mode === 'dark'
+                  ? 'rgba(34, 139, 34, 0.2)'
+                  : 'rgba(34, 139, 34, 0.1)',
+                color: '#228B22',
+              }}
+            />
+          </Box>
 
-        <Divider sx={{ my: 3 }} />
+          <Typography
+            variant="body1"
+            sx={{
+              color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+              mb: 4,
+              lineHeight: 1.6,
+            }}
+          >
+            {recipe.description}
+          </Typography>
 
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={6}>
-            <Typography variant="h6" gutterBottom>
-              Ingredients
-            </Typography>
-            <List>
-              {recipe.ingredients.map((item, index) => (
-                <ListItem key={index}>
-                  <ListItemIcon>
-                    <RestaurantIcon />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={item.ingredient.name}
-                    secondary={`${item.quantity} ${item.unit}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </Grid>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 600,
+              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+              mb: 2,
+            }}
+          >
+            Ingredients
+          </Typography>
+          <List>
+            {recipe.ingredients.map((ingredient, index) => (
+              <ListItem key={index} sx={{ py: 0.5 }}>
+                <ListItemText
+                  primary={typeof ingredient === 'string' ? ingredient : `${ingredient.quantity} ${ingredient.unit} ${ingredient.ingredient.name}`}
+                  sx={{
+                    '& .MuiListItemText-primary': {
+                      color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                    },
+                  }}
+                />
+              </ListItem>
+            ))}
+          </List>
 
-          <Grid item xs={12} md={6}>
-            <Typography variant="h6" gutterBottom>
-              Instructions
-            </Typography>
-            <List>
-              {recipe.instructions.map((instruction, index) => (
-                <ListItem key={index}>
-                  <ListItemText
-                    primary={`Step ${index + 1}`}
-                    secondary={instruction}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </Grid>
-        </Grid>
+          <Divider sx={{ my: 3 }} />
 
-        {recipe.description && (
-          <>
-            <Divider sx={{ my: 3 }} />
-            <Typography variant="h6" gutterBottom>
-              Description
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {recipe.description}
-            </Typography>
-          </>
-        )}
-      </Paper>
-    </Container>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 600,
+              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+              mb: 2,
+            }}
+          >
+            Instructions
+          </Typography>
+          <List>
+            {recipe.instructions.map((instruction, index) => (
+              <ListItem key={index} sx={{ py: 1 }}>
+                <ListItemText
+                  primary={`${index + 1}. ${instruction}`}
+                  sx={{
+                    '& .MuiListItemText-primary': {
+                      color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                      lineHeight: 1.6,
+                    },
+                  }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+      </Container>
+    </Box>
   );
 };
 

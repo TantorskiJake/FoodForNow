@@ -20,18 +20,38 @@ export const ThemeProvider = ({ children }) => {
     palette: {
       mode: darkMode ? 'dark' : 'light',
       primary: {
-        main: '#2e7d32',
+        main: '#228B22',
         light: '#4caf50',
         dark: '#1b5e20',
       },
       secondary: {
-        main: '#ff9800',
-        light: '#ffb74d',
-        dark: '#f57c00',
+        main: '#006400',
+        light: '#2e7d32',
+        dark: '#004d00',
       },
       background: {
-        default: darkMode ? '#121212' : '#f5f5f5',
+        default: darkMode ? '#121212' : '#f5f5f7',
         paper: darkMode ? '#1e1e1e' : '#ffffff',
+      },
+    },
+    typography: {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    },
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            textTransform: 'none',
+            borderRadius: 8,
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            borderRadius: 12,
+          },
+        },
       },
     },
   });
