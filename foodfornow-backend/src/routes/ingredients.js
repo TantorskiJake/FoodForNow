@@ -3,37 +3,28 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const Ingredient = require('../models/ingredient');
 
-// Get all ingredients with search and pagination
+// Get all ingredients with search
 router.get('/', authMiddleware, async (req, res) => {
   try {
     console.log('Fetching ingredients for user:', req.userId);
-    let { search = '', page = 1, limit = 10 } = req.query;
-    page = parseInt(page, 10);
-    limit = parseInt(limit, 10);
+    let { search = '' } = req.query;
     const filter = { user: req.userId };
     if (search) {
       filter.name = { $regex: search, $options: 'i' };
     }
-    const total = await Ingredient.countDocuments(filter);
-    const totalPages = Math.ceil(total / limit) || 1;
-    const ingredients = await Ingredient.find(filter)
-      .sort({ name: 1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
-    res.json({ data: ingredients, total, page, totalPages });
+    const ingredients = await Ingredient.find(filter).sort({ name: 1 });
+    res.json(ingredients);
   } catch (err) {
     console.error('Error fetching ingredients:', err);
     res.status(500).json({ message: 'Error fetching ingredients' });
   }
 });
 
-// Get shared ingredients (those not created by the current user) with search and pagination,
+// Get shared ingredients (those not created by the current user) with search,
 // excluding any whose name matches the user's (case-insensitive)
 router.get('/shared', authMiddleware, async (req, res) => {
   try {
-    let { search = '', page = 1, limit = 10 } = req.query;
-    page = parseInt(page, 10);
-    limit = parseInt(limit, 10);
+    let { search = '' } = req.query;
 
     // Find all of the user's ingredient names (case-insensitive)
     const userIngredients = await Ingredient.find({ user: req.userId }).select('name');
@@ -53,14 +44,9 @@ router.get('/shared', authMiddleware, async (req, res) => {
       };
     }
 
-    const total = await Ingredient.countDocuments(filter);
-    const totalPages = Math.ceil(total / limit) || 1;
-    const sharedIngredients = await Ingredient.find(filter)
-      .sort({ name: 1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
+    const sharedIngredients = await Ingredient.find(filter).sort({ name: 1 });
 
-    res.json({ data: sharedIngredients, total, page, totalPages });
+    res.json(sharedIngredients);
   } catch (err) {
     console.error('Error fetching shared ingredients:', err);
     res.status(500).json({ message: 'Error fetching shared ingredients' });

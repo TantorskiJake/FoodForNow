@@ -58,9 +58,6 @@ const Ingredients = () => {
   const [tab, setTab] = useState('mine');
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const LIMIT = 10;
 
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -83,15 +80,14 @@ const Ingredients = () => {
       fetchSharedIngredients();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, searchTerm, page]);
+  }, [tab, searchTerm]);
 
   const fetchIngredients = async () => {
     try {
       const response = await api.get('/ingredients', {
-        params: { search: searchTerm, page, limit: LIMIT },
+        params: { search: searchTerm },
       });
-      setIngredients(response.data.data);
-      setTotalPages(response.data.totalPages);
+      setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
       if (err.response?.status === 401) {
@@ -108,10 +104,9 @@ const Ingredients = () => {
   const fetchSharedIngredients = async () => {
     try {
       const response = await api.get('/ingredients/shared', {
-        params: { search: searchTerm, page, limit: LIMIT },
+        params: { search: searchTerm },
       });
-      setIngredients(response.data.data);
-      setTotalPages(response.data.totalPages);
+      setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching shared ingredients:', err);
       setError('Failed to fetch shared ingredients. Please try again.');
@@ -218,7 +213,6 @@ const Ingredients = () => {
         onChange={(e, newVal) => {
           setTab(newVal);
           setSearchTerm('');
-          setPage(1);
         }}
         sx={{ mb: 2 }}
       >
@@ -231,17 +225,13 @@ const Ingredients = () => {
           label="Search"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              setPage(1);
-            }
-          }}
           size="small"
         />
         <Button
           variant="contained"
           onClick={() => {
-            setPage(1);
+            // No pagination, so just trigger search
+            // Optionally could re-call fetch, but searchTerm is already in dependency
           }}
         >
           Search
@@ -259,41 +249,28 @@ const Ingredients = () => {
           </Typography>
         </Paper>
       ) : (
-        <>
-          <List>
-            {ingredients.map((ingredient) => (
-              <Paper
-                key={ingredient._id}
-                elevation={1}
-                sx={{
-                  mb: 2,
-                  '&:hover': {
-                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                  },
-                }}
-              >
-                <IngredientItem
-                  ingredient={ingredient}
-                  onEdit={() => handleOpenDialog(ingredient)}
-                  onDelete={() => handleDeleteIngredient(ingredient._id)}
-                  onDuplicate={() => handleDuplicate(ingredient._id)}
-                  isShared={tab === 'shared'}
-                />
-              </Paper>
-            ))}
-          </List>
-          {ingredients.length > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={(e, value) => {
-                  setPage(value);
-                }}
+        <List>
+          {ingredients.map((ingredient) => (
+            <Paper
+              key={ingredient._id}
+              elevation={1}
+              sx={{
+                mb: 2,
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                },
+              }}
+            >
+              <IngredientItem
+                ingredient={ingredient}
+                onEdit={() => handleOpenDialog(ingredient)}
+                onDelete={() => handleDeleteIngredient(ingredient._id)}
+                onDuplicate={() => handleDuplicate(ingredient._id)}
+                isShared={tab === 'shared'}
               />
-            </Box>
-          )}
-        </>
+            </Paper>
+          ))}
+        </List>
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
