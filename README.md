@@ -68,6 +68,28 @@ FoodForNow is a full-stack web application designed to help users manage their p
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:3001
 
+## Building and Running
+
+To create a production build of the frontend run:
+
+```bash
+npm run build
+```
+
+You can preview the built files locally with Vite:
+
+```bash
+npm run preview -w foodfornow-frontend
+```
+
+Start the backend separately:
+
+```bash
+npm run start
+```
+
+React `StrictMode` in `src/main.jsx` is enabled only when `import.meta.env.DEV` is `true`.
+
 ## Project Structure
 
 ### Frontend
