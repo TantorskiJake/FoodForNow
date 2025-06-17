@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -32,6 +31,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
+import { useAuth } from '../context/AuthContext';
 
 const UNITS = [
   'g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'
@@ -42,7 +42,6 @@ const CATEGORIES = [
 ];
 
 const Ingredients = () => {
-  const navigate = useNavigate();
   const [ingredients, setIngredients] = useState([]);
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
@@ -58,20 +57,10 @@ const Ingredients = () => {
   const [tab, setTab] = useState('mine');
 
   const [searchTerm, setSearchTerm] = useState('');
+  const { authenticated } = useAuth();
 
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
-      try {
-        await api.get('/auth/me');
-        fetchIngredients();
-      } catch {
-        // Redirect handled globally by interceptor
-      }
-    };
-    checkAuthAndFetch();
-  }, [navigate]);
-
-  useEffect(() => {
+    if (!authenticated) return;
     setLoading(true);
     setError('');
     if (tab === 'mine') {
@@ -80,7 +69,7 @@ const Ingredients = () => {
       fetchSharedIngredients();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, searchTerm]);
+  }, [tab, searchTerm, authenticated]);
 
   const fetchIngredients = async () => {
     try {

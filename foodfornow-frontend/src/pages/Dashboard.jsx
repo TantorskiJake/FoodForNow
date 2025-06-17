@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Grid,
@@ -32,9 +31,9 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import api from '../services/api';
 import MealPlanGrid from '../components/MealPlanGrid';
 import { getCategoryColor } from '../utils/categoryColors';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
-  const navigate = useNavigate();
   const theme = useTheme();
   const [recipes, setRecipes] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
@@ -50,25 +49,26 @@ const Dashboard = () => {
     recipeId: '',
   });
 
+  const { authenticated } = useAuth();
+
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
+    if (!authenticated) return;
+
+    const fetchAll = async () => {
       try {
         setLoading(true);
-        await api.get('/auth/me');
         await Promise.all([
           fetchRecipes(),
           fetchMealPlan(),
           fetchIngredients()
         ]);
-      } catch (err) {
-        console.error('Auth error:', err);
-        navigate('/login');
       } finally {
         setLoading(false);
       }
     };
-    checkAuthAndFetch();
-  }, [navigate]);
+
+    fetchAll();
+  }, [authenticated]);
 
   const fetchRecipes = async () => {
     try {

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -34,9 +33,9 @@ import {
 import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const Pantry = () => {
-  const navigate = useNavigate();
   const [pantryItems, setPantryItems] = useState([]);
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
@@ -54,18 +53,22 @@ const Pantry = () => {
   const [loading, setLoading] = useState(true);
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
 
+  const { authenticated } = useAuth();
+
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
+    if (!authenticated) return;
+
+    const fetchAll = async () => {
       try {
-        await api.get('/auth/me');
-        fetchPantryItems();
-        fetchIngredients();
-      } catch {
-        // Redirect handled globally by interceptor
+        setLoading(true);
+        await Promise.all([fetchPantryItems(), fetchIngredients()]);
+      } finally {
+        setLoading(false);
       }
     };
-    checkAuthAndFetch();
-  }, [navigate]);
+
+    fetchAll();
+  }, [authenticated]);
 
   const fetchPantryItems = async () => {
     try {

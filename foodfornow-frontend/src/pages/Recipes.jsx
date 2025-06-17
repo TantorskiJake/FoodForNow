@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Grid,
@@ -33,6 +32,7 @@ import TimerIcon from '@mui/icons-material/Timer';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
+import { useAuth } from '../context/AuthContext';
 
 const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
   const theme = useTheme();
@@ -157,7 +157,6 @@ const MemoizedRecipeList = React.memo(({ recipes, onEdit, onDelete, theme }) => 
 ));
 
 const Recipes = () => {
-  const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [error, setError] = useState('');
@@ -180,6 +179,7 @@ const Recipes = () => {
   const [tab, setTab] = useState('mine');
   const [sharedRecipes, setSharedRecipes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const { authenticated } = useAuth();
 
   // Fetch functions for recipes and ingredients
   const fetchRecipes = async () => {
@@ -213,23 +213,26 @@ const Recipes = () => {
   };
 
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
+    if (!authenticated) return;
+
+    const fetchInitial = async () => {
       try {
-        await api.get('/auth/me');
-        fetchRecipes();
-        fetchIngredients();
+        setLoading(true);
+        await Promise.all([fetchRecipes(), fetchIngredients()]);
       } catch (err) {
         setError('Failed to fetch data. Please try again.');
       } finally {
         setLoading(false);
       }
     };
-    checkAuthAndFetch();
+
+    fetchInitial();
     // eslint-disable-next-line
-  }, [navigate]);
+  }, [authenticated]);
 
   // Fetch shared recipes when tab or searchTerm changes
   useEffect(() => {
+    if (!authenticated) return;
     if (tab === 'shared') {
       setLoading(true);
       fetchSharedRecipes().finally(() => setLoading(false));
@@ -238,7 +241,7 @@ const Recipes = () => {
       fetchRecipes().finally(() => setLoading(false));
     }
     // eslint-disable-next-line
-  }, [tab, searchTerm]);
+  }, [tab, searchTerm, authenticated]);
 
   const handleDuplicateRecipe = async (id) => {
     try {
