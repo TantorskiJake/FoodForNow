@@ -87,7 +87,9 @@ const ShoppingList = () => {
   const fetchIngredients = async () => {
     try {
       const response = await api.get('/ingredients');
-      setIngredients(response.data);
+      const data = response.data;
+      const list = Array.isArray(data) ? data : [...(data.owned || []), ...(data.global || [])];
+      setIngredients(list);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
       setError('Failed to load ingredients');
