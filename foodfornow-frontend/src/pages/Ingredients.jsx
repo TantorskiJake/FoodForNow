@@ -25,6 +25,8 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import TimerIcon from '@mui/icons-material/Timer';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -287,9 +289,9 @@ const Ingredients = () => {
           />
         </Paper>
 
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
           {filteredIngredients.map((ingredient) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={ingredient._id}>
+            <Grid item xs={12} sm={6} md={4} lg={3} xl={2} key={ingredient._id}>
               <Paper
                 elevation={0}
                 sx={{
@@ -298,6 +300,7 @@ const Ingredients = () => {
                   flexDirection: 'column',
                   borderRadius: 2,
                   overflow: 'hidden',
+                  cursor: 'pointer',
                   transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                   background: theme.palette.mode === 'dark' 
                     ? 'rgba(255, 255, 255, 0.05)'
@@ -315,12 +318,12 @@ const Ingredients = () => {
                   },
                 }}
               >
-                <Box sx={{ p: 2, flex: 1 }}>
+                <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <Typography
                     variant="h6"
                     sx={{
                       fontWeight: 600,
-                      mb: 1,
+                      mb: 0.5,
                       color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
                       fontSize: '1.1rem',
                       lineHeight: 1.3,
@@ -329,7 +332,7 @@ const Ingredients = () => {
                     {ingredient.name}
                   </Typography>
 
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                     <Chip
                       size="small"
                       label={ingredient.category}
@@ -340,83 +343,92 @@ const Ingredients = () => {
                           ? `${getCategoryColor(ingredient.category).main}33`
                           : `${getCategoryColor(ingredient.category).main}22`,
                         color: getCategoryColor(ingredient.category).main,
-                        '&:hover': {
-                          background: theme.palette.mode === 'dark'
-                            ? `${getCategoryColor(ingredient.category).main}44`
-                            : `${getCategoryColor(ingredient.category).main}33`,
-                        },
                       }}
                     />
-                    {ingredient.quantity && ingredient.unit && (
-                      <Chip
-                        size="small"
-                        label={`${ingredient.quantity} ${ingredient.unit}`}
-                        sx={{
-                          height: 24,
-                          fontSize: '0.75rem',
-                          background: theme.palette.mode === 'dark'
-                            ? 'rgba(34, 139, 34, 0.2)'
-                            : 'rgba(34, 139, 34, 0.1)',
-                          color: '#228B22',
-                        }}
-                      />
-                    )}
                   </Box>
 
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
-                    {tab === 'mine' ? (
-                      <>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenDialog(ingredient)}
-                          sx={{ 
-                            color: 'primary.main',
-                            '&:hover': {
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                      mb: 1,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      lineHeight: 1.4,
+                      flex: 1,
+                    }}
+                  >
+                    {ingredient.description || 'No description'}
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 'auto' }}>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      {tab === 'mine' ? (
+                        <>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDialog(ingredient);
+                            }}
+                            sx={{ 
+                              color: 'primary.main',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'rgba(34, 139, 34, 0.1)'
+                                  : 'rgba(34, 139, 34, 0.05)',
+                              },
+                            }}
+                          >
+                            <EditIcon sx={{ fontSize: '1.1rem' }} />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteIngredient(ingredient._id);
+                            }}
+                            sx={{ 
+                              color: 'error.main',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'rgba(211, 47, 47, 0.1)'
+                                  : 'rgba(211, 47, 47, 0.05)',
+                              },
+                            }}
+                          >
+                            <DeleteIcon sx={{ fontSize: '1.1rem' }} />
+                          </IconButton>
+                        </>
+                      ) : (
+                        !myIngredients.some(myIng => myIng.name.toLowerCase() === ingredient.name.toLowerCase()) && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicate(ingredient._id);
+                            }}
+                            sx={{
+                              textTransform: 'none',
                               background: theme.palette.mode === 'dark'
-                                ? 'rgba(34, 139, 34, 0.1)'
-                                : 'rgba(34, 139, 34, 0.05)',
-                            },
-                          }}
-                        >
-                          <EditIcon sx={{ fontSize: '1.1rem' }} />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteIngredient(ingredient._id)}
-                          sx={{ 
-                            color: 'error.main',
-                            '&:hover': {
-                              background: theme.palette.mode === 'dark'
-                                ? 'rgba(211, 47, 47, 0.1)'
-                                : 'rgba(211, 47, 47, 0.05)',
-                            },
-                          }}
-                        >
-                          <DeleteIcon sx={{ fontSize: '1.1rem' }} />
-                        </IconButton>
-                      </>
-                    ) : (
-                      !myIngredients.some(myIng => myIng.name.toLowerCase() === ingredient.name.toLowerCase()) && (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={() => handleDuplicate(ingredient._id)}
-                          sx={{
-                            textTransform: 'none',
-                            background: theme.palette.mode === 'dark'
-                              ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                              : '#228B22',
-                            '&:hover': {
-                              background: theme.palette.mode === 'dark'
-                                ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
-                                : '#1B6B1B',
-                            },
-                          }}
-                        >
-                          Add
-                        </Button>
-                      )
-                    )}
+                                ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                                : '#228B22',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                                  : '#1B6B1B',
+                              },
+                            }}
+                          >
+                            Add
+                          </Button>
+                        )
+                      )}
+                    </Box>
                   </Box>
                 </Box>
               </Paper>
