@@ -1,99 +1,100 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
-  Button,
   Box,
+  Paper,
+  Grid,
+  Button,
   TextField,
   IconButton,
-  Alert,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
-  MenuItem,
-  Select,
   FormControl,
   InputLabel,
-  Paper,
-  CircularProgress,
+  Select,
+  MenuItem,
+  Chip,
   useTheme,
   Tabs,
   Tab,
-  Grid
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import TimerIcon from '@mui/icons-material/Timer';
 import api from '../services/api';
-import { getCategoryColor } from '../utils/categoryColors';
 import { useAuth } from '../context/AuthContext';
 
-const UNITS = [
-  'g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'
-];
-
-const CATEGORIES = [
-  'Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'
-];
+const getCategoryColor = (category) => {
+  const colors = {
+    'Produce': { main: '#4CAF50', dark: '#388E3C' },
+    'Dairy': { main: '#2196F3', dark: '#1976D2' },
+    'Meat': { main: '#F44336', dark: '#D32F2F' },
+    'Seafood': { main: '#00BCD4', dark: '#0097A7' },
+    'Pantry': { main: '#FF9800', dark: '#F57C00' },
+    'Spices': { main: '#9C27B0', dark: '#7B1FA2' },
+    'Beverages': { main: '#795548', dark: '#5D4037' },
+    'Frozen': { main: '#607D8B', dark: '#455A64' },
+    'Bakery': { main: '#FFC107', dark: '#FFA000' },
+    'Other': { main: '#9E9E9E', dark: '#757575' },
+  };
+  return colors[category] || colors['Other'];
+};
 
 const Ingredients = () => {
+  const theme = useTheme();
+  const { authenticated } = useAuth();
   const [ingredients, setIngredients] = useState([]);
-  const [error, setError] = useState('');
+  const [myIngredients, setMyIngredients] = useState([]);
+  const [filteredIngredients, setFilteredIngredients] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState(null);
+  const [tab, setTab] = useState('mine');
   const [formData, setFormData] = useState({
     name: '',
     category: '',
-    defaultUnit: '',
-    description: '',
-    notes: '',
+    unit: '',
+    quantity: '',
   });
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('mine');
-  const [searchTerm, setSearchTerm] = useState('');
-  const { authenticated } = useAuth();
-  const theme = useTheme();
-  const [myIngredients, setMyIngredients] = useState([]);
 
   useEffect(() => {
     if (!authenticated) return;
-    setLoading(true);
-    setError('');
     if (tab === 'mine') {
       fetchIngredients();
     } else {
       fetchSharedIngredients();
     }
-  }, [tab, searchTerm, authenticated]);
+  }, [tab, authenticated]);
+
+  useEffect(() => {
+    const filtered = ingredients.filter((ingredient) =>
+      ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredIngredients(filtered);
+  }, [searchTerm, ingredients]);
 
   const fetchIngredients = async () => {
     try {
-      const response = await api.get('/ingredients', {
-        params: { search: searchTerm },
-      });
+      const response = await api.get('/ingredients');
       setIngredients(response.data);
       setMyIngredients(response.data);
-    } catch (err) {
-      console.error('Error fetching ingredients:', err);
-      setError('Failed to fetch ingredients. Please try again.');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching ingredients:', error);
     }
   };
 
   const fetchSharedIngredients = async () => {
     try {
-      const response = await api.get('/ingredients/shared', {
-        params: { search: searchTerm },
-      });
+      const response = await api.get('/ingredients/shared');
       setIngredients(response.data);
-    } catch (err) {
-      console.error('Error fetching shared ingredients:', err);
-      setError('Failed to fetch shared ingredients. Please try again.');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching shared ingredients:', error);
     }
   };
 
@@ -101,36 +102,25 @@ const Ingredients = () => {
     try {
       await api.post(`/ingredients/${id}/duplicate`);
       setTab('mine');
-      setLoading(true);
       await fetchIngredients();
-    } catch (err) {
-      console.error('Error duplicating ingredient:', err);
-      if (err.response?.status === 409) {
-        setError('You already have this ingredient in your collection.');
-      } else {
-        setError('Failed to add ingredient. Please try again.');
-      }
+    } catch (error) {
+      console.error('Error duplicating ingredient:', error);
     }
   };
 
   const handleOpenDialog = (ingredient = null) => {
     if (ingredient) {
-      setEditingIngredient(ingredient);
-      setFormData({
+      setEditingIngredient({
+        id: ingredient._id,
         name: ingredient.name,
         category: ingredient.category,
-        defaultUnit: ingredient.defaultUnit,
         description: ingredient.description || '',
-        notes: ingredient.notes || '',
       });
     } else {
-      setEditingIngredient(null);
-      setFormData({
+      setEditingIngredient({
         name: '',
         category: '',
-        defaultUnit: '',
         description: '',
-        notes: '',
       });
     }
     setOpenDialog(true);
@@ -139,164 +129,281 @@ const Ingredients = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingIngredient(null);
+    setFormData({
+      name: '',
+      category: '',
+      unit: '',
+      quantity: '',
+    });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSaveIngredient = async () => {
     try {
-      setLoading(true);
-      if (editingIngredient) {
-        await api.put(`/ingredients/${editingIngredient._id}`, formData);
+      const ingredientData = {
+        name: editingIngredient.name,
+        category: editingIngredient.category,
+        description: editingIngredient.description,
+      };
+
+      if (editingIngredient.id) {
+        await api.put(`/ingredients/${editingIngredient.id}`, ingredientData);
       } else {
-        await api.post('/ingredients', formData);
+        await api.post('/ingredients', ingredientData);
       }
-      handleCloseDialog();
-      await fetchIngredients();
-      setError('');
-    } catch (err) {
-      console.error('Error saving ingredient:', err);
-      setError('Failed to save ingredient. Please try again.');
-    } finally {
-      setLoading(false);
+
+      setOpenDialog(false);
+      fetchIngredients();
+    } catch (error) {
+      console.error('Error saving ingredient:', error);
     }
   };
 
   const handleDeleteIngredient = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this ingredient?')) return;
-
-    try {
-      setLoading(true);
-      await api.delete(`/ingredients/${id}`);
-      await fetchIngredients();
-      setError('');
-    } catch (err) {
-      console.error('Error deleting ingredient:', err);
-      setError('Failed to delete ingredient. Please try again.');
-    } finally {
-      setLoading(false);
+    if (window.confirm('Are you sure you want to delete this ingredient?')) {
+      try {
+        await api.delete(`/ingredients/${id}`);
+        fetchIngredients();
+      } catch (error) {
+        console.error('Error deleting ingredient:', error);
+      }
     }
   };
 
-  if (loading) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
+  const categories = [
+    'Produce',
+    'Dairy',
+    'Meat',
+    'Seafood',
+    'Pantry',
+    'Spices',
+    'Beverages',
+    'Frozen',
+    'Bakery',
+    'Other',
+  ];
+
+  const units = [
+    'g',
+    'kg',
+    'ml',
+    'l',
+    'tsp',
+    'tbsp',
+    'cup',
+    'oz',
+    'lb',
+    'piece',
+    'pinch',
+  ];
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">
-              Ingredients
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-              disabled={loading}
-              size="small"
-            >
-              Add Ingredient
-            </Button>
-          </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Tabs
-            value={tab}
-            onChange={(e, newVal) => {
-              setTab(newVal);
-              setSearchTerm('');
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: theme.palette.mode === 'dark' 
+          ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
+          : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+        py: 4,
+      }}
+    >
+      <Container maxWidth="xl">
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
             }}
-            sx={{ mb: 2 }}
           >
-            <Tab label="My Ingredients" value="mine" />
-            <Tab label="Shared Ingredients" value="shared" />
-          </Tabs>
+            Ingredients
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              textTransform: 'none',
+              background: theme.palette.mode === 'dark'
+                ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                : '#228B22',
+              '&:hover': {
+                background: theme.palette.mode === 'dark'
+                  ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                  : '#1B6B1B',
+              },
+            }}
+          >
+            Add Ingredient
+          </Button>
+        </Box>
 
-          <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
-            <TextField
-              label="Search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              size="small"
-            />
-          </Box>
+        <Tabs
+          value={tab}
+          onChange={(e, newVal) => {
+            setTab(newVal);
+            setSearchTerm('');
+          }}
+          sx={{
+            mb: 3,
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '1rem',
+            },
+          }}
+        >
+          <Tab label="My Ingredients" value="mine" />
+          <Tab label="Shared Ingredients" value="shared" />
+        </Tabs>
 
-          {ingredients.length > 0 ? (
-            <Grid container spacing={2}>
-              {ingredients.map((ingredient) => (
-                <Grid item xs={12} sm={6} md={4} key={ingredient._id}>
-                  <Paper
-                    elevation={1}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 4,
+            borderRadius: 2,
+            background: theme.palette.mode === 'dark' 
+              ? 'rgba(255, 255, 255, 0.05)'
+              : 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid',
+            borderColor: theme.palette.mode === 'dark'
+              ? 'rgba(255, 255, 255, 0.1)'
+              : 'rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search ingredients..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                background: theme.palette.mode === 'dark'
+                  ? 'rgba(255, 255, 255, 0.05)'
+                  : 'rgba(255, 255, 255, 0.8)',
+              },
+            }}
+          />
+        </Paper>
+
+        <Grid container spacing={2}>
+          {filteredIngredients.map((ingredient) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} xl={2} key={ingredient._id}>
+              <Paper
+                elevation={0}
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                  background: theme.palette.mode === 'dark' 
+                    ? 'rgba(255, 255, 255, 0.05)'
+                    : 'rgba(255, 255, 255, 0.8)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid',
+                  borderColor: theme.palette.mode === 'dark'
+                    ? 'rgba(255, 255, 255, 0.1)'
+                    : 'rgba(0, 0, 0, 0.1)',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: theme.palette.mode === 'dark'
+                      ? '0 8px 24px rgba(0, 0, 0, 0.3)'
+                      : '0 8px 24px rgba(0, 0, 0, 0.1)',
+                  },
+                }}
+              >
+                <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Typography
+                    variant="h6"
                     sx={{
-                      p: 2,
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      position: 'relative',
-                      '&:hover': {
-                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                      },
+                      fontWeight: 600,
+                      mb: 0.5,
+                      color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+                      fontSize: '1.1rem',
+                      lineHeight: 1.3,
                     }}
                   >
-                    <Box sx={{ flex: 1 }}>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          fontWeight: 'medium',
-                          mb: 1
-                        }}
-                      >
-                        {ingredient.name}
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                        <Chip
-                          label={ingredient.category}
-                          size="small"
-                          sx={{
-                            backgroundColor: getCategoryColor(ingredient.category).main,
-                            color: 'white',
-                            '&:hover': {
-                              backgroundColor: getCategoryColor(ingredient.category).dark,
-                            },
-                          }}
-                        />
-                        <Typography variant="body2" color="textSecondary">
-                          {ingredient.defaultUnit}
-                        </Typography>
-                      </Box>
-                      {ingredient.description && (
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          {ingredient.description}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    {ingredient.name}
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                    <Chip
+                      size="small"
+                      label={ingredient.category}
+                      sx={{
+                        height: 24,
+                        fontSize: '0.75rem',
+                        background: theme.palette.mode === 'dark'
+                          ? `${getCategoryColor(ingredient.category).main}33`
+                          : `${getCategoryColor(ingredient.category).main}22`,
+                        color: getCategoryColor(ingredient.category).main,
+                      }}
+                    />
+                  </Box>
+
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                      mb: 1,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      lineHeight: 1.4,
+                      flex: 1,
+                    }}
+                  >
+                    {ingredient.description || 'No description'}
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 'auto' }}>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
                       {tab === 'mine' ? (
                         <>
                           <IconButton
                             size="small"
-                            onClick={() => handleOpenDialog(ingredient)}
-                            sx={{ color: 'primary.main' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDialog(ingredient);
+                            }}
+                            sx={{ 
+                              color: 'primary.main',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'rgba(34, 139, 34, 0.1)'
+                                  : 'rgba(34, 139, 34, 0.05)',
+                              },
+                            }}
                           >
-                            <EditIcon fontSize="small" />
+                            <EditIcon sx={{ fontSize: '1.1rem' }} />
                           </IconButton>
                           <IconButton
                             size="small"
-                            onClick={() => handleDeleteIngredient(ingredient._id)}
-                            sx={{ color: 'error.main' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteIngredient(ingredient._id);
+                            }}
+                            sx={{ 
+                              color: 'error.main',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'rgba(211, 47, 47, 0.1)'
+                                  : 'rgba(211, 47, 47, 0.05)',
+                              },
+                            }}
                           >
-                            <DeleteIcon fontSize="small" />
+                            <DeleteIcon sx={{ fontSize: '1.1rem' }} />
                           </IconButton>
                         </>
                       ) : (
@@ -304,106 +411,96 @@ const Ingredients = () => {
                           <Button
                             variant="contained"
                             size="small"
-                            onClick={() => handleDuplicate(ingredient._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicate(ingredient._id);
+                            }}
+                            sx={{
+                              textTransform: 'none',
+                              background: theme.palette.mode === 'dark'
+                                ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                                : '#228B22',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                                  : '#1B6B1B',
+                              },
+                            }}
                           >
                             Add
                           </Button>
                         )
                       )}
                     </Box>
-                  </Paper>
-                </Grid>
-              ))}
+                  </Box>
+                </Box>
+              </Paper>
             </Grid>
-          ) : (
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">
-                No ingredients found
-              </Typography>
-            </Paper>
-          )}
+          ))}
         </Grid>
-      </Grid>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}
-        </DialogTitle>
-        <form onSubmit={handleSubmit}>
-          <DialogContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
+        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            {editingIngredient ? 'Edit Ingredient' : 'Add New Ingredient'}
+          </DialogTitle>
+          <form onSubmit={handleSaveIngredient}>
+            <DialogContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <TextField
                   label="Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  value={editingIngredient?.name}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, name: e.target.value })}
                   fullWidth
                   required
                 />
-              </Grid>
-              <Grid item xs={12}>
                 <FormControl fullWidth required>
                   <InputLabel>Category</InputLabel>
                   <Select
-                    value={formData.category}
+                    value={editingIngredient?.category}
+                    onChange={(e) => setEditingIngredient({ ...editingIngredient, category: e.target.value })}
                     label="Category"
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   >
-                    {CATEGORIES.map((category) => (
+                    {categories.map((category) => (
                       <MenuItem key={category} value={category}>
                         {category}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth required>
-                  <InputLabel>Default Unit</InputLabel>
-                  <Select
-                    value={formData.defaultUnit}
-                    label="Default Unit"
-                    onChange={(e) => setFormData({ ...formData, defaultUnit: e.target.value })}
-                  >
-                    {UNITS.map((unit) => (
-                      <MenuItem key={unit} value={unit}>
-                        {unit}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12}>
                 <TextField
                   label="Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  value={editingIngredient?.description}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, description: e.target.value })}
                   fullWidth
                   multiline
-                  rows={2}
+                  rows={3}
                 />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  fullWidth
-                  multiline
-                  rows={2}
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button type="submit" variant="contained" color="primary" disabled={loading}>
-              {editingIngredient ? 'Update' : 'Add'}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-    </Container>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDialog}>Cancel</Button>
+              <Button
+                type="submit"
+                variant="contained"
+                sx={{
+                  textTransform: 'none',
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                    : '#228B22',
+                  '&:hover': {
+                    background: theme.palette.mode === 'dark'
+                      ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                      : '#1B6B1B',
+                  },
+                }}
+              >
+                {editingIngredient ? 'Save Changes' : 'Add Ingredient'}
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+      </Container>
+    </Box>
   );
 };
 
