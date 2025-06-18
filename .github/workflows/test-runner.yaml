@@ -1,0 +1,14 @@
+name: Test ARC Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-runner:
+    runs-on: tantorski-ffn-runner-set  # This must match the runner scale set label
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Say Hello
+        run: "echo ✅ This job is running on ARC runner: tantorski-ffn-runner-set"
