@@ -21,10 +21,12 @@ import {
 } from '@mui/icons-material';
 import PasswordField from '../components/PasswordField';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { refreshAuth } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -113,6 +115,7 @@ const Register = () => {
         }
       }
 
+      await refreshAuth();
       navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Registration error:', err);
