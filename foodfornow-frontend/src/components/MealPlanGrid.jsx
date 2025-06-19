@@ -12,7 +12,15 @@ import {
   ListItemIcon,
   ListItemText,
   useTheme,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  List,
+  ListItem,
+  ListItemText as MuiListItemText
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -26,6 +34,9 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
   const theme = useTheme();
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedMeal, setSelectedMeal] = useState(null);
+  const [missingIngredientsDialog, setMissingIngredientsDialog] = useState(false);
+  const [missingIngredients, setMissingIngredients] = useState([]);
+  const [selectedMealForCooking, setSelectedMealForCooking] = useState(null);
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
 
@@ -56,15 +67,65 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
 
   const handleToggleCooked = async (meal, event) => {
     event.stopPropagation();
+    
+    // If already cooked, just toggle off
+    if (meal.cooked) {
+      try {
+        const response = await api.patch(`/mealplan/${meal._id}/cooked`);
+        if (onMealPlanUpdate) {
+          onMealPlanUpdate(response.data);
+        }
+      } catch (error) {
+        console.error('Error toggling cooked status:', error);
+      }
+      return;
+    }
+
+    // If not cooked, try to cook the meal
     try {
-      const response = await api.patch(`/mealplan/${meal._id}/cooked`);
-      // Update the meal plan in the parent component
+      const response = await api.patch(`/mealplan/${meal._id}/cook`, {
+        addMissingToShoppingList: false
+      });
+      
       if (onMealPlanUpdate) {
-        onMealPlanUpdate(response.data);
+        onMealPlanUpdate(response.data.mealPlanItem);
       }
     } catch (error) {
-      console.error('Error toggling cooked status:', error);
+      if (error.response?.status === 400 && error.response?.data?.missingIngredients) {
+        // Show missing ingredients dialog
+        setMissingIngredients(error.response.data.missingIngredients);
+        setSelectedMealForCooking(meal);
+        setMissingIngredientsDialog(true);
+      } else {
+        console.error('Error cooking meal:', error);
+      }
     }
+  };
+
+  const handleAddMissingToShoppingList = async () => {
+    if (!selectedMealForCooking) return;
+    
+    try {
+      const response = await api.patch(`/mealplan/${selectedMealForCooking._id}/cook`, {
+        addMissingToShoppingList: true
+      });
+      
+      if (onMealPlanUpdate) {
+        onMealPlanUpdate(response.data.mealPlanItem);
+      }
+      
+      setMissingIngredientsDialog(false);
+      setMissingIngredients([]);
+      setSelectedMealForCooking(null);
+    } catch (error) {
+      console.error('Error cooking meal with shopping list:', error);
+    }
+  };
+
+  const handleCloseMissingIngredientsDialog = () => {
+    setMissingIngredientsDialog(false);
+    setMissingIngredients([]);
+    setSelectedMealForCooking(null);
   };
 
   const getMealName = (meal) => {
@@ -171,7 +232,6 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               sx={{
                                 wordBreak: 'break-word',
                                 overflow: 'hidden',
-                                display: '-webkit-box',
                                 WebkitLineClamp: 3,
                                 WebkitBoxOrient: 'vertical',
                                 lineHeight: 1.2,
@@ -233,6 +293,40 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
           </Grid>
         ))}
       </Grid>
+
+      {/* Missing Ingredients Dialog */}
+      <Dialog 
+        open={missingIngredientsDialog} 
+        onClose={handleCloseMissingIngredientsDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Missing Ingredients</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            The following ingredients are missing from your pantry:
+          </Typography>
+          <List>
+            {missingIngredients.map((ingredient, index) => (
+              <ListItem key={index}>
+                <MuiListItemText
+                  primary={ingredient.ingredient.name}
+                  secondary={`${ingredient.quantity} ${ingredient.unit} needed (${ingredient.available} ${ingredient.unit} available)`}
+                />
+              </ListItem>
+            ))}
+          </List>
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            Would you like to add the missing ingredients to your shopping list?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseMissingIngredientsDialog}>Cancel</Button>
+          <Button onClick={handleAddMissingToShoppingList} variant="contained" color="primary">
+            Add to Shopping List
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Menu
         anchorEl={menuAnchor}

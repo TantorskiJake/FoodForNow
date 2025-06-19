@@ -125,6 +125,139 @@ router.patch('/:id/cooked', authMiddleware, async (req, res) => {
   }
 });
 
+// Cook a meal - remove ingredients from pantry and handle missing ingredients
+router.patch('/:id/cook', authMiddleware, async (req, res) => {
+  try {
+    const { addMissingToShoppingList = false } = req.body;
+    
+    const mealPlanItem = await MealPlan.findOne({ _id: req.params.id, user: req.userId })
+      .populate({
+        path: 'recipe',
+        populate: {
+          path: 'ingredients.ingredient'
+        }
+      });
+    
+    if (!mealPlanItem) {
+      return res.status(404).json({ error: 'Meal plan item not found' });
+    }
+
+    if (!mealPlanItem.recipe || !mealPlanItem.recipe.ingredients) {
+      return res.status(400).json({ error: 'Recipe has no ingredients' });
+    }
+
+    // Get user's pantry
+    const Pantry = require('../models/pantry');
+    const pantry = await Pantry.findOne({ user: req.userId });
+    
+    if (!pantry) {
+      return res.status(404).json({ error: 'Pantry not found' });
+    }
+
+    const missingIngredients = [];
+    const pantryUpdates = [];
+
+    // Check each ingredient in the recipe
+    for (const recipeIngredient of mealPlanItem.recipe.ingredients) {
+      if (!recipeIngredient.ingredient) continue;
+
+      const ingredientId = recipeIngredient.ingredient._id;
+      const neededQuantity = recipeIngredient.quantity;
+      const neededUnit = recipeIngredient.unit;
+
+      // Find matching pantry item
+      const pantryItem = pantry.items.find(item => 
+        item.ingredient && 
+        item.ingredient.toString() === ingredientId.toString() && 
+        item.unit === neededUnit
+      );
+
+      if (!pantryItem || pantryItem.quantity < neededQuantity) {
+        // Missing or insufficient ingredient
+        const missingQuantity = pantryItem 
+          ? Math.max(0, neededQuantity - pantryItem.quantity)
+          : neededQuantity;
+        
+        missingIngredients.push({
+          ingredient: recipeIngredient.ingredient,
+          quantity: missingQuantity,
+          unit: neededUnit,
+          needed: neededQuantity,
+          available: pantryItem ? pantryItem.quantity : 0
+        });
+
+        if (pantryItem && pantryItem.quantity > 0) {
+          // Remove what we have
+          pantryUpdates.push({
+            itemId: pantryItem._id,
+            removeQuantity: pantryItem.quantity
+          });
+        }
+      } else {
+        // We have enough, remove the needed quantity
+        pantryUpdates.push({
+          itemId: pantryItem._id,
+          removeQuantity: neededQuantity
+        });
+      }
+    }
+
+    // If there are missing ingredients and user doesn't want to add to shopping list
+    if (missingIngredients.length > 0 && !addMissingToShoppingList) {
+      return res.status(400).json({
+        error: 'Missing ingredients',
+        missingIngredients,
+        message: 'Some ingredients are missing from your pantry'
+      });
+    }
+
+    // Add missing ingredients to shopping list if requested
+    if (missingIngredients.length > 0 && addMissingToShoppingList) {
+      const ShoppingListItem = require('../models/shopping-list-item');
+      
+      for (const missing of missingIngredients) {
+        const shoppingListItem = new ShoppingListItem({
+          user: req.userId,
+          ingredient: missing.ingredient._id,
+          quantity: missing.quantity,
+          unit: missing.unit,
+          completed: false
+        });
+        await shoppingListItem.save();
+      }
+    }
+
+    // Update pantry - remove ingredients
+    for (const update of pantryUpdates) {
+      const pantryItem = pantry.items.id(update.itemId);
+      if (pantryItem) {
+        pantryItem.quantity -= update.removeQuantity;
+        if (pantryItem.quantity <= 0) {
+          // Remove item if quantity is 0 or less
+          pantry.items = pantry.items.filter(item => item._id.toString() !== update.itemId);
+        }
+      }
+    }
+
+    await pantry.save();
+
+    // Mark meal as cooked
+    mealPlanItem.cooked = true;
+    await mealPlanItem.save();
+    await mealPlanItem.populate('recipe');
+
+    res.json({
+      mealPlanItem,
+      removedIngredients: pantryUpdates.length,
+      addedToShoppingList: missingIngredients.length
+    });
+
+  } catch (error) {
+    console.error('Error cooking meal:', error);
+    res.status(500).json({ error: 'Failed to cook meal' });
+  }
+});
+
 // Delete meal from plan
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
