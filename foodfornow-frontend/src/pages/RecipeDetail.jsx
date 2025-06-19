@@ -18,6 +18,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExploreIcon from '@mui/icons-material/Explore';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import TimerIcon from '@mui/icons-material/Timer';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import api from '../services/api';
 
@@ -175,8 +176,18 @@ const RecipeDetail = () => {
 
           <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
             <Chip
+              icon={<TimerIcon />}
+              label={`Prep: ${recipe.prepTime} mins`}
+              sx={{
+                background: theme.palette.mode === 'dark'
+                  ? 'rgba(34, 139, 34, 0.2)'
+                  : 'rgba(34, 139, 34, 0.1)',
+                color: '#228B22',
+              }}
+            />
+            <Chip
               icon={<AccessTimeIcon />}
-              label={`${recipe.cookTime} mins`}
+              label={`Cook: ${recipe.cookTime} mins`}
               sx={{
                 background: theme.palette.mode === 'dark'
                   ? 'rgba(34, 139, 34, 0.2)'
@@ -186,7 +197,7 @@ const RecipeDetail = () => {
             />
             <Chip
               icon={<RestaurantIcon />}
-              label={recipe.difficulty || 'Medium'}
+              label={`${recipe.servings} servings`}
               sx={{
                 background: theme.palette.mode === 'dark'
                   ? 'rgba(34, 139, 34, 0.2)'

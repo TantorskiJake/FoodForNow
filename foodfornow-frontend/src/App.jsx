@@ -84,7 +84,7 @@ function App() {
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
             <Route path="/" element={<Navigate to="/dashboard" />} />
           </Routes>
-          <Toaster position="top-right" />
+          <Toaster position="bottom-right" />
         </Router>
       </AuthProvider>
     </ThemeProvider>
