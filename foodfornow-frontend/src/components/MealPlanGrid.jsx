@@ -175,7 +175,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                                 WebkitLineClamp: 3,
                                 WebkitBoxOrient: 'vertical',
                                 lineHeight: 1.2,
-                                fontSize: '0.875rem',
+                                fontSize: '0.75rem',
                                 pt: 2,
                                 color: 'white',
                                 pl: 3, // Left padding to avoid status indicator
