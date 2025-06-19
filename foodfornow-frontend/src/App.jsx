@@ -1,8 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
+import PrivateRoute from './components/PrivateRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -13,16 +14,6 @@ import RecipeDetail from './pages/RecipeDetail';
 import Ingredients from './pages/Ingredients';
 import { Toaster } from 'react-hot-toast';
 import Profile from './pages/Profile';
-
-const PrivateRoute = ({ children }) => {
-  const { authenticated, loading } = useAuth();
-
-  if (loading) {
-    return null;
-  }
-
-  return authenticated ? children : <Navigate to="/login" />;
-};
 
 function App() {
   return (
