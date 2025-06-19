@@ -47,7 +47,7 @@ const Dashboard = () => {
   });
   const [resetWeekDialog, setResetWeekDialog] = useState(false);
 
-  const { authenticated } = useAuth();
+  const { authenticated, user } = useAuth();
 
   useEffect(() => {
     if (!authenticated) return;
@@ -349,7 +349,7 @@ const Dashboard = () => {
         <Grid item xs={12}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
             <Typography variant="h4" component="h1">
-              Dashboard
+              {user?.name ? `${user.name}'s Dashboard` : 'Dashboard'}
             </Typography>
           </Box>
         </Grid>
