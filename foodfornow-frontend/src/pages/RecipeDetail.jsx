@@ -13,8 +13,10 @@ import {
   ListItem,
   ListItemText,
   useTheme,
+  Stack,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ExploreIcon from '@mui/icons-material/Explore';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import api from '../services/api';
@@ -82,7 +84,7 @@ const RecipeDetail = () => {
         <Button
           variant="contained"
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/recipes')}
+          onClick={() => navigate('/dashboard')}
           sx={{
             textTransform: 'none',
             background: theme.palette.mode === 'dark'
@@ -95,7 +97,7 @@ const RecipeDetail = () => {
             },
           }}
         >
-          Back to Recipes
+          Back to Dashboard
         </Button>
       </Box>
     );
@@ -112,21 +114,36 @@ const RecipeDetail = () => {
       }}
     >
       <Container maxWidth="md">
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/recipes')}
-          sx={{
-            mb: 3,
-            color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
-            textTransform: 'none',
-            '&:hover': {
-              background: 'transparent',
-              color: '#228B22',
-            },
-          }}
-        >
-          Back to Recipes
-        </Button>
+        <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/dashboard')}
+            sx={{
+              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+              textTransform: 'none',
+              '&:hover': {
+                background: 'transparent',
+                color: '#228B22',
+              },
+            }}
+          >
+            Back to Dashboard
+          </Button>
+          <Button
+            startIcon={<ExploreIcon />}
+            onClick={() => navigate('/recipes')}
+            sx={{
+              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+              textTransform: 'none',
+              '&:hover': {
+                background: 'transparent',
+                color: '#228B22',
+              },
+            }}
+          >
+            Explore Other Recipes
+          </Button>
+        </Stack>
 
         <Paper
           elevation={0}
