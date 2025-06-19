@@ -3,6 +3,22 @@
 ## Overview
 FoodForNow is a full-stack web application designed to help users manage their pantry, recipes, and shopping lists. The application is built using React for the frontend and Node.js with Express for the backend.
 
+## Docker Setup
+
+Production deployments can be built using the provided Dockerfiles. Both the
+backend and frontend images can be built locally or via the included GitHub
+Actions workflow which publishes images to GitHub Container Registry.
+
+```bash
+# build and run backend
+docker build -t foodfornow-backend ./foodfornow-backend
+docker run -p 3001:3001 --env-file foodfornow-backend/.env.example foodfornow-backend
+
+# build and run frontend
+docker build -t foodfornow-frontend ./foodfornow-frontend
+docker run -p 8080:80 --env-file foodfornow-frontend/.env.example foodfornow-frontend
+```
+
 ## Features
 - **User Authentication**: Secure login and registration system.
 - **Dashboard**: Overview of user's pantry, recipes, and shopping lists.
