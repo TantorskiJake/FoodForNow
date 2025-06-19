@@ -22,17 +22,40 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function onRefreshed() {
+  refreshSubscribers.forEach((callback) => callback());
+  refreshSubscribers = [];
+}
+
 // Global response interceptor to handle auth token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const { response, config } = error;
     if (response && response.status === 401 && !config._retry) {
+      if (isRefreshing) {
+        // Queue the request until the refresh is done
+        return new Promise((resolve, reject) => {
+          refreshSubscribers.push(() => {
+            config._retry = true;
+            api(config).then(resolve).catch(reject);
+          });
+        });
+      }
       config._retry = true;
+      isRefreshing = true;
       try {
         await api.post('/auth/token');
+        isRefreshing = false;
+        onRefreshed();
         return api(config);
       } catch (refreshError) {
+        isRefreshing = false;
+        refreshSubscribers = [];
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
           window.location.href = '/login';
