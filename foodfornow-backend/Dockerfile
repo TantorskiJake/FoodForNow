@@ -3,8 +3,7 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 
 # Install system dependencies for bcrypt and native modules
-RUN apk add --no-cache python3 make g++ \
-  && npm config set python python3
+RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
 RUN npm install --omit=dev
