@@ -68,16 +68,8 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
   const handleToggleCooked = async (meal, event) => {
     event.stopPropagation();
     
-    // If already cooked, just toggle off
+    // If already cooked, do nothing (cooked meals cannot be uncooked)
     if (meal.cooked) {
-      try {
-        const response = await api.patch(`/mealplan/${meal._id}/cooked`);
-        if (onMealPlanUpdate) {
-          onMealPlanUpdate(response.data);
-        }
-      } catch (error) {
-        console.error('Error toggling cooked status:', error);
-      }
       return;
     }
 

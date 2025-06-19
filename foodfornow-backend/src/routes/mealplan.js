@@ -125,6 +125,26 @@ router.patch('/:id/cooked', authMiddleware, async (req, res) => {
   }
 });
 
+// Reset week - delete all meal plans
+router.delete('/reset-week', authMiddleware, async (req, res) => {
+  try {
+    console.log('Resetting week for user:', req.userId);
+    
+    // Delete all meal plans for the user
+    const result = await MealPlan.deleteMany({ user: req.userId });
+    
+    console.log(`Deleted ${result.deletedCount} meal plans`);
+    
+    res.json({
+      message: `Reset week - deleted ${result.deletedCount} meal plans`,
+      mealPlans: []
+    });
+  } catch (error) {
+    console.error('Error resetting week:', error);
+    res.status(500).json({ error: 'Failed to reset week' });
+  }
+});
+
 // Cook a meal - remove ingredients from pantry and handle missing ingredients
 router.patch('/:id/cook', authMiddleware, async (req, res) => {
   try {

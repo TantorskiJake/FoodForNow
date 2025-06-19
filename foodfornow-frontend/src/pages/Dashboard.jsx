@@ -123,6 +123,27 @@ const Dashboard = () => {
     }
   };
 
+  const handleResetWeek = async () => {
+    try {
+      setLoading(true);
+      const response = await api.delete('/mealplan/reset-week');
+      console.log('Reset week:', response.data);
+      
+      // Clear the meal plan state
+      setMealPlan([]);
+      
+      // Refresh ingredients since clearing meals affects needed ingredients
+      await fetchIngredients();
+      
+      setError('');
+    } catch (err) {
+      console.error('Error resetting week:', err);
+      setError('Failed to reset week. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOpenMealDialog = (day, mealType, existingMeal = null) => {
     const today = new Date();
     const monday = new Date(today);
@@ -260,9 +281,20 @@ const Dashboard = () => {
         <Grid item xs={12}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Meal Plan
-              </Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" gutterBottom>
+                  Meal Plan
+                </Typography>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={handleResetWeek}
+                  disabled={loading || mealPlan.length === 0}
+                  size="small"
+                >
+                  Reset Week
+                </Button>
+              </Box>
               <MealPlanGrid
                 mealPlan={mealPlan}
                 onAddMeal={handleOpenMealDialog}
