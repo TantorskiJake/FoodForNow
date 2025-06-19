@@ -387,4 +387,67 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
   }
 });
 
+// Populate week with random recipes
+router.post('/populate-week', authMiddleware, async (req, res) => {
+  try {
+    console.log('Populating week with random recipes for user:', req.userId);
+    
+    // Get all recipes for the user
+    const recipes = await Recipe.find({ createdBy: req.userId });
+    
+    if (recipes.length === 0) {
+      return res.status(400).json({ error: 'No recipes found. Please add some recipes first.' });
+    }
+
+    // Calculate the start of the current week (Monday)
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1);
+    monday.setHours(0, 0, 0, 0);
+
+    // Clear existing meal plan for the week
+    await MealPlan.deleteMany({ 
+      user: req.userId,
+      weekStart: {
+        $gte: monday,
+        $lt: new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
+    const newMealPlans = [];
+
+    // Populate each meal slot with a random recipe
+    for (const day of days) {
+      for (const meal of mealTypes) {
+        // Get a random recipe
+        const randomRecipe = recipes[Math.floor(Math.random() * recipes.length)];
+        
+        const mealPlanItem = new MealPlan({
+          user: req.userId,
+          weekStart: monday,
+          day,
+          meal,
+          recipe: randomRecipe._id
+        });
+
+        await mealPlanItem.save();
+        await mealPlanItem.populate('recipe');
+        newMealPlans.push(mealPlanItem);
+      }
+    }
+
+    console.log(`Populated week with ${newMealPlans.length} meals`);
+    
+    res.json({
+      message: `Week populated with ${newMealPlans.length} random recipes`,
+      mealPlans: newMealPlans
+    });
+  } catch (error) {
+    console.error('Error populating week:', error);
+    res.status(500).json({ error: 'Failed to populate week' });
+  }
+});
+
 module.exports = router; 

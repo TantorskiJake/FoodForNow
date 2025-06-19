@@ -133,6 +133,20 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
     return meal.recipe.name || 'Unnamed Recipe';
   };
 
+  const getDynamicFontSize = (text) => {
+    if (!text) return '1rem';
+    
+    const length = text.length;
+    
+    if (length <= 8) return '1.3rem';
+    if (length <= 12) return '1.2rem';
+    if (length <= 16) return '1.1rem';
+    if (length <= 20) return '1rem';
+    if (length <= 25) return '0.95rem';
+    if (length <= 30) return '0.9rem';
+    return '0.85rem';
+  };
+
   return (
     <Box sx={{ mt: 4 }}>
       <Grid container spacing={2}>
@@ -234,7 +248,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                                 WebkitLineClamp: 3,
                                 WebkitBoxOrient: 'vertical',
                                 lineHeight: 1.2,
-                                fontSize: '0.75rem',
+                                fontSize: getDynamicFontSize(getMealName(meal)),
                                 pt: 2,
                                 color: 'white',
                                 pl: 3, // Left padding to avoid status indicator
@@ -243,7 +257,8 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                                 minHeight: '60px',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center'
+                                justifyContent: 'center',
+                                fontWeight: 500
                               }}
                             >
                               {getMealName(meal)}

@@ -24,6 +24,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CasinoIcon from '@mui/icons-material/Casino';
 import api from '../services/api';
 import MealPlanGrid from '../components/MealPlanGrid';
 import { getCategoryColor } from '../utils/categoryColors';
@@ -156,6 +157,31 @@ const Dashboard = () => {
   const handleConfirmResetWeek = async () => {
     setResetWeekDialog(false);
     await handleResetWeek();
+  };
+
+  const handlePopulateWeek = async () => {
+    try {
+      setLoading(true);
+      const response = await api.post('/mealplan/populate-week');
+      console.log('Populated week:', response.data);
+      
+      // Refresh meal plan and ingredients
+      await Promise.all([
+        fetchMealPlan(),
+        fetchIngredients()
+      ]);
+      
+      setError('');
+    } catch (err) {
+      console.error('Error populating week:', err);
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError('Failed to populate week. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpenMealDialog = (day, mealType, existingMeal = null) => {
@@ -343,15 +369,27 @@ const Dashboard = () => {
                 <Typography variant="h6" gutterBottom>
                   Meal Plan
                 </Typography>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  onClick={handleOpenResetWeekDialog}
-                  disabled={loading || mealPlan.length === 0}
-                  size="small"
-                >
-                  Reset Week
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<CasinoIcon />}
+                    onClick={handlePopulateWeek}
+                    disabled={loading || recipes.length === 0}
+                    size="small"
+                  >
+                    Populate Week
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={handleOpenResetWeekDialog}
+                    disabled={loading || mealPlan.length === 0}
+                    size="small"
+                  >
+                    Reset Week
+                  </Button>
+                </Box>
               </Box>
               <MealPlanGrid
                 mealPlan={mealPlan}
