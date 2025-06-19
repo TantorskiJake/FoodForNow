@@ -217,6 +217,43 @@ const Dashboard = () => {
     }
   };
 
+  const handleRecipeSelect = async (recipeId) => {
+    if (!recipeId) return;
+    
+    try {
+      setLoading(true);
+      const updatedFormData = { ...mealFormData, recipeId };
+      
+      let response;
+      if (mealFormData._id) {
+        // Editing existing meal
+        response = await api.put(`/mealplan/${mealFormData._id}`, {
+          recipeId: recipeId
+        });
+      } else {
+        // Adding new meal
+        response = await api.post('/mealplan', updatedFormData);
+      }
+
+      handleCloseMealDialog();
+      await Promise.all([
+        fetchMealPlan(),
+        fetchIngredients()
+      ]);
+      
+      setError('');
+    } catch (err) {
+      console.error('Error saving meal:', err);
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError('Failed to save meal. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEditMeal = (day, mealType, existingMeal) => {
     handleOpenMealDialog(day, mealType, existingMeal);
   };
@@ -416,62 +453,77 @@ const Dashboard = () => {
 
       <Dialog open={openMealDialog} onClose={handleCloseMealDialog}>
         <DialogTitle>
-          {mealFormData._id ? 'Edit Meal' : 'Add Meal'}
+          {mealFormData._id ? 'Edit Meal' : `Add Meal - ${mealFormData.day} ${mealFormData.meal}`}
         </DialogTitle>
-        <form onSubmit={handleAddMeal}>
-          <DialogContent>
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Day</InputLabel>
-              <Select
-                value={mealFormData.day}
-                onChange={(e) => setMealFormData({ ...mealFormData, day: e.target.value })}
-                required
-              >
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                  <MenuItem key={day} value={day}>
-                    {day}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+        <DialogContent>
+          {mealFormData._id ? (
+            // Editing existing meal - show all fields
+            <>
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Day</InputLabel>
+                <Select
+                  value={mealFormData.day}
+                  onChange={(e) => setMealFormData({ ...mealFormData, day: e.target.value })}
+                  required
+                >
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                    <MenuItem key={day} value={day}>
+                      {day}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Meal</InputLabel>
-              <Select
-                value={mealFormData.meal}
-                onChange={(e) => setMealFormData({ ...mealFormData, meal: e.target.value })}
-                required
-              >
-                {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((meal) => (
-                  <MenuItem key={meal} value={meal}>
-                    {meal}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Meal</InputLabel>
+                <Select
+                  value={mealFormData.meal}
+                  onChange={(e) => setMealFormData({ ...mealFormData, meal: e.target.value })}
+                  required
+                >
+                  {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((meal) => (
+                    <MenuItem key={meal} value={meal}>
+                      {meal}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </>
+          ) : (
+            // Adding new meal - show day and meal as read-only
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Day: <strong>{mealFormData.day}</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Meal: <strong>{mealFormData.meal}</strong>
+              </Typography>
+            </Box>
+          )}
 
-            <FormControl fullWidth>
-              <InputLabel>Recipe</InputLabel>
-              <Select
-                value={mealFormData.recipeId}
-                onChange={(e) => setMealFormData({ ...mealFormData, recipeId: e.target.value })}
-                required
-              >
-                {recipes.map((recipe) => (
-                  <MenuItem key={recipe._id} value={recipe._id}>
-                    {recipe.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseMealDialog}>Cancel</Button>
+          <FormControl fullWidth>
+            <InputLabel>Recipe</InputLabel>
+            <Select
+              value={mealFormData.recipeId}
+              onChange={(e) => handleRecipeSelect(e.target.value)}
+              required
+            >
+              {recipes.map((recipe) => (
+                <MenuItem key={recipe._id} value={recipe._id}>
+                  {recipe.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseMealDialog}>Cancel</Button>
+          {mealFormData._id && (
             <Button type="submit" variant="contained" color="primary" disabled={loading}>
-              {mealFormData._id ? 'Update' : 'Add'}
+              Update
             </Button>
-          </DialogActions>
-        </form>
+          )}
+        </DialogActions>
       </Dialog>
 
       {/* Reset Week Confirmation Dialog */}
