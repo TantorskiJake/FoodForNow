@@ -197,100 +197,88 @@ const Ingredients = () => {
   ];
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        background: theme.palette.mode === 'dark' 
-          ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
-          : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+    <Container 
+      maxWidth={false}
+      sx={{ 
         py: 4,
+        px: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8 },
+        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
-      <Container maxWidth="xl">
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 700,
-              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h4" component="h1">
+              Ingredients
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog()}
+              size="small"
+            >
+              Add Ingredient
+            </Button>
+          </Box>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Tabs
+            value={tab}
+            onChange={(e, newVal) => {
+              setTab(newVal);
+              setSearchTerm('');
             }}
-          >
-            Ingredients
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
             sx={{
-              textTransform: 'none',
-              background: theme.palette.mode === 'dark'
-                ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                : '#228B22',
-              '&:hover': {
-                background: theme.palette.mode === 'dark'
-                  ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
-                  : '#1B6B1B',
+              mb: 3,
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '1rem',
               },
             }}
           >
-            Add Ingredient
-          </Button>
-        </Box>
+            <Tab label="My Ingredients" value="mine" />
+            <Tab label="Shared Ingredients" value="shared" />
+          </Tabs>
 
-        <Tabs
-          value={tab}
-          onChange={(e, newVal) => {
-            setTab(newVal);
-            setSearchTerm('');
-          }}
-          sx={{
-            mb: 3,
-            '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '1rem',
-            },
-          }}
-        >
-          <Tab label="My Ingredients" value="mine" />
-          <Tab label="Shared Ingredients" value="shared" />
-        </Tabs>
-
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            mb: 4,
-            borderRadius: 2,
-            background: theme.palette.mode === 'dark' 
-              ? 'rgba(255, 255, 255, 0.05)'
-              : 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid',
-            borderColor: theme.palette.mode === 'dark'
-              ? 'rgba(255, 255, 255, 0.1)'
-              : 'rgba(0, 0, 0, 0.1)',
-          }}
-        >
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Search ingredients..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-            }}
+          <Paper
+            elevation={0}
             sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                background: theme.palette.mode === 'dark'
-                  ? 'rgba(255, 255, 255, 0.05)'
-                  : 'rgba(255, 255, 255, 0.8)',
-              },
+              p: 2,
+              mb: 4,
+              borderRadius: 2,
+              background: theme.palette.mode === 'dark' 
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid',
+              borderColor: theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.1)'
+                : 'rgba(0, 0, 0, 0.1)',
             }}
-          />
-        </Paper>
+          >
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Search ingredients..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  background: theme.palette.mode === 'dark'
+                    ? 'rgba(255, 255, 255, 0.05)'
+                    : 'rgba(255, 255, 255, 0.8)',
+                },
+              }}
+            />
+          </Paper>
+        </Grid>
 
         <Grid container spacing={2}>
           {filteredIngredients.map((ingredient) => (
@@ -499,8 +487,8 @@ const Ingredients = () => {
             </DialogActions>
           </form>
         </Dialog>
-      </Container>
-    </Box>
+      </Grid>
+    </Container>
   );
 };
 

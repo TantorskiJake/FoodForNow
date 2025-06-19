@@ -274,7 +274,14 @@ const Dashboard = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container 
+      maxWidth={false}
+      sx={{ 
+        py: 4,
+        px: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8 },
+        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+      }}
+    >
       <Grid container spacing={3}>
         <Grid item xs={12}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
