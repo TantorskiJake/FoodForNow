@@ -44,6 +44,7 @@ const Dashboard = () => {
     meal: '',
     recipeId: '',
   });
+  const [resetWeekDialog, setResetWeekDialog] = useState(false);
 
   const { authenticated } = useAuth();
 
@@ -142,6 +143,19 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenResetWeekDialog = () => {
+    setResetWeekDialog(true);
+  };
+
+  const handleCloseResetWeekDialog = () => {
+    setResetWeekDialog(false);
+  };
+
+  const handleConfirmResetWeek = async () => {
+    setResetWeekDialog(false);
+    await handleResetWeek();
   };
 
   const handleOpenMealDialog = (day, mealType, existingMeal = null) => {
@@ -288,7 +302,7 @@ const Dashboard = () => {
                 <Button
                   variant="outlined"
                   color="error"
-                  onClick={handleResetWeek}
+                  onClick={handleOpenResetWeekDialog}
                   disabled={loading || mealPlan.length === 0}
                   size="small"
                 >
@@ -451,6 +465,25 @@ const Dashboard = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* Reset Week Confirmation Dialog */}
+      <Dialog open={resetWeekDialog} onClose={handleCloseResetWeekDialog}>
+        <DialogTitle>Reset Week</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Are you sure you want to reset your meal plan for this week?
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            This will permanently delete all your meal plans and cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseResetWeekDialog}>Cancel</Button>
+          <Button onClick={handleConfirmResetWeek} variant="contained" color="error">
+            Reset Week
+          </Button>
+        </DialogActions>
       </Dialog>
     </Container>
   );
