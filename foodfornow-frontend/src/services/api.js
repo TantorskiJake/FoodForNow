@@ -1,6 +1,11 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api';
+// Use environment variable to configure the backend API URL. During
+// development the value from `.env` will be used and in production the
+// variable can be provided at build time. Fallback to `/api` so the
+// frontend can be served from the same host as the backend when behind a
+// reverse proxy.
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance with default config
 const api = axios.create({

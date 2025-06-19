@@ -1,0 +1,47 @@
+name: Build and Push Docker images
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker image names
+        run: |
+          echo "IMAGE_BACKEND=${{ env.REGISTRY }}/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')-backend" >> $GITHUB_ENV
+          echo "IMAGE_FRONTEND=${{ env.REGISTRY }}/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')-frontend" >> $GITHUB_ENV
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend image
+        run: |
+          docker build -t $IMAGE_BACKEND:${{ github.sha }} -t $IMAGE_BACKEND:latest ./foodfornow-backend
+
+      - name: Build frontend image
+        run: |
+          docker build -t $IMAGE_FRONTEND:${{ github.sha }} -t $IMAGE_FRONTEND:latest ./foodfornow-frontend
+
+      - name: Push images
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push $IMAGE_BACKEND:${{ github.sha }}
+          docker push $IMAGE_BACKEND:latest
+          docker push $IMAGE_FRONTEND:${{ github.sha }}
+          docker push $IMAGE_FRONTEND:latest
