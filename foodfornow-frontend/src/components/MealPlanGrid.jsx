@@ -110,8 +110,15 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
         addMissingToShoppingList: true
       });
       
-      if (onMealPlanUpdate) {
-        onMealPlanUpdate(response.data.mealPlanItem);
+      // Only update the meal plan if it was actually marked as cooked
+      if (response.data.mealPlanItem.cooked) {
+        if (onMealPlanUpdate) {
+          onMealPlanUpdate(response.data.mealPlanItem);
+        }
+      } else {
+        // If not cooked, just refresh the meal plan to show current state
+        // The meal should remain uncooked
+        window.location.reload();
       }
       
       setMissingIngredientsDialog(false);

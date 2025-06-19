@@ -21,6 +21,14 @@ router.get('/', authMiddleware, async (req, res) => {
       return res.json({ items: [] });
     }
 
+    // Clean up any items with zero or negative quantity
+    const originalCount = pantry.items.length;
+    pantry.items = pantry.items.filter(item => item.quantity > 0);
+    if (pantry.items.length !== originalCount) {
+      console.log(`Cleaned up ${originalCount - pantry.items.length} zero-quantity items`);
+      await pantry.save();
+    }
+
     // Ensure each item has the required fields and ingredient data
     const items = pantry.items.map(item => ({
       _id: item._id,

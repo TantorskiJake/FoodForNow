@@ -210,6 +210,12 @@ const Dashboard = () => {
           meal._id === updatedMeal._id ? updatedMeal : meal
         )
       );
+      
+      // If the meal was cooked (status changed to cooked), refresh ingredients
+      if (updatedMeal.cooked) {
+        console.log('Meal was cooked, refreshing ingredients...');
+        await fetchIngredients();
+      }
     } catch (err) {
       console.error('Error updating meal plan:', err);
       setError('Failed to update meal plan. Please try again.');

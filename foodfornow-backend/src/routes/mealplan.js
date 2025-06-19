@@ -225,23 +225,41 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
         });
         await shoppingListItem.save();
       }
+      
+      // Don't mark as cooked if there were missing ingredients
+      // Just return the meal plan item without changing cooked status
+      await mealPlanItem.populate('recipe');
+      return res.json({
+        mealPlanItem,
+        removedIngredients: pantryUpdates.length,
+        addedToShoppingList: missingIngredients.length,
+        message: 'Missing ingredients added to shopping list. Meal not marked as cooked.'
+      });
     }
 
     // Update pantry - remove ingredients
     for (const update of pantryUpdates) {
       const pantryItem = pantry.items.id(update.itemId);
       if (pantryItem) {
+        console.log(`Removing ${update.removeQuantity} from ${pantryItem.ingredient} (current: ${pantryItem.quantity})`);
         pantryItem.quantity -= update.removeQuantity;
+        console.log(`New quantity: ${pantryItem.quantity}`);
+        
         if (pantryItem.quantity <= 0) {
           // Remove item if quantity is 0 or less
+          console.log(`Removing item with zero quantity: ${pantryItem.ingredient}`);
           pantry.items = pantry.items.filter(item => item._id.toString() !== update.itemId);
         }
       }
     }
 
+    // Additional cleanup: remove any items that might have slipped through
+    pantry.items = pantry.items.filter(item => item.quantity > 0);
+    console.log(`Final pantry items count: ${pantry.items.length}`);
+
     await pantry.save();
 
-    // Mark meal as cooked
+    // Mark meal as cooked only if all ingredients were available
     mealPlanItem.cooked = true;
     await mealPlanItem.save();
     await mealPlanItem.populate('recipe');
@@ -249,7 +267,7 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
     res.json({
       mealPlanItem,
       removedIngredients: pantryUpdates.length,
-      addedToShoppingList: missingIngredients.length
+      addedToShoppingList: 0
     });
 
   } catch (error) {
@@ -292,9 +310,13 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
 
     console.log('Found meal plans:', mealPlans.length);
 
-    // Aggregate needed ingredients (by ingredient+unit)
+    // Filter out cooked meals - only count ingredients from uncooked meals
+    const uncookedMealPlans = mealPlans.filter(mealPlan => !mealPlan.cooked);
+    console.log('Uncooked meal plans:', uncookedMealPlans.length);
+
+    // Aggregate needed ingredients (by ingredient+unit) from uncooked meals only
     const ingredients = new Map();
-    mealPlans.forEach(mealPlan => {
+    uncookedMealPlans.forEach(mealPlan => {
       if (mealPlan.recipe && mealPlan.recipe.ingredients) {
         mealPlan.recipe.ingredients.forEach(ing => {
           if (!ing.ingredient) return;
@@ -337,7 +359,7 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
       };
     });
 
-    console.log('Aggregated ingredients:', result.length);
+    console.log('Aggregated ingredients from uncooked meals:', result.length);
     res.json(result);
   } catch (error) {
     console.error('Error fetching ingredients:', error);
