@@ -105,6 +105,26 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Toggle cooked status
+router.patch('/:id/cooked', authMiddleware, async (req, res) => {
+  try {
+    const mealPlanItem = await MealPlan.findOne({ _id: req.params.id, user: req.userId });
+    
+    if (!mealPlanItem) {
+      return res.status(404).json({ error: 'Meal plan item not found' });
+    }
+
+    mealPlanItem.cooked = !mealPlanItem.cooked;
+    await mealPlanItem.save();
+    
+    await mealPlanItem.populate('recipe');
+    res.json(mealPlanItem);
+  } catch (error) {
+    console.error('Error toggling cooked status:', error);
+    res.status(500).json({ error: 'Failed to toggle cooked status' });
+  }
+});
+
 // Delete meal from plan
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {

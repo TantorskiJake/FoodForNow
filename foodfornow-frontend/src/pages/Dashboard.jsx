@@ -202,6 +202,20 @@ const Dashboard = () => {
     }
   };
 
+  const handleMealPlanUpdate = async (updatedMeal) => {
+    try {
+      // Update the local meal plan state with the updated meal
+      setMealPlan(prevMealPlan => 
+        prevMealPlan.map(meal => 
+          meal._id === updatedMeal._id ? updatedMeal : meal
+        )
+      );
+    } catch (err) {
+      console.error('Error updating meal plan:', err);
+      setError('Failed to update meal plan. Please try again.');
+    }
+  };
+
   const handleAddToPantry = () => {
     // Implementation of adding to pantry
   };
@@ -248,6 +262,7 @@ const Dashboard = () => {
                 onAddMeal={handleOpenMealDialog}
                 onEditMeal={handleEditMeal}
                 onDeleteMeal={handleDeleteMeal}
+                onMealPlanUpdate={handleMealPlanUpdate}
               />
             </CardContent>
           </Card>

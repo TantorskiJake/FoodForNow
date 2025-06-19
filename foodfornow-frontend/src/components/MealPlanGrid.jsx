@@ -11,13 +11,17 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  useTheme
+  useTheme,
+  Chip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
+import api from '../services/api';
 
-const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal }) => {
+const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMealPlanUpdate }) => {
   const navigate = useNavigate();
   const theme = useTheme();
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -48,6 +52,19 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal }) =>
       navigate(`/recipes/${selectedMeal.recipe._id}`);
     }
     handleMenuClose();
+  };
+
+  const handleToggleCooked = async (meal, event) => {
+    event.stopPropagation();
+    try {
+      const response = await api.patch(`/mealplan/${meal._id}/cooked`);
+      // Update the meal plan in the parent component
+      if (onMealPlanUpdate) {
+        onMealPlanUpdate(response.data);
+      }
+    } catch (error) {
+      console.error('Error toggling cooked status:', error);
+    }
   };
 
   const getMealName = (meal) => {
@@ -89,18 +106,26 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal }) =>
                 const meal = mealPlan.find(
                   (m) => m?.day?.toLowerCase() === day.toLowerCase() && m?.meal === mealType
                 );
+                const isCooked = meal?.cooked || false;
+                
                 return (
                   <Grid item xs={1.5} key={`${day}-${mealType}`}>
                     <Card 
                       sx={{ 
                         height: '100%',
                         minHeight: 100,
-                        bgcolor: meal ? 'primary.light' : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100',
+                        bgcolor: meal 
+                          ? (isCooked ? 'success.light' : 'primary.light')
+                          : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100',
                         '&:hover': {
-                          bgcolor: meal ? 'primary.main' : theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200',
+                          bgcolor: meal 
+                            ? (isCooked ? 'success.main' : 'primary.main')
+                            : theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200',
                           cursor: 'pointer'
                         },
-                        border: theme.palette.mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : 'none'
+                        border: theme.palette.mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : 'none',
+                        position: 'relative',
+                        overflow: 'visible'
                       }}
                       onClick={(e) => meal ? handleMealClick(meal, e) : onAddMeal(day, mealType)}
                     >
@@ -113,6 +138,34 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal }) =>
                       }}>
                         {meal ? (
                           <>
+                            {/* Cooking status indicator - positioned top-left */}
+                            <Box sx={{ 
+                              position: 'absolute',
+                              top: 4,
+                              left: 4,
+                              zIndex: 1
+                            }}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleToggleCooked(meal, e)}
+                                sx={{
+                                  bgcolor: isCooked ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                  color: 'white',
+                                  width: 24,
+                                  height: 24,
+                                  '&:hover': {
+                                    bgcolor: isCooked ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)',
+                                  }
+                                }}
+                              >
+                                {isCooked ? (
+                                  <CheckCircleIcon sx={{ fontSize: 16 }} />
+                                ) : (
+                                  <RestaurantMenuIcon sx={{ fontSize: 16 }} />
+                                )}
+                              </IconButton>
+                            </Box>
+
                             <Typography 
                               variant="body2" 
                               sx={{
@@ -124,11 +177,19 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal }) =>
                                 lineHeight: 1.2,
                                 fontSize: '0.875rem',
                                 pt: 2,
-                                color: 'white'
+                                color: 'white',
+                                pl: 3, // Left padding to avoid status indicator
+                                pr: 3, // Right padding to avoid delete button
+                                textAlign: 'center',
+                                minHeight: '60px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
                               }}
                             >
                               {getMealName(meal)}
                             </Typography>
+                            
                             <IconButton
                               size="small"
                               onClick={(e) => {

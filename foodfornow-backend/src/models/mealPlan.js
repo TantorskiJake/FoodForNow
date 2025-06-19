@@ -29,6 +29,10 @@ const mealPlanSchema = new mongoose.Schema(
     notes: {
       type: String
     },
+    cooked: {
+      type: Boolean,
+      default: false
+    },
     groceryList: [
       {
         name: {
