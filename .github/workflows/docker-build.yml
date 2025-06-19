@@ -3,7 +3,7 @@ name: Build and Push Docker images
 on:
   push:
     branches: [ main ]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,7 +14,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: tantorski-ffn-runner-set
     steps:
       - uses: actions/checkout@v4
 
