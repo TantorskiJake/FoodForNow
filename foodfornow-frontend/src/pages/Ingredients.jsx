@@ -25,6 +25,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import SortIcon from '@mui/icons-material/Sort';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import TimerIcon from '@mui/icons-material/Timer';
 import api from '../services/api';
@@ -56,6 +57,7 @@ const Ingredients = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState(null);
   const [tab, setTab] = useState('mine');
+  const [sortBy, setSortBy] = useState('name');
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -196,6 +198,26 @@ const Ingredients = () => {
     'pinch',
   ];
 
+  // Sort filtered ingredients based on current sort setting
+  const sortedFilteredIngredients = [...filteredIngredients].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name);
+      case 'name-desc':
+        return b.name.localeCompare(a.name);
+      case 'category':
+        return a.category.localeCompare(b.category);
+      case 'category-desc':
+        return b.category.localeCompare(a.category);
+      case 'description':
+        return (a.description || '').localeCompare(b.description || '');
+      case 'description-desc':
+        return (b.description || '').localeCompare(a.description || '');
+      default:
+        return 0;
+    }
+  });
+
   return (
     <Container 
       maxWidth={false}
@@ -230,8 +252,8 @@ const Ingredients = () => {
               setTab(newVal);
               setSearchTerm('');
             }}
-            sx={{
-              mb: 3,
+            sx={{ 
+              mb: 2,
               '& .MuiTab-root': {
                 textTransform: 'none',
                 fontWeight: 600,
@@ -243,45 +265,34 @@ const Ingredients = () => {
             <Tab label="Shared Ingredients" value="shared" />
           </Tabs>
 
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2,
-              mb: 4,
-              borderRadius: 2,
-              background: theme.palette.mode === 'dark' 
-                ? 'rgba(255, 255, 255, 0.05)'
-                : 'rgba(255, 255, 255, 0.8)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid',
-              borderColor: theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.1)'
-                : 'rgba(0, 0, 0, 0.1)',
-            }}
-          >
+          <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
             <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="Search ingredients..."
+              label="Search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  background: theme.palette.mode === 'dark'
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : 'rgba(255, 255, 255, 0.8)',
-                },
-              }}
+              size="small"
             />
-          </Paper>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Sort by</InputLabel>
+              <Select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                label="Sort by"
+                startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
+              >
+                <MenuItem value="name">Name (A-Z)</MenuItem>
+                <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+                <MenuItem value="category">Category (A-Z)</MenuItem>
+                <MenuItem value="category-desc">Category (Z-A)</MenuItem>
+                <MenuItem value="description">Description (A-Z)</MenuItem>
+                <MenuItem value="description-desc">Description (Z-A)</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
         </Grid>
 
         <Grid container spacing={2}>
-          {filteredIngredients.map((ingredient) => (
+          {sortedFilteredIngredients.map((ingredient) => (
             <Grid item xs={12} sm={6} md={4} lg={3} xl={2} key={ingredient._id}>
               <Paper
                 elevation={0}

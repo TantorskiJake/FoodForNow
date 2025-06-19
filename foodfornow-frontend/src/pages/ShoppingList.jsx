@@ -25,13 +25,17 @@ import {
   CircularProgress,
   Chip,
   useTheme,
-  LinearProgress
+  LinearProgress,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Add as AddIcon,
   AddShoppingCart as AddShoppingCartIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Sort as SortIcon,
 } from '@mui/icons-material';
 import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
@@ -52,6 +56,7 @@ const ShoppingList = () => {
     unit: ''
   });
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
+  const [sortBy, setSortBy] = useState('name');
 
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
 
@@ -198,6 +203,26 @@ const ShoppingList = () => {
     }
   };
 
+  // Sort shopping items based on current sort setting
+  const sortedShoppingItems = [...shoppingItems].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return (a.ingredient?.name || '').localeCompare(b.ingredient?.name || '');
+      case 'name-desc':
+        return (b.ingredient?.name || '').localeCompare(a.ingredient?.name || '');
+      case 'quantity':
+        return a.quantity - b.quantity;
+      case 'quantity-desc':
+        return b.quantity - a.quantity;
+      case 'completed':
+        return (a.completed === b.completed) ? 0 : a.completed ? 1 : -1;
+      case 'completed-desc':
+        return (a.completed === b.completed) ? 0 : a.completed ? -1 : 1;
+      default:
+        return 0;
+    }
+  });
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
@@ -212,7 +237,23 @@ const ShoppingList = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Shopping List
         </Typography>
-        <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Sort by</InputLabel>
+            <Select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              label="Sort by"
+              startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
+            >
+              <MenuItem value="name">Name (A-Z)</MenuItem>
+              <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+              <MenuItem value="quantity">Quantity (Low-High)</MenuItem>
+              <MenuItem value="quantity-desc">Quantity (High-Low)</MenuItem>
+              <MenuItem value="completed">Completed First</MenuItem>
+              <MenuItem value="completed-desc">Not Completed First</MenuItem>
+            </Select>
+          </FormControl>
           <Button
             variant="contained"
             color="error"
@@ -274,7 +315,7 @@ const ShoppingList = () => {
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {shoppingItems.map((item) => (
+          {sortedShoppingItems.map((item) => (
             <Grid item xs={12} sm={6} md={4} key={item._id}>
               <Paper
                 elevation={1}

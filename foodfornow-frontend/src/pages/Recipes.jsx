@@ -27,6 +27,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import TimerIcon from '@mui/icons-material/Timer';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
+import SortIcon from '@mui/icons-material/Sort';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
@@ -181,8 +182,72 @@ const Recipes = () => {
   const [tab, setTab] = useState('mine');
   const [sharedRecipes, setSharedRecipes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name');
   const { authenticated } = useAuth();
   const navigate = useNavigate();
+
+  // Sort recipes based on current sort setting
+  const sortedRecipes = [...recipes].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name);
+      case 'name-desc':
+        return b.name.localeCompare(a.name);
+      case 'cookTime':
+        return a.cookTime - b.cookTime;
+      case 'cookTime-desc':
+        return b.cookTime - a.cookTime;
+      case 'prepTime':
+        return a.prepTime - b.prepTime;
+      case 'prepTime-desc':
+        return b.prepTime - a.prepTime;
+      case 'totalTime':
+        return (a.prepTime + a.cookTime) - (b.prepTime + b.cookTime);
+      case 'totalTime-desc':
+        return (b.prepTime + b.cookTime) - (a.prepTime + a.cookTime);
+      case 'servings':
+        return a.servings - b.servings;
+      case 'servings-desc':
+        return b.servings - a.servings;
+      case 'ingredients':
+        return a.ingredients.length - b.ingredients.length;
+      case 'ingredients-desc':
+        return b.ingredients.length - a.ingredients.length;
+      default:
+        return 0;
+    }
+  });
+
+  const sortedSharedRecipes = [...sharedRecipes].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name);
+      case 'name-desc':
+        return b.name.localeCompare(a.name);
+      case 'cookTime':
+        return a.cookTime - b.cookTime;
+      case 'cookTime-desc':
+        return b.cookTime - a.cookTime;
+      case 'prepTime':
+        return a.prepTime - b.prepTime;
+      case 'prepTime-desc':
+        return b.prepTime - a.prepTime;
+      case 'totalTime':
+        return (a.prepTime + a.cookTime) - (b.prepTime + b.cookTime);
+      case 'totalTime-desc':
+        return (b.prepTime + b.cookTime) - (a.prepTime + a.cookTime);
+      case 'servings':
+        return a.servings - b.servings;
+      case 'servings-desc':
+        return b.servings - a.servings;
+      case 'ingredients':
+        return a.ingredients.length - b.ingredients.length;
+      case 'ingredients-desc':
+        return b.ingredients.length - a.ingredients.length;
+      default:
+        return 0;
+    }
+  });
 
   // Fetch functions for recipes and ingredients
   const fetchRecipes = async () => {
@@ -421,27 +486,56 @@ const Recipes = () => {
               setTab(newVal);
               setSearchTerm('');
             }}
-            sx={{ mb: 2 }}
+            sx={{ 
+              mb: 2,
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '1rem',
+              },
+            }}
           >
             <Tab label="My Recipes" value="mine" />
             <Tab label="Shared Recipes" value="shared" />
           </Tabs>
 
-          <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+          <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
             <TextField
               label="Search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="small"
             />
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Sort by</InputLabel>
+              <Select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                label="Sort by"
+                startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
+              >
+                <MenuItem value="name">Name (A-Z)</MenuItem>
+                <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+                <MenuItem value="cookTime">Cook Time (Low-High)</MenuItem>
+                <MenuItem value="cookTime-desc">Cook Time (High-Low)</MenuItem>
+                <MenuItem value="prepTime">Prep Time (Low-High)</MenuItem>
+                <MenuItem value="prepTime-desc">Prep Time (High-Low)</MenuItem>
+                <MenuItem value="totalTime">Total Time (Low-High)</MenuItem>
+                <MenuItem value="totalTime-desc">Total Time (High-Low)</MenuItem>
+                <MenuItem value="servings">Servings (Low-High)</MenuItem>
+                <MenuItem value="servings-desc">Servings (High-Low)</MenuItem>
+                <MenuItem value="ingredients">Ingredients (Low-High)</MenuItem>
+                <MenuItem value="ingredients-desc">Ingredients (High-Low)</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
         </Grid>
 
         {tab === 'mine' ? (
-          recipes.length > 0 ? (
+          sortedRecipes.length > 0 ? (
             <Container maxWidth="xl">
               <Grid container spacing={3}>
-                {recipes.map((recipe) => (
+                {sortedRecipes.map((recipe) => (
                   <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
                     <Paper
                       elevation={0}
@@ -635,89 +729,57 @@ const Recipes = () => {
             </Box>
           )
         ) : (
-          <Container maxWidth="xl">
-            <Grid container spacing={3}>
-              {sharedRecipes.map((recipe) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      borderRadius: 2,
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                      background: theme.palette.mode === 'dark' 
-                        ? 'rgba(255, 255, 255, 0.05)'
-                        : 'rgba(255, 255, 255, 0.8)',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid',
-                      borderColor: theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.1)'
-                        : 'rgba(0, 0, 0, 0.1)',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: theme.palette.mode === 'dark'
-                          ? '0 8px 24px rgba(0, 0, 0, 0.3)'
-                          : '0 8px 24px rgba(0, 0, 0, 0.1)',
-                      },
-                    }}
-                    onClick={() => navigate(`/recipes/${recipe._id}`)}
-                  >
-                    <Box sx={{ p: 2, flex: 1 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          fontWeight: 600,
-                          mb: 1,
-                          color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
-                          fontSize: '1.1rem',
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        {recipe.name}
-                      </Typography>
+          sortedSharedRecipes.length > 0 ? (
+            <Container maxWidth="xl">
+              <Grid container spacing={3}>
+                {sortedSharedRecipes.map((recipe) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                        background: theme.palette.mode === 'dark' 
+                          ? 'rgba(255, 255, 255, 0.05)'
+                          : 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid',
+                        borderColor: theme.palette.mode === 'dark'
+                          ? 'rgba(255, 255, 255, 0.1)'
+                          : 'rgba(0, 0, 0, 0.1)',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: theme.palette.mode === 'dark'
+                            ? '0 8px 24px rgba(0, 0, 0, 0.3)'
+                            : '0 8px 24px rgba(0, 0, 0, 0.1)',
+                        },
+                      }}
+                      onClick={() => navigate(`/recipes/${recipe._id}`)}
+                    >
+                      <Box sx={{ p: 2, flex: 1 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 600,
+                            mb: 1,
+                            color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+                            fontSize: '1.1rem',
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {recipe.name}
+                        </Typography>
 
-                      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                        <Chip
-                          size="small"
-                          icon={<AccessTimeIcon sx={{ fontSize: '1rem' }} />}
-                          label={`${recipe.cookTime} mins`}
-                          sx={{
-                            height: 24,
-                            fontSize: '0.75rem',
-                            background: theme.palette.mode === 'dark'
-                              ? 'rgba(34, 139, 34, 0.2)'
-                              : 'rgba(34, 139, 34, 0.1)',
-                            color: '#228B22',
-                            '& .MuiChip-icon': {
-                              color: '#228B22',
-                            },
-                          }}
-                        />
-                        <Chip
-                          size="small"
-                          icon={<TimerIcon sx={{ fontSize: '1rem' }} />}
-                          label={`${recipe.prepTime} mins`}
-                          sx={{
-                            height: 24,
-                            fontSize: '0.75rem',
-                            background: theme.palette.mode === 'dark'
-                              ? 'rgba(34, 139, 34, 0.2)'
-                              : 'rgba(34, 139, 34, 0.1)',
-                            color: '#228B22',
-                            '& .MuiChip-icon': {
-                              color: '#228B22',
-                            },
-                          }}
-                        />
-                        {recipe.tags && recipe.tags.map((tag, index) => (
+                        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                           <Chip
-                            key={index}
                             size="small"
-                            label={tag}
+                            icon={<AccessTimeIcon sx={{ fontSize: '1rem' }} />}
+                            label={`${recipe.cookTime} mins`}
                             sx={{
                               height: 24,
                               fontSize: '0.75rem',
@@ -725,64 +787,112 @@ const Recipes = () => {
                                 ? 'rgba(34, 139, 34, 0.2)'
                                 : 'rgba(34, 139, 34, 0.1)',
                               color: '#228B22',
+                              '& .MuiChip-icon': {
+                                color: '#228B22',
+                              },
                             }}
                           />
-                        ))}
-                      </Box>
-
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
-                          mb: 2,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {recipe.description}
-                      </Typography>
-
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-                          }}
-                        >
-                          {recipe.ingredients.length} ingredients
-                        </Typography>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDuplicateRecipe(recipe._id);
-                          }}
-                          sx={{
-                            textTransform: 'none',
-                            background: theme.palette.mode === 'dark'
-                              ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                              : '#228B22',
-                            '&:hover': {
+                          <Chip
+                            size="small"
+                            icon={<TimerIcon sx={{ fontSize: '1rem' }} />}
+                            label={`${recipe.prepTime} mins`}
+                            sx={{
+                              height: 24,
+                              fontSize: '0.75rem',
                               background: theme.palette.mode === 'dark'
-                                ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
-                                : '#1B6B1B',
-                            },
+                                ? 'rgba(34, 139, 34, 0.2)'
+                                : 'rgba(34, 139, 34, 0.1)',
+                              color: '#228B22',
+                              '& .MuiChip-icon': {
+                                color: '#228B22',
+                              },
+                            }}
+                          />
+                          {recipe.tags && recipe.tags.map((tag, index) => (
+                            <Chip
+                              key={index}
+                              size="small"
+                              label={tag}
+                              sx={{
+                                height: 24,
+                                fontSize: '0.75rem',
+                                background: theme.palette.mode === 'dark'
+                                  ? 'rgba(34, 139, 34, 0.2)'
+                                  : 'rgba(34, 139, 34, 0.1)',
+                                color: '#228B22',
+                              }}
+                            />
+                          ))}
+                        </Box>
+
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                            mb: 2,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            lineHeight: 1.4,
                           }}
                         >
-                          Add
-                        </Button>
+                          {recipe.description}
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                            }}
+                          >
+                            {recipe.ingredients.length} ingredients
+                          </Typography>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicateRecipe(recipe._id);
+                            }}
+                            sx={{
+                              textTransform: 'none',
+                              background: theme.palette.mode === 'dark'
+                                ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                                : '#228B22',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                                  : '#1B6B1B',
+                              },
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </Box>
                       </Box>
-                    </Box>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </Container>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Container>
+          ) : (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                py: 8,
+              }}
+            >
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No shared recipes found
+              </Typography>
+            </Box>
+          )
         )}
       </Grid>
 

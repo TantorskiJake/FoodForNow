@@ -29,7 +29,8 @@ import {
   Edit as EditIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
-  AddShoppingCart as AddShoppingCartIcon
+  AddShoppingCart as AddShoppingCartIcon,
+  Sort as SortIcon
 } from '@mui/icons-material';
 import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
@@ -53,6 +54,7 @@ const Pantry = () => {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
+  const [sortBy, setSortBy] = useState('name');
 
   const { authenticated } = useAuth();
 
@@ -254,6 +256,30 @@ const Pantry = () => {
     }
   };
 
+  // Sort pantry items based on current sort setting
+  const sortedPantryItems = [...pantryItems].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return (a.ingredient?.name || '').localeCompare(b.ingredient?.name || '');
+      case 'name-desc':
+        return (b.ingredient?.name || '').localeCompare(a.ingredient?.name || '');
+      case 'quantity':
+        return a.quantity - b.quantity;
+      case 'quantity-desc':
+        return b.quantity - a.quantity;
+      case 'category':
+        return (a.ingredient?.category || '').localeCompare(b.ingredient?.category || '');
+      case 'category-desc':
+        return (b.ingredient?.category || '').localeCompare(a.ingredient?.category || '');
+      case 'expiry':
+        return new Date(a.expiryDate || '9999-12-31') - new Date(b.expiryDate || '9999-12-31');
+      case 'expiry-desc':
+        return new Date(b.expiryDate || '9999-12-31') - new Date(a.expiryDate || '9999-12-31');
+      default:
+        return 0;
+    }
+  });
+
   const PantryItem = ({ item, onEdit, onDelete }) => {
     const theme = useTheme();
     
@@ -346,7 +372,25 @@ const Pantry = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Pantry
         </Typography>
-        <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Sort by</InputLabel>
+            <Select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              label="Sort by"
+              startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
+            >
+              <MenuItem value="name">Name (A-Z)</MenuItem>
+              <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+              <MenuItem value="quantity">Quantity (Low-High)</MenuItem>
+              <MenuItem value="quantity-desc">Quantity (High-Low)</MenuItem>
+              <MenuItem value="category">Category (A-Z)</MenuItem>
+              <MenuItem value="category-desc">Category (Z-A)</MenuItem>
+              <MenuItem value="expiry">Expiry (Soonest)</MenuItem>
+              <MenuItem value="expiry-desc">Expiry (Latest)</MenuItem>
+            </Select>
+          </FormControl>
           <Button
             variant="contained"
             color="error"
@@ -386,7 +430,7 @@ const Pantry = () => {
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {pantryItems.map((item) => (
+          {sortedPantryItems.map((item) => (
             <Grid item xs={12} sm={6} md={4} key={item._id}>
               <Paper
                 elevation={1}
