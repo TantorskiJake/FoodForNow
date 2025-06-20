@@ -445,11 +445,9 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
     // Use provided weekStart or calculate the start of the current week (Monday)
     let monday;
     if (req.body.weekStart) {
-      monday = new Date(req.body.weekStart);
-      // Ensure it's the start of the week (Monday)
-      const dayOfWeek = monday.getDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, so we need to go back 6 days
-      monday.setDate(monday.getDate() - daysToMonday);
+      // Parse the date string properly to avoid timezone issues
+      const [year, month, day] = req.body.weekStart.split('-').map(Number);
+      monday = new Date(year, month - 1, day); // month is 0-indexed
       monday.setHours(0, 0, 0, 0);
     } else {
       const today = new Date();
