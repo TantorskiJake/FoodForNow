@@ -20,11 +20,13 @@ import {
   CircularProgress,
   LinearProgress,
   Paper,
+  TextField,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CasinoIcon from '@mui/icons-material/Casino';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import api from '../services/api';
 import MealPlanGrid from '../components/MealPlanGrid';
 import { getCategoryColor } from '../utils/categoryColors';
@@ -46,11 +48,21 @@ const Dashboard = () => {
     recipeId: '',
   });
   const [resetWeekDialog, setResetWeekDialog] = useState(false);
+  const [selectedWeekStart, setSelectedWeekStart] = useState('');
 
   const { authenticated, user } = useAuth();
 
+  // Initialize selected week to current week's Monday
   useEffect(() => {
-    if (!authenticated) return;
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1);
+    monday.setHours(0, 0, 0, 0);
+    setSelectedWeekStart(monday.toISOString().split('T')[0]);
+  }, []);
+
+  useEffect(() => {
+    if (!authenticated || !selectedWeekStart) return;
 
     const fetchAll = async () => {
       try {
@@ -66,7 +78,7 @@ const Dashboard = () => {
     };
 
     fetchAll();
-  }, [authenticated]);
+  }, [authenticated, selectedWeekStart]);
 
   const fetchRecipes = async () => {
     try {
@@ -80,7 +92,7 @@ const Dashboard = () => {
 
   const fetchMealPlan = async () => {
     try {
-      const response = await api.get('/mealplan');
+      const response = await api.get(`/mealplan?weekStart=${selectedWeekStart}`);
       setMealPlan(response.data || []);
     } catch (err) {
       console.error('Error fetching meal plan:', err);
@@ -90,7 +102,7 @@ const Dashboard = () => {
 
   const fetchIngredients = async () => {
     try {
-      const response = await api.get('/mealplan/ingredients');
+      const response = await api.get(`/mealplan/ingredients?weekStart=${selectedWeekStart}`);
       console.log('Ingredients response:', response.data);
       if (response.data && typeof response.data === 'object') {
         // Convert the object to an array of ingredients
@@ -128,7 +140,7 @@ const Dashboard = () => {
   const handleResetWeek = async () => {
     try {
       setLoading(true);
-      const response = await api.delete('/mealplan/reset-week');
+      const response = await api.delete(`/mealplan/reset-week?weekStart=${selectedWeekStart}`);
       console.log('Reset week:', response.data);
       
       // Clear the meal plan state
@@ -162,7 +174,9 @@ const Dashboard = () => {
   const handlePopulateWeek = async () => {
     try {
       setLoading(true);
-      const response = await api.post('/mealplan/populate-week');
+      const response = await api.post('/mealplan/populate-week', {
+        weekStart: selectedWeekStart
+      });
       console.log('Populated week:', response.data);
       
       // Refresh meal plan and ingredients
@@ -185,14 +199,9 @@ const Dashboard = () => {
   };
 
   const handleOpenMealDialog = (day, mealType, existingMeal = null) => {
-    const today = new Date();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - today.getDay() + 1);
-    monday.setHours(0, 0, 0, 0);
-
     setMealFormData({
       _id: existingMeal?._id || '',
-      weekStart: existingMeal?.weekStart || monday.toISOString().split('T')[0],
+      weekStart: existingMeal?.weekStart || selectedWeekStart,
       day: day || existingMeal?.day || '',
       meal: mealType || existingMeal?.meal || '',
       recipeId: existingMeal?.recipe?._id || '',
@@ -352,6 +361,89 @@ const Dashboard = () => {
               {user?.name ? `${user.name}'s Dashboard` : 'Dashboard'}
             </Typography>
           </Box>
+        </Grid>
+
+        {/* Week Selector */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+                <Box display="flex" alignItems="center" gap={1}>
+                  <CalendarTodayIcon color="primary" />
+                  <Typography variant="h6">
+                    Week of Monday, {selectedWeekStart ? (() => {
+                      const [year, month, day] = selectedWeekStart.split('-').map(Number);
+                      const date = new Date(year, month - 1, day);
+                      return date.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      });
+                    })() : ''}
+                  </Typography>
+                </Box>
+                <Box display="flex" alignItems="center" gap={1} ml="auto">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      const currentDate = new Date(selectedWeekStart);
+                      currentDate.setDate(currentDate.getDate() - 7);
+                      setSelectedWeekStart(currentDate.toISOString().split('T')[0]);
+                    }}
+                  >
+                    Previous Week
+                  </Button>
+                  <TextField
+                    type="date"
+                    value={selectedWeekStart}
+                    onChange={(e) => {
+                      // Parse the date string properly to avoid timezone issues
+                      const [year, month, day] = e.target.value.split('-').map(Number);
+                      const selectedDate = new Date(year, month - 1, day); // month is 0-indexed
+                      
+                      // Adjust to Monday of that week
+                      const dayOfWeek = selectedDate.getDay();
+                      // Calculate days to go back to get to Monday
+                      // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+                      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                      
+                      selectedDate.setDate(selectedDate.getDate() - daysToMonday);
+                      selectedDate.setHours(0, 0, 0, 0);
+                      
+                      setSelectedWeekStart(selectedDate.toISOString().split('T')[0]);
+                    }}
+                    size="small"
+                    sx={{ minWidth: 150 }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      const currentDate = new Date(selectedWeekStart);
+                      currentDate.setDate(currentDate.getDate() + 7);
+                      setSelectedWeekStart(currentDate.toISOString().split('T')[0]);
+                    }}
+                  >
+                    Next Week
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      const today = new Date();
+                      const monday = new Date(today);
+                      monday.setDate(today.getDate() - today.getDay() + 1);
+                      monday.setHours(0, 0, 0, 0);
+                      setSelectedWeekStart(monday.toISOString().split('T')[0]);
+                    }}
+                  >
+                    This Week
+                  </Button>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
 
         {error && (

@@ -9,7 +9,22 @@ const router = express.Router();
 router.get('/', authMiddleware, async (req, res) => {
   try {
     console.log('Fetching meal plan for user:', req.userId);
-    const mealPlan = await MealPlan.find({ user: req.userId }).populate('recipe');
+    
+    let query = { user: req.userId };
+    
+    // If weekStart is provided, filter by that week
+    if (req.query.weekStart) {
+      const weekStart = new Date(req.query.weekStart);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      
+      query.weekStart = {
+        $gte: weekStart,
+        $lt: weekEnd
+      };
+    }
+    
+    const mealPlan = await MealPlan.find(query).populate('recipe');
     console.log('Found meal plan:', mealPlan);
     res.json(mealPlan);
   } catch (error) {
@@ -130,8 +145,22 @@ router.delete('/reset-week', authMiddleware, async (req, res) => {
   try {
     console.log('Resetting week for user:', req.userId);
     
-    // Delete all meal plans for the user
-    const result = await MealPlan.deleteMany({ user: req.userId });
+    let query = { user: req.userId };
+    
+    // If weekStart is provided, only delete meal plans for that week
+    if (req.query.weekStart) {
+      const weekStart = new Date(req.query.weekStart);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      
+      query.weekStart = {
+        $gte: weekStart,
+        $lt: weekEnd
+      };
+    }
+    
+    // Delete meal plans matching the query
+    const result = await MealPlan.deleteMany(query);
     
     console.log(`Deleted ${result.deletedCount} meal plans`);
     
@@ -319,8 +348,22 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
   try {
     console.log('Fetching ingredients for user:', req.userId);
     
-    // Get all meal plans for the user
-    const mealPlans = await MealPlan.find({ user: req.userId })
+    let query = { user: req.userId };
+    
+    // If weekStart is provided, filter by that week
+    if (req.query.weekStart) {
+      const weekStart = new Date(req.query.weekStart);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      
+      query.weekStart = {
+        $gte: weekStart,
+        $lt: weekEnd
+      };
+    }
+    
+    // Get meal plans for the user (filtered by week if specified)
+    const mealPlans = await MealPlan.find(query)
       .populate({
         path: 'recipe',
         populate: {
@@ -399,11 +442,21 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'No recipes found. Please add some recipes first.' });
     }
 
-    // Calculate the start of the current week (Monday)
-    const today = new Date();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - today.getDay() + 1);
-    monday.setHours(0, 0, 0, 0);
+    // Use provided weekStart or calculate the start of the current week (Monday)
+    let monday;
+    if (req.body.weekStart) {
+      monday = new Date(req.body.weekStart);
+      // Ensure it's the start of the week (Monday)
+      const dayOfWeek = monday.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, so we need to go back 6 days
+      monday.setDate(monday.getDate() - daysToMonday);
+      monday.setHours(0, 0, 0, 0);
+    } else {
+      const today = new Date();
+      monday = new Date(today);
+      monday.setDate(today.getDate() - today.getDay() + 1);
+      monday.setHours(0, 0, 0, 0);
+    }
 
     // Clear existing meal plan for the week
     await MealPlan.deleteMany({ 
