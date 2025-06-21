@@ -6,13 +6,34 @@ const Pantry = require('../models/pantry');
 const ShoppingListItem = require('../models/shopping-list-item');
 const MealPlan = require('../models/mealPlan');
 
+/**
+ * Database Cleanup Script
+ * 
+ * This script performs a complete cleanup of the database for development/testing purposes.
+ * It removes all user data except for a system user, and clears all related collections.
+ * 
+ * WARNING: This will permanently delete all user data!
+ * Only use this script in development environments.
+ * 
+ * Usage: node src/scripts/cleanup-db.js
+ */
+
+/**
+ * Main cleanup function
+ * 
+ * Connects to MongoDB and performs a complete database cleanup:
+ * 1. Creates or finds a system user
+ * 2. Deletes all non-system users
+ * 3. Clears all related collections (ingredients, recipes, pantry, etc.)
+ */
 async function cleanupDatabase() {
   try {
-    // Connect to MongoDB
+    // Connect to local MongoDB instance
     await mongoose.connect('mongodb://localhost:27017/foodfornow');
     console.log('Connected to MongoDB');
 
-    // Find the system user
+    // Find or create the system user
+    // This user is preserved during cleanup for system-level operations
     const systemUser = await User.findOne({ email: 'system@foodfornow.com' });
     if (!systemUser) {
       console.log('System user not found, creating...');
@@ -24,27 +45,29 @@ async function cleanupDatabase() {
       console.log('System user created');
     }
 
-    // Delete all non-system users
+    // Delete all users except the system user
+    // This removes all regular user accounts and their associated data
     const result = await User.deleteMany({ email: { $ne: 'system@foodfornow.com' } });
     console.log(`Deleted ${result.deletedCount} users`);
 
-    // Delete all ingredients except system ones
+    // Delete all ingredients except those owned by the system user
+    // System ingredients are preserved for seeding and reference
     const ingredientResult = await Ingredient.deleteMany({ user: { $ne: systemUser._id } });
     console.log(`Deleted ${ingredientResult.deletedCount} ingredients`);
 
-    // Delete all recipes
+    // Delete all recipes (all recipes are user-created)
     const recipeResult = await Recipe.deleteMany({});
     console.log(`Deleted ${recipeResult.deletedCount} recipes`);
 
-    // Delete all pantry items
+    // Delete all pantry items (all pantry data is user-specific)
     const pantryResult = await Pantry.deleteMany({});
     console.log(`Deleted ${pantryResult.deletedCount} pantry items`);
 
-    // Delete all shopping list items
+    // Delete all shopping list items (all shopping lists are user-specific)
     const shoppingListResult = await ShoppingListItem.deleteMany({});
     console.log(`Deleted ${shoppingListResult.deletedCount} shopping list items`);
 
-    // Delete all meal plans
+    // Delete all meal plans (all meal plans are user-specific)
     const mealPlanResult = await MealPlan.deleteMany({});
     console.log(`Deleted ${mealPlanResult.deletedCount} meal plans`);
 
@@ -52,9 +75,11 @@ async function cleanupDatabase() {
   } catch (error) {
     console.error('Error during database cleanup:', error);
   } finally {
+    // Always disconnect from MongoDB when done
     await mongoose.disconnect();
     console.log('Disconnected from MongoDB');
   }
 }
 
+// Run the cleanup function
 cleanupDatabase(); 
