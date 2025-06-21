@@ -8,19 +8,23 @@ const router = express.Router();
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { search = '' } = req.query;
-    const filter = { createdBy: req.userId };
+    console.log('Fetching recipes for user:', req.userId);
+    const { search } = req.query;
+    
+    let query = { createdBy: req.userId };
+    
     if (search) {
-      filter.name = { $regex: search, $options: 'i' };
+      query.name = { $regex: search, $options: 'i' };
     }
-    const recipes = await Recipe.find(filter)
-      .populate('ingredients.ingredient')
-      .sort({ name: 1 });
-
+    
+    const recipes = await Recipe.find(query)
+      .populate('ingredients.ingredient', 'name category')
+      .sort({ createdAt: -1 });
+    
     res.json(recipes);
-  } catch (error) {
-    console.error('Error getting recipes:', error);
-    res.status(500).json({ error: 'Failed to get recipes' });
+  } catch (err) {
+    console.error('Error fetching recipes:', err);
+    res.status(500).json({ error: 'Failed to fetch recipes' });
   }
 });
 
@@ -104,9 +108,7 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
         userIng = new Ingredient({
           name: origIng.name,
           category: origIng.category,
-          defaultUnit: origIng.defaultUnit,
           description: origIng.description,
-          notes: origIng.notes,
           user: req.userId
         });
         await userIng.save();

@@ -80,9 +80,7 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
     const duplicate = new Ingredient({
       name: original.name,
       category: original.category,
-      defaultUnit: original.defaultUnit,
       description: original.description,
-      notes: original.notes,
       user: req.userId
     });
     await duplicate.save();

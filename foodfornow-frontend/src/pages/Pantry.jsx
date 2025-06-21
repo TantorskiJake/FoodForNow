@@ -47,7 +47,6 @@ const Pantry = () => {
     quantity: '',
     unit: '',
     expiryDate: '',
-    notes: '',
   });
   const [ingredients, setIngredients] = useState([]);
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
@@ -116,7 +115,6 @@ const Pantry = () => {
         quantity: item.quantity,
         unit: item.unit,
         expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
-        notes: item.notes || '',
       });
     } else {
       setEditingItem(null);
@@ -125,7 +123,6 @@ const Pantry = () => {
         quantity: '',
         unit: '',
         expiryDate: '',
-        notes: '',
       });
     }
     setOpenDialog(true);
@@ -139,7 +136,6 @@ const Pantry = () => {
       quantity: '',
       unit: '',
       expiryDate: '',
-      notes: '',
     });
   };
 
@@ -161,9 +157,6 @@ const Pantry = () => {
 
       if (formData.expiryDate) {
         submitData.expiryDate = formData.expiryDate;
-      }
-      if (formData.notes) {
-        submitData.notes = formData.notes;
       }
 
       console.log('Submitting pantry item:', submitData);
@@ -188,8 +181,7 @@ const Pantry = () => {
           ingredient: '',
           quantity: '',
           unit: '',
-          expiryDate: '',
-          notes: ''
+          expiryDate: ''
         });
       } else {
         throw new Error('No response data received');
@@ -314,11 +306,6 @@ const Pantry = () => {
                   {item.quantity} {item.unit}
                 </Typography>
               </Box>
-              {item.notes && (
-                <Typography variant="body2" color="text.secondary">
-                  {item.notes}
-                </Typography>
-              )}
               {item.expiryDate && (
                 <Typography variant="body2" color="text.secondary">
                   Expires: {new Date(item.expiryDate).toLocaleDateString()}
@@ -473,11 +460,6 @@ const Pantry = () => {
                       {item.quantity} {item.unit}
                     </Typography>
                   </Box>
-                  {item.notes && (
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                      {item.notes}
-                    </Typography>
-                  )}
                   {item.expiryDate && (
                     <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
                       Expires: {new Date(item.expiryDate).toLocaleDateString()}
@@ -559,15 +541,6 @@ const Pantry = () => {
               fullWidth
               sx={{ mb: 2 }}
               InputLabelProps={{ shrink: true }}
-            />
-
-            <TextField
-              label="Notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              fullWidth
-              multiline
-              rows={2}
             />
           </Box>
         </DialogContent>

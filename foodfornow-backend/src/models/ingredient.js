@@ -11,16 +11,7 @@ const ingredientSchema = new mongoose.Schema({
     required: true,
     enum: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other']
   },
-  defaultUnit: {
-    type: String,
-    required: true,
-    enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']
-  },
   description: {
-    type: String,
-    trim: true
-  },
-  notes: {
     type: String,
     trim: true
   },

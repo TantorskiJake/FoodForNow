@@ -39,8 +39,7 @@ router.get('/', authMiddleware, async (req, res) => {
       } : null,
       quantity: item.quantity,
       unit: item.unit,
-      expiryDate: item.expiryDate,
-      notes: item.notes
+      expiryDate: item.expiryDate
     }));
 
     console.log('Returning items:', items);
@@ -54,7 +53,7 @@ router.get('/', authMiddleware, async (req, res) => {
 // Update item
 router.patch('/items/:itemId', authMiddleware, async (req, res) => {
   try {
-    const { ingredient, quantity, unit, expiryDate, notes } = req.body;
+    const { ingredient, quantity, unit, expiryDate } = req.body;
     console.log('Updating pantry item:', { itemId: req.params.itemId, body: req.body });
     
     const pantry = await Pantry.findOne({ user: req.userId });
@@ -74,7 +73,6 @@ router.patch('/items/:itemId', authMiddleware, async (req, res) => {
     if (quantity !== undefined) item.quantity = Number(quantity);
     if (unit) item.unit = unit;
     if (expiryDate) item.expiryDate = new Date(expiryDate);
-    if (notes !== undefined) item.notes = notes;
     
     console.log('Updated item:', item);
     await pantry.save();
@@ -91,9 +89,9 @@ router.patch('/items/:itemId', authMiddleware, async (req, res) => {
 // Add or update a pantry item
 router.post("/", authMiddleware, async (req, res) => {
   try {
-    const { ingredient, quantity, unit, expiryDate, notes } = req.body;
+    const { ingredient, quantity, unit, expiryDate } = req.body;
 
-    console.log("Pantry Item Add Request:", { ingredient, quantity, unit, expiryDate, notes });
+    console.log("Pantry Item Add Request:", { ingredient, quantity, unit, expiryDate });
 
     // Validate required fields
     if (!ingredient || !quantity || !unit) {
@@ -124,8 +122,7 @@ router.post("/", authMiddleware, async (req, res) => {
           ingredient: new mongoose.Types.ObjectId(ingredient),
           quantity: Number(quantity),
           unit: unit,
-          expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-          notes: notes
+          expiryDate: expiryDate ? new Date(expiryDate) : undefined
         }]
       });
 
@@ -154,17 +151,13 @@ router.post("/", authMiddleware, async (req, res) => {
       if (expiryDate) {
         pantry.items[existingItemIndex].expiryDate = new Date(expiryDate);
       }
-      if (notes) {
-        pantry.items[existingItemIndex].notes = notes;
-      }
     } else {
       // Add new item
       pantry.items.push({
         ingredient: new mongoose.Types.ObjectId(ingredient),
         quantity: Number(quantity),
         unit: unit,
-        expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-        notes: notes
+        expiryDate: expiryDate ? new Date(expiryDate) : undefined
       });
     }
 

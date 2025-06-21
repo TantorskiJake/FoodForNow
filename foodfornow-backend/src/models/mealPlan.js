@@ -32,27 +32,7 @@ const mealPlanSchema = new mongoose.Schema(
     cooked: {
       type: Boolean,
       default: false
-    },
-    groceryList: [
-      {
-        name: {
-          type: String,
-          required: true
-        },
-        amount: {
-          type: Number,
-          required: true
-        },
-        unit: {
-          type: String,
-          required: true
-        },
-        purchased: {
-          type: Boolean,
-          default: false
-        }
-      }
-    ]
+    }
   },
   { timestamps: true }
 );

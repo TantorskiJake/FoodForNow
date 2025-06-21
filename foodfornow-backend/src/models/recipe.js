@@ -44,10 +44,6 @@ const recipeSchema = new mongoose.Schema({
   tags: [{
     type: String
   }],
-  popularity: {
-    type: Number,
-    default: 0
-  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

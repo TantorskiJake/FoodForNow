@@ -6,19 +6,16 @@ const basicIngredients = [
   {
     name: 'Milk',
     category: 'Dairy',
-    defaultUnit: 'cup',
     description: 'Fresh dairy milk'
   },
   {
     name: 'Lobster',
     category: 'Seafood',
-    defaultUnit: 'piece',
     description: 'Fresh lobster'
   },
   {
     name: 'Butter',
     category: 'Dairy',
-    defaultUnit: 'tbsp',
     description: 'Unsalted butter'
   }
 ];

@@ -16,12 +16,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
-  },
-  cookbook: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Recipe'
-  }],
-  shoppingList: [{ type: mongoose.Schema.Types.ObjectId, ref: "Pantry" }], // Items the user needs
+  }
 }, {
   timestamps: true
 });

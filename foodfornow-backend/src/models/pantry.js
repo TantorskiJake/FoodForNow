@@ -18,9 +18,6 @@ const pantryItemSchema = new mongoose.Schema({
   },
   expiryDate: {
     type: Date
-  },
-  notes: {
-    type: String
   }
 });
 
