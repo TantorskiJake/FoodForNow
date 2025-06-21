@@ -226,11 +226,15 @@ const Pantry = () => {
 
   const handleAddToShoppingList = async (item) => {
     try {
-      await api.post('/shopping-list', { ingredient: item.ingredient._id, quantity: item.quantity });
-      fetchPantryItems();
+      await api.post('/shopping-list', {
+        ingredient: item.ingredient._id,
+        quantity: item.quantity,
+        unit: item.unit
+      });
+      toast.success(`Added ${item.quantity} ${item.unit} ${item.ingredient.name} to shopping list`);
     } catch (err) {
       console.error('Error adding to shopping list:', err);
-      setError('Failed to add to shopping list. Please try again.');
+      toast.error('Failed to add to shopping list');
     }
   };
 
@@ -422,74 +426,164 @@ const Pantry = () => {
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {filteredItems.map((item) => (
-            <Grid item xs={12} sm={6} md={4} key={item._id}>
-              <Paper
-                elevation={1}
-                sx={{
-                  p: 2,
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                  '&:hover': {
-                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                  },
-                }}
-              >
-                <Box sx={{ flex: 1 }}>
+          {(() => {
+            // Group items by ingredient name
+            const groupedItems = filteredItems.reduce((groups, item) => {
+              const ingredientName = item.ingredient?.name || 'Unknown Ingredient';
+              if (!groups[ingredientName]) {
+                groups[ingredientName] = [];
+              }
+              groups[ingredientName].push(item);
+              return groups;
+            }, {});
+
+            return Object.entries(groupedItems).map(([ingredientName, items]) => (
+              <Grid item xs={12} sm={6} md={4} key={ingredientName}>
+                <Paper
+                  elevation={1}
+                  sx={{
+                    p: 2,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    '&:hover': {
+                      backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                    },
+                  }}
+                >
+                  {/* Ingredient Name Header */}
                   <Typography
-                    variant="subtitle1"
+                    variant="h6"
                     sx={{
-                      fontWeight: 'medium',
-                      mb: 1
+                      fontWeight: 600,
+                      mb: 1,
+                      color: 'text.primary',
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1
                     }}
                   >
-                    {item.ingredient?.name || 'Unknown Ingredient'}
-                  </Typography>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    {item.ingredient?.category && (
+                    {ingredientName}
+                    {items.length > 1 && (
                       <Chip
-                        label={item.ingredient.category}
+                        label={`${items.length} units`}
                         size="small"
-                        sx={{
-                          backgroundColor: getCategoryColor(item.ingredient.category).main,
-                          color: 'white',
-                          '&:hover': {
-                            backgroundColor: getCategoryColor(item.ingredient.category).dark,
-                          },
-                        }}
+                        color="primary"
+                        variant="outlined"
+                        sx={{ fontSize: '0.7rem', height: 20 }}
                       />
                     )}
-                    <Typography variant="body2" color="textSecondary">
-                      {item.quantity} {item.unit}
-                    </Typography>
+                  </Typography>
+
+                  {/* Individual Items */}
+                  <Box sx={{ flex: 1 }}>
+                    {items.map((item, index) => (
+                      <Box
+                        key={item._id}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          mb: index < items.length - 1 ? 1 : 0,
+                          p: 1,
+                          borderRadius: 1,
+                          backgroundColor: theme.palette.mode === 'dark' 
+                            ? 'rgba(255, 255, 255, 0.03)' 
+                            : 'rgba(0, 0, 0, 0.02)',
+                        }}
+                      >
+                        <Box sx={{ flex: 1 }}>
+                          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                            {item.ingredient?.category && (
+                              <Chip
+                                label={item.ingredient.category}
+                                size="small"
+                                sx={{
+                                  backgroundColor: getCategoryColor(item.ingredient.category).main,
+                                  color: 'white',
+                                  fontSize: '0.7rem',
+                                  height: 20,
+                                  '&:hover': {
+                                    backgroundColor: getCategoryColor(item.ingredient.category).dark,
+                                  },
+                                }}
+                              />
+                            )}
+                            <Typography 
+                              variant="body2" 
+                              color="textSecondary"
+                              sx={{ fontWeight: 500 }}
+                            >
+                              {item.quantity} {item.unit}
+                            </Typography>
+                          </Box>
+                          {item.expiryDate && (
+                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                              Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog(item)}
+                            sx={{ 
+                              color: 'primary.main',
+                              '&:hover': {
+                                backgroundColor: theme.palette.mode === 'dark'
+                                  ? 'rgba(25, 118, 210, 0.1)'
+                                  : 'rgba(25, 118, 210, 0.05)',
+                              },
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteItem(item._id)}
+                            sx={{ 
+                              color: 'error.main',
+                              '&:hover': {
+                                backgroundColor: theme.palette.mode === 'dark'
+                                  ? 'rgba(244, 67, 54, 0.1)'
+                                  : 'rgba(244, 67, 54, 0.05)',
+                              },
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    ))}
                   </Box>
-                  {item.expiryDate && (
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-                      Expires: {new Date(item.expiryDate).toLocaleDateString()}
-                    </Typography>
-                  )}
-                </Box>
-                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleOpenDialog(item)}
-                    sx={{ color: 'primary.main' }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleDeleteItem(item._id)}
-                    sx={{ color: 'error.main' }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              </Paper>
-            </Grid>
-          ))}
+
+                  {/* Group Summary */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    mt: 1, 
+                    pt: 1,
+                    borderTop: '1px solid',
+                    borderColor: 'divider'
+                  }}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {items.length} item{items.length !== 1 ? 's' : ''}
+                      </Typography>
+                      {items.length > 1 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          Total: {items.reduce((sum, item) => sum + item.quantity, 0)} units
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Paper>
+              </Grid>
+            ));
+          })()}
         </Grid>
       )}
 
