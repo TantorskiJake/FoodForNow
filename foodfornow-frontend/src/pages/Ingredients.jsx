@@ -58,6 +58,7 @@ const Ingredients = () => {
   const [editingIngredient, setEditingIngredient] = useState(null);
   const [tab, setTab] = useState('mine');
   const [sortBy, setSortBy] = useState('name');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -75,11 +76,13 @@ const Ingredients = () => {
   }, [tab, authenticated]);
 
   useEffect(() => {
-    const filtered = ingredients.filter((ingredient) =>
-      ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = ingredients.filter((ingredient) => {
+      const matchesSearch = ingredient.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = !categoryFilter || ingredient.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
     setFilteredIngredients(filtered);
-  }, [searchTerm, ingredients]);
+  }, [searchTerm, ingredients, categoryFilter]);
 
   const fetchIngredients = async () => {
     try {
@@ -219,79 +222,82 @@ const Ingredients = () => {
   });
 
   return (
-    <Container 
-      maxWidth={false}
-      sx={{ 
-        py: 4,
-        px: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8 },
-        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
-      }}
-    >
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-            <Typography variant="h4" component="h1">
-              Ingredients
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-              size="small"
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Ingredients
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Search ingredients..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            sx={{ minWidth: 200 }}
+          />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Sort by</InputLabel>
+            <Select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              label="Sort by"
+              startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
             >
-              Add Ingredient
-            </Button>
-          </Box>
-        </Grid>
-
-        <Grid item xs={12}>
-          <Tabs
-            value={tab}
-            onChange={(e, newVal) => {
-              setTab(newVal);
-              setSearchTerm('');
-            }}
-            sx={{ 
-              mb: 2,
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '1rem',
-              },
-            }}
+              <MenuItem value="name">Name (A-Z)</MenuItem>
+              <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+              <MenuItem value="category">Category (A-Z)</MenuItem>
+              <MenuItem value="category-desc">Category (Z-A)</MenuItem>
+              <MenuItem value="description">Description (A-Z)</MenuItem>
+              <MenuItem value="description-desc">Description (Z-A)</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              label="Category"
+            >
+              <MenuItem value="">All Categories</MenuItem>
+              {categories.map((category) => (
+                <MenuItem key={category} value={category}>
+                  {category}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenDialog(true)}
+            size="small"
           >
-            <Tab label="My Ingredients" value="mine" />
-            <Tab label="Shared Ingredients" value="shared" />
-          </Tabs>
+            Add Ingredient
+          </Button>
+        </Box>
+      </Box>
 
-          <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
-            <TextField
-              label="Search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              size="small"
-            />
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Sort by</InputLabel>
-              <Select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                label="Sort by"
-                startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
-              >
-                <MenuItem value="name">Name (A-Z)</MenuItem>
-                <MenuItem value="name-desc">Name (Z-A)</MenuItem>
-                <MenuItem value="category">Category (A-Z)</MenuItem>
-                <MenuItem value="category-desc">Category (Z-A)</MenuItem>
-                <MenuItem value="description">Description (A-Z)</MenuItem>
-                <MenuItem value="description-desc">Description (Z-A)</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-        </Grid>
+      <Tabs
+        value={tab}
+        onChange={(e, newVal) => {
+          setTab(newVal);
+          setSearchTerm('');
+        }}
+        sx={{ 
+          mb: 2,
+          '& .MuiTab-root': {
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '1rem',
+          },
+        }}
+      >
+        <Tab label="My Ingredients" value="mine" />
+        <Tab label="Shared Ingredients" value="shared" />
+      </Tabs>
 
-        <Grid container spacing={2}>
+      <Grid container spacing={2}>
           {sortedFilteredIngredients.map((ingredient) => (
             <Grid item xs={12} sm={6} md={4} lg={3} xl={2} key={ingredient._id}>
               <Paper
@@ -498,9 +504,8 @@ const Ingredients = () => {
             </DialogActions>
           </form>
         </Dialog>
-      </Grid>
-    </Container>
-  );
+      </Container>
+    );
 };
 
 export default Ingredients;

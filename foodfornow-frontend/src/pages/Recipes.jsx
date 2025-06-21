@@ -183,6 +183,7 @@ const Recipes = () => {
   const [sharedRecipes, setSharedRecipes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const { authenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -248,6 +249,60 @@ const Recipes = () => {
         return 0;
     }
   });
+
+  // Get unique categories for filtering
+  const categories = [...new Set(recipes.map(recipe => recipe.category).filter(Boolean))];
+
+  // Filter and sort recipes based on search term, category filter, and sort setting
+  const filteredRecipes = recipes
+    .filter(recipe => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = recipe.name.toLowerCase().includes(searchLower) ||
+                           recipe.description?.toLowerCase().includes(searchLower) ||
+                           recipe.category?.toLowerCase().includes(searchLower);
+      
+      const matchesCategory = !categoryFilter || recipe.category === categoryFilter;
+      
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        case 'cookTime':
+          return (a.cookTime || 0) - (b.cookTime || 0);
+        case 'difficulty':
+          const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+          return (difficultyOrder[a.difficulty] || 0) - (difficultyOrder[b.difficulty] || 0);
+        default:
+          return 0;
+      }
+    });
+
+  const filteredSharedRecipes = sharedRecipes
+    .filter(recipe => {
+      const searchLower = searchTerm.toLowerCase();
+      return recipe.name.toLowerCase().includes(searchLower) ||
+             recipe.description?.toLowerCase().includes(searchLower) ||
+             recipe.category?.toLowerCase().includes(searchLower);
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        case 'cookTime':
+          return (a.cookTime || 0) - (b.cookTime || 0);
+        case 'difficulty':
+          const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+          return (difficultyOrder[a.difficulty] || 0) - (difficultyOrder[b.difficulty] || 0);
+        default:
+          return 0;
+      }
+    });
 
   // Fetch functions for recipes and ingredients
   const fetchRecipes = async () => {
@@ -452,449 +507,447 @@ const Recipes = () => {
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-            <Typography variant="h4" component="h1">
-              Recipes
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Recipes
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Search recipes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            sx={{ minWidth: 200 }}
+          />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Sort by</InputLabel>
+            <Select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              label="Sort by"
+              startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
+            >
+              <MenuItem value="name">Name (A-Z)</MenuItem>
+              <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+              <MenuItem value="cookTime">Cook Time (Fast-Slow)</MenuItem>
+              <MenuItem value="difficulty">Difficulty (Easy-Hard)</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              label="Category"
+            >
+              <MenuItem value="">All Categories</MenuItem>
+              {categories.map((category) => (
+                <MenuItem key={category} value={category}>
+                  {category}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenDialog(true)}
+            size="small"
+          >
+            Add Recipe
+          </Button>
+        </Box>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Tabs
+        value={tab}
+        onChange={(e, newVal) => {
+          setTab(newVal);
+          setSearchTerm('');
+        }}
+        sx={{ 
+          mb: 2,
+          '& .MuiTab-root': {
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '1rem',
+          },
+        }}
+      >
+        <Tab label="My Recipes" value="mine" />
+        <Tab label="Shared Recipes" value="shared" />
+      </Tabs>
+
+      {tab === 'mine' ? (
+        filteredRecipes.length > 0 ? (
+          <Container maxWidth="xl">
+            <Grid container spacing={3}>
+              {filteredRecipes.map((recipe) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      borderRadius: 2,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                      background: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid',
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: theme.palette.mode === 'dark'
+                          ? '0 8px 24px rgba(0, 0, 0, 0.3)'
+                          : '0 8px 24px rgba(0, 0, 0, 0.1)',
+                      },
+                    }}
+                    onClick={() => navigate(`/recipes/${recipe._id}`)}
+                  >
+                    <Box sx={{ p: 2, flex: 1 }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight: 600,
+                          mb: 1,
+                          color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+                          fontSize: '1.1rem',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {recipe.name}
+                      </Typography>
+
+                      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                        <Chip
+                          size="small"
+                          icon={<AccessTimeIcon sx={{ fontSize: '1rem' }} />}
+                          label={`${recipe.cookTime} mins`}
+                          sx={{
+                            height: 24,
+                            fontSize: '0.75rem',
+                            background: theme.palette.mode === 'dark'
+                              ? 'rgba(34, 139, 34, 0.2)'
+                              : 'rgba(34, 139, 34, 0.1)',
+                            color: '#228B22',
+                            '& .MuiChip-icon': {
+                              color: '#228B22',
+                            },
+                          }}
+                        />
+                        <Chip
+                          size="small"
+                          icon={<TimerIcon sx={{ fontSize: '1rem' }} />}
+                          label={`${recipe.prepTime} mins`}
+                          sx={{
+                            height: 24,
+                            fontSize: '0.75rem',
+                            background: theme.palette.mode === 'dark'
+                              ? 'rgba(34, 139, 34, 0.2)'
+                              : 'rgba(34, 139, 34, 0.1)',
+                            color: '#228B22',
+                            '& .MuiChip-icon': {
+                              color: '#228B22',
+                            },
+                          }}
+                        />
+                        {recipe.tags && recipe.tags.map((tag, index) => (
+                          <Chip
+                            key={index}
+                            size="small"
+                            label={tag}
+                            sx={{
+                              height: 24,
+                              fontSize: '0.75rem',
+                              background: theme.palette.mode === 'dark'
+                                ? 'rgba(34, 139, 34, 0.2)'
+                                : 'rgba(34, 139, 34, 0.1)',
+                              color: '#228B22',
+                            }}
+                          />
+                        ))}
+                      </Box>
+
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                          mb: 2,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {recipe.description}
+                      </Typography>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                          }}
+                        >
+                          {recipe.ingredients.length} ingredients
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDialog(recipe);
+                            }}
+                            sx={{ 
+                              color: 'primary.main',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'rgba(34, 139, 34, 0.1)'
+                                  : 'rgba(34, 139, 34, 0.05)',
+                              },
+                            }}
+                          >
+                            <EditIcon sx={{ fontSize: '1.1rem' }} />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRecipe(recipe._id);
+                            }}
+                            sx={{ 
+                              color: 'error.main',
+                              '&:hover': {
+                                background: theme.palette.mode === 'dark'
+                                  ? 'rgba(211, 47, 47, 0.1)'
+                                  : 'rgba(211, 47, 47, 0.05)',
+                              },
+                            }}
+                          >
+                            <DeleteIcon sx={{ fontSize: '1.1rem' }} />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Container>
+        ) : (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 8,
+            }}
+          >
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No recipes found
             </Typography>
             <Button
               variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-              disabled={loading}
-              size="small"
+              onClick={handleOpenDialog}
+              sx={{
+                textTransform: 'none',
+                background: theme.palette.mode === 'dark'
+                  ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                  : '#228B22',
+                '&:hover': {
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                    : '#1B6B1B',
+                },
+              }}
             >
               Add Recipe
             </Button>
           </Box>
-        </Grid>
+        )
+      ) : (
+        filteredSharedRecipes.length > 0 ? (
+          <Container maxWidth="xl">
+            <Grid container spacing={3}>
+              {filteredSharedRecipes.map((recipe) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      borderRadius: 2,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                      background: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid',
+                      borderColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: theme.palette.mode === 'dark'
+                          ? '0 8px 24px rgba(0, 0, 0, 0.3)'
+                          : '0 8px 24px rgba(0, 0, 0, 0.1)',
+                      },
+                    }}
+                    onClick={() => navigate(`/recipes/${recipe._id}`)}
+                  >
+                    <Box sx={{ p: 2, flex: 1 }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight: 600,
+                          mb: 1,
+                          color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+                          fontSize: '1.1rem',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {recipe.name}
+                      </Typography>
 
-        {error && (
-          <Grid item xs={12}>
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          </Grid>
-        )}
+                      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                        <Chip
+                          size="small"
+                          icon={<AccessTimeIcon sx={{ fontSize: '1rem' }} />}
+                          label={`${recipe.cookTime} mins`}
+                          sx={{
+                            height: 24,
+                            fontSize: '0.75rem',
+                            background: theme.palette.mode === 'dark'
+                              ? 'rgba(34, 139, 34, 0.2)'
+                              : 'rgba(34, 139, 34, 0.1)',
+                            color: '#228B22',
+                            '& .MuiChip-icon': {
+                              color: '#228B22',
+                            },
+                          }}
+                        />
+                        <Chip
+                          size="small"
+                          icon={<TimerIcon sx={{ fontSize: '1rem' }} />}
+                          label={`${recipe.prepTime} mins`}
+                          sx={{
+                            height: 24,
+                            fontSize: '0.75rem',
+                            background: theme.palette.mode === 'dark'
+                              ? 'rgba(34, 139, 34, 0.2)'
+                              : 'rgba(34, 139, 34, 0.1)',
+                            color: '#228B22',
+                            '& .MuiChip-icon': {
+                              color: '#228B22',
+                            },
+                          }}
+                        />
+                        {recipe.tags && recipe.tags.map((tag, index) => (
+                          <Chip
+                            key={index}
+                            size="small"
+                            label={tag}
+                            sx={{
+                              height: 24,
+                              fontSize: '0.75rem',
+                              background: theme.palette.mode === 'dark'
+                                ? 'rgba(34, 139, 34, 0.2)'
+                                : 'rgba(34, 139, 34, 0.1)',
+                              color: '#228B22',
+                            }}
+                          />
+                        ))}
+                      </Box>
 
-        <Grid item xs={12}>
-          <Tabs
-            value={tab}
-            onChange={(e, newVal) => {
-              setTab(newVal);
-              setSearchTerm('');
-            }}
-            sx={{ 
-              mb: 2,
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '1rem',
-              },
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                          mb: 2,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {recipe.description}
+                      </Typography>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                          }}
+                        >
+                          {recipe.ingredients.length} ingredients
+                        </Typography>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateRecipe(recipe._id);
+                          }}
+                          sx={{
+                            textTransform: 'none',
+                            background: theme.palette.mode === 'dark'
+                              ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                              : '#228B22',
+                            '&:hover': {
+                              background: theme.palette.mode === 'dark'
+                                ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                                : '#1B6B1B',
+                            },
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Container>
+        ) : (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 8,
             }}
           >
-            <Tab label="My Recipes" value="mine" />
-            <Tab label="Shared Recipes" value="shared" />
-          </Tabs>
-
-          <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
-            <TextField
-              label="Search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              size="small"
-            />
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Sort by</InputLabel>
-              <Select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                label="Sort by"
-                startAdornment={<SortIcon sx={{ mr: 1, fontSize: 20 }} />}
-              >
-                <MenuItem value="name">Name (A-Z)</MenuItem>
-                <MenuItem value="name-desc">Name (Z-A)</MenuItem>
-                <MenuItem value="cookTime">Cook Time (Low-High)</MenuItem>
-                <MenuItem value="cookTime-desc">Cook Time (High-Low)</MenuItem>
-                <MenuItem value="prepTime">Prep Time (Low-High)</MenuItem>
-                <MenuItem value="prepTime-desc">Prep Time (High-Low)</MenuItem>
-                <MenuItem value="totalTime">Total Time (Low-High)</MenuItem>
-                <MenuItem value="totalTime-desc">Total Time (High-Low)</MenuItem>
-                <MenuItem value="servings">Servings (Low-High)</MenuItem>
-                <MenuItem value="servings-desc">Servings (High-Low)</MenuItem>
-                <MenuItem value="ingredients">Ingredients (Low-High)</MenuItem>
-                <MenuItem value="ingredients-desc">Ingredients (High-Low)</MenuItem>
-              </Select>
-            </FormControl>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No shared recipes found
+            </Typography>
           </Box>
-        </Grid>
-
-        {tab === 'mine' ? (
-          sortedRecipes.length > 0 ? (
-            <Container maxWidth="xl">
-              <Grid container spacing={3}>
-                {sortedRecipes.map((recipe) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                        background: theme.palette.mode === 'dark' 
-                          ? 'rgba(255, 255, 255, 0.05)'
-                          : 'rgba(255, 255, 255, 0.8)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid',
-                        borderColor: theme.palette.mode === 'dark'
-                          ? 'rgba(255, 255, 255, 0.1)'
-                          : 'rgba(0, 0, 0, 0.1)',
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: theme.palette.mode === 'dark'
-                            ? '0 8px 24px rgba(0, 0, 0, 0.3)'
-                            : '0 8px 24px rgba(0, 0, 0, 0.1)',
-                        },
-                      }}
-                      onClick={() => navigate(`/recipes/${recipe._id}`)}
-                    >
-                      <Box sx={{ p: 2, flex: 1 }}>
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: 600,
-                            mb: 1,
-                            color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
-                            fontSize: '1.1rem',
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {recipe.name}
-                        </Typography>
-
-                        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                          <Chip
-                            size="small"
-                            icon={<AccessTimeIcon sx={{ fontSize: '1rem' }} />}
-                            label={`${recipe.cookTime} mins`}
-                            sx={{
-                              height: 24,
-                              fontSize: '0.75rem',
-                              background: theme.palette.mode === 'dark'
-                                ? 'rgba(34, 139, 34, 0.2)'
-                                : 'rgba(34, 139, 34, 0.1)',
-                              color: '#228B22',
-                              '& .MuiChip-icon': {
-                                color: '#228B22',
-                              },
-                            }}
-                          />
-                          <Chip
-                            size="small"
-                            icon={<TimerIcon sx={{ fontSize: '1rem' }} />}
-                            label={`${recipe.prepTime} mins`}
-                            sx={{
-                              height: 24,
-                              fontSize: '0.75rem',
-                              background: theme.palette.mode === 'dark'
-                                ? 'rgba(34, 139, 34, 0.2)'
-                                : 'rgba(34, 139, 34, 0.1)',
-                              color: '#228B22',
-                              '& .MuiChip-icon': {
-                                color: '#228B22',
-                              },
-                            }}
-                          />
-                          {recipe.tags && recipe.tags.map((tag, index) => (
-                            <Chip
-                              key={index}
-                              size="small"
-                              label={tag}
-                              sx={{
-                                height: 24,
-                                fontSize: '0.75rem',
-                                background: theme.palette.mode === 'dark'
-                                  ? 'rgba(34, 139, 34, 0.2)'
-                                  : 'rgba(34, 139, 34, 0.1)',
-                                color: '#228B22',
-                              }}
-                            />
-                          ))}
-                        </Box>
-
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
-                            mb: 2,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {recipe.description}
-                        </Typography>
-
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-                            }}
-                          >
-                            {recipe.ingredients.length} ingredients
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.5 }}>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenDialog(recipe);
-                              }}
-                              sx={{ 
-                                color: 'primary.main',
-                                '&:hover': {
-                                  background: theme.palette.mode === 'dark'
-                                    ? 'rgba(34, 139, 34, 0.1)'
-                                    : 'rgba(34, 139, 34, 0.05)',
-                                },
-                              }}
-                            >
-                              <EditIcon sx={{ fontSize: '1.1rem' }} />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteRecipe(recipe._id);
-                              }}
-                              sx={{ 
-                                color: 'error.main',
-                                '&:hover': {
-                                  background: theme.palette.mode === 'dark'
-                                    ? 'rgba(211, 47, 47, 0.1)'
-                                    : 'rgba(211, 47, 47, 0.05)',
-                                },
-                              }}
-                            >
-                              <DeleteIcon sx={{ fontSize: '1.1rem' }} />
-                            </IconButton>
-                          </Box>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            </Container>
-          ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                py: 8,
-              }}
-            >
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No recipes found
-              </Typography>
-              <Button
-                variant="contained"
-                onClick={handleOpenDialog}
-                sx={{
-                  textTransform: 'none',
-                  background: theme.palette.mode === 'dark'
-                    ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                    : '#228B22',
-                  '&:hover': {
-                    background: theme.palette.mode === 'dark'
-                      ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
-                      : '#1B6B1B',
-                  },
-                }}
-              >
-                Add Recipe
-              </Button>
-            </Box>
-          )
-        ) : (
-          sortedSharedRecipes.length > 0 ? (
-            <Container maxWidth="xl">
-              <Grid container spacing={3}>
-                {sortedSharedRecipes.map((recipe) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                        background: theme.palette.mode === 'dark' 
-                          ? 'rgba(255, 255, 255, 0.05)'
-                          : 'rgba(255, 255, 255, 0.8)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid',
-                        borderColor: theme.palette.mode === 'dark'
-                          ? 'rgba(255, 255, 255, 0.1)'
-                          : 'rgba(0, 0, 0, 0.1)',
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: theme.palette.mode === 'dark'
-                            ? '0 8px 24px rgba(0, 0, 0, 0.3)'
-                            : '0 8px 24px rgba(0, 0, 0, 0.1)',
-                        },
-                      }}
-                      onClick={() => navigate(`/recipes/${recipe._id}`)}
-                    >
-                      <Box sx={{ p: 2, flex: 1 }}>
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: 600,
-                            mb: 1,
-                            color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
-                            fontSize: '1.1rem',
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {recipe.name}
-                        </Typography>
-
-                        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                          <Chip
-                            size="small"
-                            icon={<AccessTimeIcon sx={{ fontSize: '1rem' }} />}
-                            label={`${recipe.cookTime} mins`}
-                            sx={{
-                              height: 24,
-                              fontSize: '0.75rem',
-                              background: theme.palette.mode === 'dark'
-                                ? 'rgba(34, 139, 34, 0.2)'
-                                : 'rgba(34, 139, 34, 0.1)',
-                              color: '#228B22',
-                              '& .MuiChip-icon': {
-                                color: '#228B22',
-                              },
-                            }}
-                          />
-                          <Chip
-                            size="small"
-                            icon={<TimerIcon sx={{ fontSize: '1rem' }} />}
-                            label={`${recipe.prepTime} mins`}
-                            sx={{
-                              height: 24,
-                              fontSize: '0.75rem',
-                              background: theme.palette.mode === 'dark'
-                                ? 'rgba(34, 139, 34, 0.2)'
-                                : 'rgba(34, 139, 34, 0.1)',
-                              color: '#228B22',
-                              '& .MuiChip-icon': {
-                                color: '#228B22',
-                              },
-                            }}
-                          />
-                          {recipe.tags && recipe.tags.map((tag, index) => (
-                            <Chip
-                              key={index}
-                              size="small"
-                              label={tag}
-                              sx={{
-                                height: 24,
-                                fontSize: '0.75rem',
-                                background: theme.palette.mode === 'dark'
-                                  ? 'rgba(34, 139, 34, 0.2)'
-                                  : 'rgba(34, 139, 34, 0.1)',
-                                color: '#228B22',
-                              }}
-                            />
-                          ))}
-                        </Box>
-
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
-                            mb: 2,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {recipe.description}
-                        </Typography>
-
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-                            }}
-                          >
-                            {recipe.ingredients.length} ingredients
-                          </Typography>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDuplicateRecipe(recipe._id);
-                            }}
-                            sx={{
-                              textTransform: 'none',
-                              background: theme.palette.mode === 'dark'
-                                ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                                : '#228B22',
-                              '&:hover': {
-                                background: theme.palette.mode === 'dark'
-                                  ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
-                                  : '#1B6B1B',
-                              },
-                            }}
-                          >
-                            Add
-                          </Button>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            </Container>
-          ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                py: 8,
-              }}
-            >
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No shared recipes found
-              </Typography>
-            </Box>
-          )
-        )}
-      </Grid>
+        )
+      )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>

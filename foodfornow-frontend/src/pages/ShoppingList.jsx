@@ -57,6 +57,7 @@ const ShoppingList = () => {
   });
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
   const [sortBy, setSortBy] = useState('name');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
 
@@ -204,24 +205,28 @@ const ShoppingList = () => {
   };
 
   // Sort shopping items based on current sort setting
-  const sortedShoppingItems = [...shoppingItems].sort((a, b) => {
-    switch (sortBy) {
-      case 'name':
-        return (a.ingredient?.name || '').localeCompare(b.ingredient?.name || '');
-      case 'name-desc':
-        return (b.ingredient?.name || '').localeCompare(a.ingredient?.name || '');
-      case 'quantity':
-        return a.quantity - b.quantity;
-      case 'quantity-desc':
-        return b.quantity - a.quantity;
-      case 'completed':
-        return (a.completed === b.completed) ? 0 : a.completed ? 1 : -1;
-      case 'completed-desc':
-        return (a.completed === b.completed) ? 0 : a.completed ? -1 : 1;
-      default:
-        return 0;
-    }
-  });
+  const sortedShoppingItems = [...shoppingItems]
+    .filter((item) => 
+      item.ingredient?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.ingredient?.name || '').localeCompare(b.ingredient?.name || '');
+        case 'name-desc':
+          return (b.ingredient?.name || '').localeCompare(a.ingredient?.name || '');
+        case 'quantity':
+          return a.quantity - b.quantity;
+        case 'quantity-desc':
+          return b.quantity - a.quantity;
+        case 'completed':
+          return (a.completed === b.completed) ? 0 : a.completed ? 1 : -1;
+        case 'completed-desc':
+          return (a.completed === b.completed) ? 0 : a.completed ? -1 : 1;
+        default:
+          return 0;
+      }
+    });
 
   if (loading) {
     return (
@@ -237,7 +242,14 @@ const ShoppingList = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Shopping List
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Search items..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            sx={{ minWidth: 200 }}
+          />
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Sort by</InputLabel>
             <Select
@@ -259,7 +271,7 @@ const ShoppingList = () => {
             color="error"
             onClick={() => setOpenClearConfirmDialog(true)}
             startIcon={<DeleteIcon />}
-            sx={{ mr: 2 }}
+            size="small"
             disabled={loading || shoppingItems.length === 0}
           >
             Clear All
@@ -269,7 +281,7 @@ const ShoppingList = () => {
             color="primary"
             onClick={handleCheckAll}
             startIcon={<CheckCircleIcon />}
-            sx={{ mr: 2 }}
+            size="small"
             disabled={loading || shoppingItems.length === 0}
           >
             {shoppingItems.every(item => item.completed) ? 'Uncheck All' : 'Check All'}
@@ -279,15 +291,16 @@ const ShoppingList = () => {
             color="success"
             onClick={handleAddAllToPantry}
             startIcon={<AddShoppingCartIcon />}
-            sx={{ mr: 2 }}
+            size="small"
           >
-            Add All to Pantry
+            Add to Pantry
           </Button>
           <Button
             variant="contained"
             color="primary"
             onClick={handleUpdateFromMealPlan}
             startIcon={<AddIcon />}
+            size="small"
           >
             Auto Update
           </Button>

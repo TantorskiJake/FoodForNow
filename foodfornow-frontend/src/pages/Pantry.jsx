@@ -54,6 +54,7 @@ const Pantry = () => {
   const [loading, setLoading] = useState(true);
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
   const [sortBy, setSortBy] = useState('name');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { authenticated } = useAuth();
 
@@ -248,29 +249,34 @@ const Pantry = () => {
     }
   };
 
-  // Sort pantry items based on current sort setting
-  const sortedPantryItems = [...pantryItems].sort((a, b) => {
-    switch (sortBy) {
-      case 'name':
-        return (a.ingredient?.name || '').localeCompare(b.ingredient?.name || '');
-      case 'name-desc':
-        return (b.ingredient?.name || '').localeCompare(a.ingredient?.name || '');
-      case 'quantity':
-        return a.quantity - b.quantity;
-      case 'quantity-desc':
-        return b.quantity - a.quantity;
-      case 'category':
-        return (a.ingredient?.category || '').localeCompare(b.ingredient?.category || '');
-      case 'category-desc':
-        return (b.ingredient?.category || '').localeCompare(a.ingredient?.category || '');
-      case 'expiry':
-        return new Date(a.expiryDate || '9999-12-31') - new Date(b.expiryDate || '9999-12-31');
-      case 'expiry-desc':
-        return new Date(b.expiryDate || '9999-12-31') - new Date(a.expiryDate || '9999-12-31');
-      default:
-        return 0;
-    }
-  });
+  // Filter and sort pantry items
+  const filteredItems = pantryItems
+    .filter(item => {
+      const searchLower = searchTerm.toLowerCase();
+      return item.ingredient?.name?.toLowerCase().includes(searchLower) ||
+             item.ingredient?.category?.toLowerCase().includes(searchLower);
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.ingredient?.name || '').localeCompare(b.ingredient?.name || '');
+        case 'name-desc':
+          return (b.ingredient?.name || '').localeCompare(a.ingredient?.name || '');
+        case 'category':
+          return (a.ingredient?.category || '').localeCompare(b.ingredient?.category || '');
+        case 'quantity':
+          return parseFloat(a.quantity) - parseFloat(b.quantity);
+        case 'quantity-desc':
+          return parseFloat(b.quantity) - parseFloat(a.quantity);
+        case 'expiry':
+          if (!a.expiryDate && !b.expiryDate) return 0;
+          if (!a.expiryDate) return 1;
+          if (!b.expiryDate) return -1;
+          return new Date(a.expiryDate) - new Date(b.expiryDate);
+        default:
+          return 0;
+      }
+    });
 
   const PantryItem = ({ item, onEdit, onDelete }) => {
     const theme = useTheme();
@@ -347,19 +353,19 @@ const Pantry = () => {
   };
 
   return (
-    <Container 
-      maxWidth={false}
-      sx={{ 
-        py: 4,
-        px: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8 },
-        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
-      }}
-    >
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Pantry
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Search ingredients..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            sx={{ minWidth: 200 }}
+          />
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Sort by</InputLabel>
             <Select
@@ -370,12 +376,10 @@ const Pantry = () => {
             >
               <MenuItem value="name">Name (A-Z)</MenuItem>
               <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+              <MenuItem value="category">Category (A-Z)</MenuItem>
               <MenuItem value="quantity">Quantity (Low-High)</MenuItem>
               <MenuItem value="quantity-desc">Quantity (High-Low)</MenuItem>
-              <MenuItem value="category">Category (A-Z)</MenuItem>
-              <MenuItem value="category-desc">Category (Z-A)</MenuItem>
               <MenuItem value="expiry">Expiry (Soonest)</MenuItem>
-              <MenuItem value="expiry-desc">Expiry (Latest)</MenuItem>
             </Select>
           </FormControl>
           <Button
@@ -383,7 +387,7 @@ const Pantry = () => {
             color="error"
             onClick={() => setOpenClearConfirmDialog(true)}
             startIcon={<DeleteIcon />}
-            sx={{ mr: 2 }}
+            size="small"
             disabled={loading || pantryItems.length === 0}
           >
             Clear All
@@ -393,6 +397,7 @@ const Pantry = () => {
             color="primary"
             startIcon={<AddIcon />}
             onClick={() => handleOpenDialog()}
+            size="small"
           >
             Add Item
           </Button>
@@ -417,7 +422,7 @@ const Pantry = () => {
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {sortedPantryItems.map((item) => (
+          {filteredItems.map((item) => (
             <Grid item xs={12} sm={6} md={4} key={item._id}>
               <Paper
                 elevation={1}
