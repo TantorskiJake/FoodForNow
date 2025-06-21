@@ -563,10 +563,18 @@ const Dashboard = () => {
         <Grid item xs={12}>
           <Card>
             <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  Needed Ingredients
-                </Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    Needed Ingredients
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {ingredients.length > 0 
+                      ? `${ingredients.length} ingredient${ingredients.length !== 1 ? 's' : ''} needed for your meal plan`
+                      : 'No ingredients needed from your meal plan'
+                    }
+                  </Typography>
+                </Box>
                 <Button
                   variant="contained"
                   color="primary"
@@ -574,71 +582,229 @@ const Dashboard = () => {
                   onClick={handleAddAllToShoppingList}
                   disabled={loading || ingredients.length === 0}
                   size="small"
+                  sx={{ 
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    px: 3
+                  }}
                 >
                   Add All to Shopping List
                 </Button>
               </Box>
+              
               {ingredients.length > 0 ? (
-                <Grid container spacing={2}>
-                  {ingredients.map((ingredient) => (
-                    <Grid item xs={12} sm={6} md={4} key={ingredient._id}>
-                      <Paper
-                        elevation={1}
-                        sx={{
-                          p: 2,
-                          height: '100%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          position: 'relative',
-                          '&:hover': {
-                            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                          },
-                        }}
-                      >
-                        <Box sx={{ flex: 1 }}>
-                          <Typography
-                            variant="subtitle1"
+                <Box>
+                  {/* Summary Stats */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 2, 
+                    mb: 3, 
+                    flexWrap: 'wrap',
+                    p: 2,
+                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                    borderRadius: 2
+                  }}>
+                    <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" color="primary" sx={{ fontWeight: 700 }}>
+                        {ingredients.length}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Total Items
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" color="success.main" sx={{ fontWeight: 700 }}>
+                        {ingredients.filter(ing => (ing.pantryQuantity || 0) >= ing.quantity).length}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        In Stock
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" color="warning.main" sx={{ fontWeight: 700 }}>
+                        {ingredients.filter(ing => (ing.pantryQuantity || 0) > 0 && (ing.pantryQuantity || 0) < ing.quantity).length}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Partial
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                      <Typography variant="h6" color="error.main" sx={{ fontWeight: 700 }}>
+                        {ingredients.filter(ing => (ing.pantryQuantity || 0) === 0).length}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Missing
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Ingredients Grid */}
+                  <Grid container spacing={2}>
+                    {ingredients.map((ingredient) => {
+                      const percentage = Math.min(100, ((ingredient.pantryQuantity || 0) / ingredient.quantity) * 100);
+                      const isComplete = percentage >= 100;
+                      const isPartial = percentage > 0 && percentage < 100;
+                      const isMissing = percentage === 0;
+                      
+                      return (
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={ingredient._id}>
+                          <Paper
+                            elevation={1}
                             sx={{
-                              fontWeight: 'medium',
-                              mb: 1
+                              p: 2.5,
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              position: 'relative',
+                              borderRadius: 2,
+                              border: '1px solid',
+                              borderColor: isComplete 
+                                ? 'success.main' 
+                                : isPartial 
+                                  ? 'warning.main' 
+                                  : 'error.main',
+                              backgroundColor: theme.palette.mode === 'dark' 
+                                ? 'rgba(255, 255, 255, 0.03)' 
+                                : 'rgba(255, 255, 255, 0.8)',
+                              '&:hover': {
+                                backgroundColor: theme.palette.mode === 'dark' 
+                                  ? 'rgba(255, 255, 255, 0.08)' 
+                                  : 'rgba(0, 0, 0, 0.03)',
+                                transform: 'translateY(-2px)',
+                                transition: 'all 0.2s ease-in-out',
+                              },
                             }}
                           >
-                            {ingredient.name}
-                          </Typography>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Typography variant="body2" color="textSecondary">
-                              {ingredient.pantryQuantity > 0 ? `${ingredient.pantryQuantity}/${ingredient.quantity}` : ingredient.quantity} {ingredient.unit}
-                            </Typography>
-                            <Box sx={{ width: '100px', ml: 1 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={Math.min(100, ((ingredient.pantryQuantity || 0) / ingredient.quantity) * 100)}
+                            {/* Status Indicator */}
+                            <Box sx={{ 
+                              position: 'absolute', 
+                              top: 8, 
+                              right: 8,
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              backgroundColor: isComplete 
+                                ? 'success.main' 
+                                : isPartial 
+                                  ? 'warning.main' 
+                                  : 'error.main',
+                              border: '2px solid',
+                              borderColor: theme.palette.background.paper
+                            }} />
+                            
+                            <Box sx={{ flex: 1 }}>
+                              <Typography
+                                variant="subtitle1"
                                 sx={{
-                                  height: 8,
-                                  borderRadius: 4,
-                                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                                  '& .MuiLinearProgress-bar': {
-                                    borderRadius: 4,
-                                    backgroundColor: (theme) => {
-                                      const percentage = ((ingredient.pantryQuantity || 0) / ingredient.quantity) * 100;
-                                      if (percentage >= 100) return theme.palette.success.main;
-                                      if (percentage >= 50) return theme.palette.warning.main;
-                                      return theme.palette.error.main;
-                                    },
-                                  },
+                                  fontWeight: 600,
+                                  mb: 1.5,
+                                  color: isComplete ? 'text.disabled' : 'text.primary',
+                                  textDecoration: isComplete ? 'line-through' : 'none',
+                                  fontSize: '1.1rem'
                                 }}
-                              />
+                              >
+                                {ingredient.name}
+                              </Typography>
+                              
+                              <Box sx={{ mb: 2 }}>
+                                <Typography 
+                                  variant="h6" 
+                                  sx={{ 
+                                    fontWeight: 700,
+                                    color: isComplete 
+                                      ? 'success.main' 
+                                      : isPartial 
+                                        ? 'warning.main' 
+                                        : 'error.main',
+                                    mb: 0.5
+                                  }}
+                                >
+                                  {ingredient.quantity} {ingredient.unit}
+                                </Typography>
+                                
+                                {ingredient.pantryQuantity > 0 && (
+                                  <Typography 
+                                    variant="body2" 
+                                    color="text.secondary"
+                                    sx={{ mb: 1 }}
+                                  >
+                                    You have: {ingredient.pantryQuantity} {ingredient.unit}
+                                  </Typography>
+                                )}
+                              </Box>
+                              
+                              {/* Progress Bar */}
+                              <Box sx={{ mb: 1 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Stock Level
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {Math.round(percentage)}%
+                                  </Typography>
+                                </Box>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={percentage}
+                                  sx={{
+                                    height: 8,
+                                    borderRadius: 4,
+                                    backgroundColor: theme.palette.mode === 'dark' 
+                                      ? 'rgba(255, 255, 255, 0.1)' 
+                                      : 'rgba(0, 0, 0, 0.1)',
+                                    '& .MuiLinearProgress-bar': {
+                                      borderRadius: 4,
+                                      backgroundColor: isComplete 
+                                        ? 'success.main' 
+                                        : isPartial 
+                                          ? 'warning.main' 
+                                          : 'error.main',
+                                    },
+                                  }}
+                                />
+                              </Box>
+                              
+                              {/* Status Text */}
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  fontWeight: 600,
+                                  color: isComplete 
+                                    ? 'success.main' 
+                                    : isPartial 
+                                      ? 'warning.main' 
+                                      : 'error.main',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: 0.5
+                                }}
+                              >
+                                {isComplete ? '✓ In Stock' : isPartial ? '⚠ Partial' : '✗ Missing'}
+                              </Typography>
                             </Box>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    </Grid>
-                  ))}
-                </Grid>
+                          </Paper>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                </Box>
               ) : (
-                <Paper sx={{ p: 3, textAlign: 'center' }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No ingredients needed from your meal plan
+                <Paper sx={{ 
+                  p: 4, 
+                  textAlign: 'center',
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(255, 255, 255, 0.03)' 
+                    : 'rgba(0, 0, 0, 0.02)',
+                  borderRadius: 2
+                }}>
+                  <Box sx={{ mb: 2 }}>
+                    <ShoppingCartIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                  </Box>
+                  <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                    No ingredients needed
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Add meals to your meal plan to see required ingredients here
                   </Typography>
                 </Paper>
               )}
