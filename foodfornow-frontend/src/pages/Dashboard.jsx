@@ -386,6 +386,16 @@ const Dashboard = () => {
                   <Button
                     variant="outlined"
                     size="small"
+                    sx={{
+                      backgroundColor: theme.palette.primary.main,
+                      color: 'white',
+                      borderColor: theme.palette.primary.main,
+                      '&:hover': {
+                        backgroundColor: theme.palette.primary.dark,
+                        borderColor: theme.palette.primary.dark,
+                        color: 'white'
+                      }
+                    }}
                     onClick={() => {
                       const currentDate = new Date(selectedWeekStart);
                       currentDate.setDate(currentDate.getDate() - 7);
@@ -394,31 +404,77 @@ const Dashboard = () => {
                   >
                     Previous Week
                   </Button>
-                  <TextField
-                    type="date"
-                    value={selectedWeekStart}
-                    onChange={(e) => {
-                      // Parse the date string properly to avoid timezone issues
-                      const [year, month, day] = e.target.value.split('-').map(Number);
-                      const selectedDate = new Date(year, month - 1, day); // month is 0-indexed
-                      
-                      // Adjust to Monday of that week
-                      const dayOfWeek = selectedDate.getDay();
-                      // Calculate days to go back to get to Monday
-                      // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-                      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                      
-                      selectedDate.setDate(selectedDate.getDate() - daysToMonday);
-                      selectedDate.setHours(0, 0, 0, 0);
-                      
-                      setSelectedWeekStart(selectedDate.toISOString().split('T')[0]);
-                    }}
-                    size="small"
-                    sx={{ minWidth: 150 }}
-                  />
                   <Button
                     variant="outlined"
                     size="small"
+                    sx={{
+                      justifyContent: 'flex-start',
+                      textTransform: 'none',
+                      position: 'relative',
+                      backgroundColor: theme.palette.primary.main,
+                      color: 'white',
+                      borderColor: theme.palette.primary.main,
+                      '&:hover': {
+                        backgroundColor: theme.palette.primary.dark,
+                        borderColor: theme.palette.primary.dark,
+                        color: 'white'
+                      }
+                    }}
+                  >
+                    <CalendarTodayIcon sx={{ fontSize: 16, mr: 1 }} />
+                    {selectedWeekStart ? (() => {
+                      const [year, month, day] = selectedWeekStart.split('-').map(Number);
+                      const date = new Date(year, month - 1, day);
+                      return date.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      });
+                    })() : 'Select Date'}
+                    <input
+                      type="date"
+                      value={selectedWeekStart}
+                      onChange={(e) => {
+                        // Parse the date string properly to avoid timezone issues
+                        const [year, month, day] = e.target.value.split('-').map(Number);
+                        const selectedDate = new Date(year, month - 1, day); // month is 0-indexed
+                        
+                        // Adjust to Monday of that week
+                        const dayOfWeek = selectedDate.getDay();
+                        // Calculate days to go back to get to Monday
+                        // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+                        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                        
+                        selectedDate.setDate(selectedDate.getDate() - daysToMonday);
+                        selectedDate.setHours(0, 0, 0, 0);
+                        
+                        setSelectedWeekStart(selectedDate.toISOString().split('T')[0]);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0,
+                        cursor: 'pointer',
+                        zIndex: 1
+                      }}
+                    />
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      backgroundColor: theme.palette.primary.main,
+                      color: 'white',
+                      borderColor: theme.palette.primary.main,
+                      '&:hover': {
+                        backgroundColor: theme.palette.primary.dark,
+                        borderColor: theme.palette.primary.dark,
+                        color: 'white'
+                      }
+                    }}
                     onClick={() => {
                       const currentDate = new Date(selectedWeekStart);
                       currentDate.setDate(currentDate.getDate() + 7);
@@ -430,6 +486,16 @@ const Dashboard = () => {
                   <Button
                     variant="outlined"
                     size="small"
+                    sx={{
+                      backgroundColor: theme.palette.primary.main,
+                      color: 'white',
+                      borderColor: theme.palette.primary.main,
+                      '&:hover': {
+                        backgroundColor: theme.palette.primary.dark,
+                        borderColor: theme.palette.primary.dark,
+                        color: 'white'
+                      }
+                    }}
                     onClick={() => {
                       const today = new Date();
                       const monday = new Date(today);
