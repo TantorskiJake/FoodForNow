@@ -110,7 +110,10 @@ const Dashboard = () => {
           _id: key,
           ...value
         }));
-        setIngredients(ingredientsArray);
+        
+        // Aggregate ingredients by name to handle duplicates
+        const aggregatedIngredients = aggregateIngredientsByName(ingredientsArray);
+        setIngredients(aggregatedIngredients);
       } else {
         console.error('Invalid ingredients data format:', response.data);
         setIngredients([]);
@@ -120,6 +123,147 @@ const Dashboard = () => {
       setError('Failed to fetch ingredients. Please try again.');
       setIngredients([]);
     }
+  };
+
+  // Helper function to aggregate ingredients by name
+  const aggregateIngredientsByName = (ingredients) => {
+    const ingredientMap = new Map();
+    
+    ingredients.forEach(ingredient => {
+      const name = ingredient.name;
+      
+      if (ingredientMap.has(name)) {
+        // Combine with existing ingredient
+        const existing = ingredientMap.get(name);
+        
+        // Try to combine quantities if units are the same
+        if (existing.unit === ingredient.unit) {
+          existing.quantity += ingredient.quantity;
+          existing.pantryQuantity = (existing.pantryQuantity || 0) + (ingredient.pantryQuantity || 0);
+        } else {
+          // Different units - convert to standard unit and combine
+          const convertedQuantity = convertToStandardUnit(ingredient.quantity, ingredient.unit, name);
+          const convertedPantryQuantity = convertToStandardUnit(ingredient.pantryQuantity || 0, ingredient.unit, name);
+          
+          const existingConvertedQuantity = convertToStandardUnit(existing.quantity, existing.unit, name);
+          const existingConvertedPantryQuantity = convertToStandardUnit(existing.pantryQuantity || 0, existing.unit, name);
+          
+          // Use the most common unit as standard, or convert to grams for most ingredients
+          const standardUnit = getStandardUnit(name);
+          
+          // Convert back to standard unit
+          const totalConvertedQuantity = existingConvertedQuantity + convertedQuantity;
+          const totalConvertedPantryQuantity = existingConvertedPantryQuantity + convertedPantryQuantity;
+          
+          existing.quantity = convertFromStandardUnit(totalConvertedQuantity, standardUnit, name);
+          existing.pantryQuantity = convertFromStandardUnit(totalConvertedPantryQuantity, standardUnit, name);
+          existing.unit = standardUnit;
+        }
+      } else {
+        // First occurrence of this ingredient
+        ingredientMap.set(name, { ...ingredient });
+      }
+    });
+    
+    return Array.from(ingredientMap.values());
+  };
+
+  // Helper function to convert to standard unit (grams for most ingredients)
+  const convertToStandardUnit = (quantity, unit, ingredientName) => {
+    const conversions = {
+      // Weight conversions (to grams)
+      'g': 1,
+      'kg': 1000,
+      'oz': 28.35,
+      'lb': 453.59,
+      
+      // Volume conversions (to ml)
+      'ml': 1,
+      'l': 1000,
+      'cup': 236.59,
+      'tbsp': 14.79,
+      'tsp': 4.93,
+      
+      // Special cases
+      'piece': 1, // Keep as pieces
+      'pinch': 0.36, // Approximate pinch to grams
+    };
+    
+    // For liquids and some ingredients, use volume as standard
+    const liquidIngredients = ['milk', 'water', 'oil', 'juice', 'broth', 'sauce'];
+    const isLiquid = liquidIngredients.some(liquid => 
+      ingredientName.toLowerCase().includes(liquid)
+    );
+    
+    if (isLiquid && ['ml', 'l', 'cup', 'tbsp', 'tsp'].includes(unit)) {
+      // Convert to ml for liquids
+      return quantity * (conversions[unit] || 1);
+    } else if (['g', 'kg', 'oz', 'lb'].includes(unit)) {
+      // Convert to grams for solids
+      return quantity * (conversions[unit] || 1);
+    } else if (unit === 'piece' || unit === 'pinch') {
+      // Keep pieces as is, convert pinches to grams
+      return unit === 'piece' ? quantity : quantity * conversions[unit];
+    }
+    
+    return quantity; // Default fallback
+  };
+
+  // Helper function to convert from standard unit back to display unit
+  const convertFromStandardUnit = (quantity, targetUnit, ingredientName) => {
+    const conversions = {
+      // Weight conversions (from grams)
+      'g': 1,
+      'kg': 1/1000,
+      'oz': 1/28.35,
+      'lb': 1/453.59,
+      
+      // Volume conversions (from ml)
+      'ml': 1,
+      'l': 1/1000,
+      'cup': 1/236.59,
+      'tbsp': 1/14.79,
+      'tsp': 1/4.93,
+      
+      // Special cases
+      'piece': 1,
+      'pinch': 1/0.36,
+    };
+    
+    return quantity * (conversions[targetUnit] || 1);
+  };
+
+  // Helper function to determine the best standard unit for an ingredient
+  const getStandardUnit = (ingredientName) => {
+    const name = ingredientName.toLowerCase();
+    
+    // Liquids
+    if (['milk', 'water', 'oil', 'juice', 'broth', 'sauce', 'vinegar', 'lemon juice'].some(liquid => name.includes(liquid))) {
+      return 'ml';
+    }
+    
+    // Small quantities of spices/herbs
+    if (['salt', 'pepper', 'spice', 'herb', 'garlic', 'onion powder', 'cinnamon', 'nutmeg'].some(spice => name.includes(spice))) {
+      return 'g';
+    }
+    
+    // Large quantities
+    if (['flour', 'sugar', 'rice', 'pasta', 'beans'].some(bulk => name.includes(bulk))) {
+      return 'g';
+    }
+    
+    // Proteins
+    if (['chicken', 'beef', 'pork', 'fish', 'meat', 'lobster', 'shrimp'].some(protein => name.includes(protein))) {
+      return 'g';
+    }
+    
+    // Fruits and vegetables
+    if (['banana', 'apple', 'orange', 'tomato', 'carrot', 'lettuce', 'spinach'].some(produce => name.includes(produce))) {
+      return 'piece';
+    }
+    
+    // Default to grams for most ingredients
+    return 'g';
   };
 
   const handleAddAllToShoppingList = async () => {
