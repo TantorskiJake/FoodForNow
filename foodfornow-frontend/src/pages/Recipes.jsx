@@ -31,6 +31,7 @@ import SortIcon from '@mui/icons-material/Sort';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
+import { useAchievements } from '../context/AchievementContext';
 import { getCategoryColor } from '../utils/categoryColors';
 import { useNavigate } from 'react-router-dom';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -185,6 +186,7 @@ const Recipes = () => {
   const [sortBy, setSortBy] = useState('name');
   const [categoryFilter, setCategoryFilter] = useState('');
   const { authenticated } = useAuth();
+  const { showAchievements } = useAchievements();
   const navigate = useNavigate();
 
   // Sort recipes based on current sort setting
@@ -442,7 +444,12 @@ const Recipes = () => {
       if (editingRecipe) {
         await api.put(`/recipes/${editingRecipe._id}`, recipeData);
       } else {
-        await api.post('/recipes', recipeData);
+        const response = await api.post('/recipes', recipeData);
+        
+        // Check for achievements in response
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
       }
 
       handleCloseDialog();

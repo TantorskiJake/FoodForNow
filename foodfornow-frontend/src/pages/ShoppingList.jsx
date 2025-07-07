@@ -41,10 +41,12 @@ import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useAchievements } from '../context/AchievementContext';
 
 const ShoppingList = () => {
   const theme = useTheme();
   const { authenticated } = useAuth();
+  const { showAchievements } = useAchievements();
   const [shoppingItems, setShoppingItems] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,13 @@ const ShoppingList = () => {
 
   const handleToggleComplete = async (item) => {
     try {
-      await api.patch(`/shopping-list/${item._id}`, { completed: !item.completed });
+      const response = await api.patch(`/shopping-list/${item._id}`, { completed: !item.completed });
+      
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      
       fetchShoppingList();
     } catch (err) {
       toast.error('Failed to update item status');
@@ -128,11 +136,17 @@ const ShoppingList = () => {
     }
 
     try {
-      await api.post('/pantry', {
+      const response = await api.post('/pantry', {
         ingredient: item.ingredient._id,
         quantity: item.quantity,
         unit: item.unit
       });
+      
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      
       await handleDeleteItem(item._id);
       toast.success('Added to pantry');
     } catch (err) {
@@ -153,7 +167,13 @@ const ShoppingList = () => {
         return;
       }
       
-      await api.post('/pantry/add-all-from-shopping-list');
+      const response = await api.post('/pantry/add-all-from-shopping-list');
+      
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      
       fetchShoppingList();
       toast.success(`Added ${completedItems.length} item${completedItems.length !== 1 ? 's' : ''} to pantry!`);
     } catch (err) {
@@ -166,7 +186,13 @@ const ShoppingList = () => {
 
   const handleUpdateFromMealPlan = async () => {
     try {
-      await api.post('/shopping-list/update-from-meal-plan');
+      const response = await api.post('/shopping-list/update-from-meal-plan');
+      
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      
       fetchShoppingList();
       toast.success('Updated from meal plan');
     } catch (err) {
@@ -181,12 +207,25 @@ const ShoppingList = () => {
       // Check if all items are completed
       const allCompleted = shoppingItems.every(item => item.completed);
       
-      // Update all items in parallel
-      await Promise.all(
+      // Update all items in parallel and collect responses
+      const responses = await Promise.all(
         shoppingItems.map(item =>
           api.patch(`/shopping-list/${item._id}`, { completed: !allCompleted })
         )
       );
+      
+      // Check for achievements in any of the responses
+      const allAchievements = [];
+      responses.forEach(response => {
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          allAchievements.push(...response.data.achievements);
+        }
+      });
+      
+      // Show achievements if any were unlocked
+      if (allAchievements.length > 0) {
+        showAchievements(allAchievements);
+      }
       
       // Refresh the shopping list
       await fetchShoppingList();

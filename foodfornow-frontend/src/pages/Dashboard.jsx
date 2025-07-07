@@ -31,6 +31,7 @@ import api from '../services/api';
 import MealPlanGrid from '../components/MealPlanGrid';
 import { getCategoryColor } from '../utils/categoryColors';
 import { useAuth } from '../context/AuthContext';
+import { useAchievements } from '../context/AchievementContext';
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -51,6 +52,7 @@ const Dashboard = () => {
   const [selectedWeekStart, setSelectedWeekStart] = useState('');
 
   const { authenticated, user } = useAuth();
+  const { showAchievements } = useAchievements();
 
   // Initialize selected week to current week's Monday
   useEffect(() => {
@@ -375,6 +377,11 @@ const Dashboard = () => {
         });
       } else {
         response = await api.post('/mealplan', mealFormData);
+        
+        // Check for achievements in response
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
       }
 
       handleCloseMealDialog();
@@ -412,6 +419,11 @@ const Dashboard = () => {
       } else {
         // Adding new meal
         response = await api.post('/mealplan', updatedFormData);
+        
+        // Check for achievements in response
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
       }
 
       handleCloseMealDialog();

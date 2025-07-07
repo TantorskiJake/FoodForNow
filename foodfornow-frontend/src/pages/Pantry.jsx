@@ -36,6 +36,7 @@ import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useAchievements } from '../context/AchievementContext';
 
 const Pantry = () => {
   const [pantryItems, setPantryItems] = useState([]);
@@ -57,6 +58,7 @@ const Pantry = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const { authenticated } = useAuth();
+  const { showAchievements } = useAchievements();
 
   useEffect(() => {
     if (!authenticated) return;
@@ -172,6 +174,11 @@ const Pantry = () => {
         console.log('Creating new item');
         response = await api.post('/pantry', submitData);
         console.log('Create response:', response);
+        
+        // Check for achievements in response
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
       }
       
       if (response && response.data) {

@@ -129,21 +129,65 @@ router.post('/register', async (req, res) => {
     await user.save();
     console.log('User created successfully:', { id: user._id, email: user.email });
 
-    // Generate authentication tokens
-    const { accessToken, refreshToken } = await generateTokens(user._id);
+    // Check for registration achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkRegistrationAchievements(user._id);
+      
+      // Generate authentication tokens
+      const { accessToken, refreshToken } = await generateTokens(user._id);
 
-    // Set secure HTTP-only cookies
-    res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
-    res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
-    
-    // Return user data (without password)
-    res.status(201).json({
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email
+      // Set secure HTTP-only cookies
+      res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
+      res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
+      
+      // Return user data and achievements if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.status(201).json({
+            user: {
+              id: user._id,
+              name: user.name,
+              email: user.email
+            },
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
       }
-    });
+      
+      // Return user data (without password)
+      res.status(201).json({
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email
+        }
+      });
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+      
+      // Generate authentication tokens
+      const { accessToken, refreshToken } = await generateTokens(user._id);
+
+      // Set secure HTTP-only cookies
+      res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
+      res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
+      
+      // Return user data (without password)
+      res.status(201).json({
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email
+        }
+      });
+    }
   } catch (err) {
     console.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed. Please try again.' });

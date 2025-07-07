@@ -164,6 +164,31 @@ router.post("/", authMiddleware, async (req, res) => {
     console.log("Updating pantry:", pantry);
     const updatedPantry = await pantry.save();
     console.log("Updated pantry saved:", updatedPantry);
+    
+    // Check for pantry-related achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkPantryAchievements(req.userId, updatedPantry);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.status(201).json({
+            pantry: updatedPantry,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+    
     res.status(201).json(updatedPantry);
   } catch (err) {
     console.error("Error adding pantry item:", err);
@@ -291,6 +316,30 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
     // Get updated pantry with populated ingredients
     const updatedPantry = await Pantry.findOne({ user: userId })
       .populate('items.ingredient');
+
+    // Check for pantry-related achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkPantryAchievements(userId, updatedPantry);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.json({
+            pantry: updatedPantry,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
 
     res.json(updatedPantry);
   } catch (error) {

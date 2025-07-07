@@ -74,6 +74,31 @@ router.post('/', authMiddleware, async (req, res) => {
     await mealPlanItem.save();
     console.log('Meal plan item saved:', mealPlanItem);
     
+    // Check for meal planning achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkMealPlanningAchievements(req.userId);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          await mealPlanItem.populate('recipe');
+          res.status(201).json({
+            mealPlanItem,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+    
     // Populate recipe details before sending response
     await mealPlanItem.populate('recipe');
     res.status(201).json(mealPlanItem);
@@ -329,6 +354,32 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
     mealPlanItem.cooked = true;
     await mealPlanItem.save();
     await mealPlanItem.populate('recipe');
+
+    // Check for cooking-related achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkMealCookingAchievements(req.userId, mealPlanItem);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.json({
+            mealPlanItem,
+            removedIngredients: pantryUpdates.length,
+            addedToShoppingList: 0,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
 
     res.json({
       mealPlanItem,

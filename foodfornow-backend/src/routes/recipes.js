@@ -188,6 +188,31 @@ router.post('/', authMiddleware, async (req, res) => {
 
     await recipe.save();
     await recipe.populate('ingredients.ingredient');
+    
+    // Check for recipe-related achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkRecipeAchievements(req.userId, recipe);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.status(201).json({
+            recipe,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+    
     res.status(201).json(recipe);
   } catch (error) {
     console.error('Error creating recipe:', error);

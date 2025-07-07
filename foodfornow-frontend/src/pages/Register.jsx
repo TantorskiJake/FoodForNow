@@ -22,11 +22,13 @@ import {
 import PasswordField from '../components/PasswordField';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAchievements } from '../context/AchievementContext';
 
 const Register = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const { refreshAuth } = useAuth();
+  const { showAchievements } = useAchievements();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -94,11 +96,16 @@ const Register = () => {
 
     try {
       setIsLoading(true);
-      await api.post('/auth/register', {
+      const response = await api.post('/auth/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password,
       });
+
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
 
       if ('PasswordCredential' in window && 'credentials' in navigator) {
         try {

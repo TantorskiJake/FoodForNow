@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { AchievementProvider } from './context/AchievementContext';
 import Navbar from './components/Navbar';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './pages/Login';
@@ -12,6 +13,7 @@ import Pantry from './pages/Pantry';
 import Recipes from './pages/Recipes';
 import RecipeDetail from './pages/RecipeDetail';
 import Ingredients from './pages/Ingredients';
+import Achievements from './pages/Achievements';
 import { Toaster } from 'react-hot-toast';
 import Profile from './pages/Profile';
 
@@ -32,13 +34,15 @@ function App() {
     <ThemeProvider>
       {/* Authentication provider for user state management */}
       <AuthProvider>
-        {/* Router for client-side navigation */}
-        <Router>
-          {/* Global navigation bar - appears on all pages */}
-          <Navbar />
-          
-          {/* Route definitions for the application */}
-          <Routes>
+        {/* Achievement provider for achievement notifications */}
+        <AchievementProvider>
+          {/* Router for client-side navigation */}
+          <Router>
+            {/* Global navigation bar - appears on all pages */}
+            <Navbar />
+            
+            {/* Route definitions for the application */}
+            <Routes>
             {/* Public routes - accessible without authentication */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -100,6 +104,14 @@ function App() {
                 </PrivateRoute>
               } 
             />
+            <Route 
+              path="/achievements" 
+              element={
+                <PrivateRoute>
+                  <Achievements />
+                </PrivateRoute>
+              } 
+            />
             
             {/* Default route - redirect to dashboard */}
             <Route path="/" element={<Navigate to="/dashboard" />} />
@@ -108,6 +120,7 @@ function App() {
           {/* Global toast notifications */}
           <Toaster position="bottom-right" />
         </Router>
+        </AchievementProvider>
       </AuthProvider>
     </ThemeProvider>
   );

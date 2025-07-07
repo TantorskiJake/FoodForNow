@@ -19,6 +19,7 @@ import KitchenIcon from '@mui/icons-material/Kitchen';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -27,7 +28,8 @@ const pages = [
   { name: 'Shopping List', path: '/shopping-list', icon: <ShoppingCartIcon /> },
   { name: 'Pantry', path: '/pantry', icon: <KitchenIcon /> },
   { name: 'Recipes', path: '/recipes', icon: <MenuBookIcon /> },
-  { name: 'Ingredients', path: '/ingredients', icon: <LocalDiningIcon /> }
+  { name: 'Ingredients', path: '/ingredients', icon: <LocalDiningIcon /> },
+  { name: 'Achievements', path: '/achievements', icon: <EmojiEventsIcon /> }
 ];
 
 const Navbar = () => {

@@ -28,10 +28,12 @@ import RestaurantIcon from '@mui/icons-material/Restaurant';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import api from '../services/api';
+import { useAchievements } from '../context/AchievementContext';
 
 const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMealPlanUpdate }) => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { showAchievements } = useAchievements();
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [missingIngredientsDialog, setMissingIngredientsDialog] = useState(false);
@@ -79,6 +81,11 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
         addMissingToShoppingList: false
       });
       
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      
       if (onMealPlanUpdate) {
         onMealPlanUpdate(response.data.mealPlanItem);
       }
@@ -101,6 +108,11 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
       const response = await api.patch(`/mealplan/${selectedMealForCooking._id}/cook`, {
         addMissingToShoppingList: true
       });
+      
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
       
       // Only update the meal plan if it was actually marked as cooked
       if (response.data.mealPlanItem.cooked) {

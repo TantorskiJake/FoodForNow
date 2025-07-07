@@ -23,6 +23,7 @@ const recipesRoutes = require("./src/routes/recipes");
 const pantryRoutes = require("./src/routes/pantry");
 const ingredientRoutes = require("./src/routes/ingredients");
 const shoppingListRoutes = require("./src/routes/shopping-list");
+const achievementsRoutes = require("./src/routes/achievements");
 
 // Create Express application instance
 const app = express();
@@ -72,6 +73,7 @@ app.use("/api/recipes", recipesRoutes);     // Recipe management
 app.use("/api/pantry", pantryRoutes);       // Pantry management
 app.use("/api/ingredients", ingredientRoutes); // Ingredient management
 app.use("/api/shopping-list", shoppingListRoutes); // Shopping list functionality
+app.use("/api/achievements", achievementsRoutes); // Achievements system
 
 /**
  * Root Route

@@ -225,6 +225,30 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       };
     });
 
+    // Check for shopping list-related achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkShoppingListAchievements(req.userId, responseWithPantryQuantities);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.json({
+            shoppingList: responseWithPantryQuantities,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+
     res.json(responseWithPantryQuantities);
   } catch (error) {
     console.error('Error updating shopping list:', error);
@@ -247,6 +271,30 @@ router.put('/:id/toggle', authMiddleware, async (req, res) => {
 
     item.completed = !item.completed;
     await item.save();
+
+    // Check for shopping list-related achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkShoppingListAchievements(req.userId, [item]);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.json({
+            item,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
 
     res.json(item);
   } catch (err) {
@@ -301,6 +349,31 @@ router.patch('/:id', authMiddleware, async (req, res) => {
     if (!item) {
       return res.status(404).json({ message: 'Item not found' });
     }
+
+    // Check for shopping list-related achievements
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkShoppingListAchievements(req.userId, [item]);
+      
+      // Add achievement data to response if any were unlocked
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.json({
+            item,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+
     res.json(item);
   } catch (err) {
     console.error('Error updating shopping list item:', err);
