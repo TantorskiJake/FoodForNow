@@ -109,9 +109,25 @@ export const ThemeProvider = ({ children }) => {
     setDarkMode(!darkMode);
   };
 
+  /**
+   * Set Theme From User Preferences
+   * 
+   * Updates the theme based on user's saved preferences.
+   * @param {string} themePreference - 'light', 'dark', or 'auto'
+   */
+  const setThemeFromPreference = (themePreference) => {
+    if (themePreference === 'dark') {
+      setDarkMode(true);
+    } else if (themePreference === 'light') {
+      setDarkMode(false);
+    } else if (themePreference === 'auto') {
+      setDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+  };
+
   // Provide theme context and Material-UI theme to child components
   return (
-    <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
+    <ThemeContext.Provider value={{ darkMode, toggleDarkMode, setThemeFromPreference }}>
       <MuiThemeProvider theme={theme}>
         <CssBaseline /> {/* Reset CSS and apply Material-UI base styles */}
         {children}

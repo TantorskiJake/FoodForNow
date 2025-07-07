@@ -83,11 +83,13 @@ import {
 import { toast } from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useTheme as useCustomTheme } from '../context/ThemeContext';
 
 const Profile = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const { user, loading: authLoading, refreshAuth } = useAuth();
+  const { setThemeFromPreference } = useCustomTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -192,8 +194,13 @@ const Profile = () => {
       
       setLoading(false);
       fetchUserStats();
+      
+      // Apply current theme preference when component loads
+      if (user?.preferences?.theme) {
+        setThemeFromPreference(user.preferences.theme);
+      }
     }
-  }, [authLoading, user]);
+  }, [authLoading, user, setThemeFromPreference]);
 
   const fetchUserStats = async () => {
     try {
@@ -332,6 +339,12 @@ const Profile = () => {
 
       setSuccess('Profile updated successfully!');
       toast.success('Profile updated successfully');
+      
+      // Apply theme changes immediately if theme preference was updated
+      if (response.data.user.preferences?.theme) {
+        setThemeFromPreference(response.data.user.preferences.theme);
+      }
+      
       refreshAuth();
       
       // Clear success message after 3 seconds
