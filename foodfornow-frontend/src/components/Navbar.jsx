@@ -116,7 +116,9 @@ const Navbar = () => {
               },
             }}
           >
-            {userInitial ? (
+            {user?.profilePicture ? (
+              <Avatar src={user.profilePicture} alt={user.name} />
+            ) : userInitial ? (
               <Avatar>{userInitial}</Avatar>
             ) : (
               <AccountCircle />

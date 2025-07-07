@@ -218,7 +218,14 @@ router.get('/me', auth, async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        bio: user.bio,
+        location: user.location,
+        website: user.website,
+        profilePicture: user.profilePicture,
+        preferences: user.preferences,
+        notifications: user.notifications,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
@@ -286,20 +293,58 @@ router.post("/logout", (req, res) => {
 /**
  * PUT /auth/profile - Update user profile
  * 
- * Allows users to update their name, email, and password.
- * Validates current password when changing password and enforces security requirements.
+ * Allows users to update their profile information including name, email, bio, location, website,
+ * preferences, notifications, and password. Validates current password when changing password.
  */
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { name, email, currentPassword, newPassword } = req.body;
+    console.log('Profile update request body:', req.body);
+    
+    const { 
+      name, 
+      email, 
+      bio, 
+      location, 
+      website, 
+      profilePicture,
+      preferences,
+      notifications,
+      currentPassword, 
+      newPassword 
+    } = req.body;
+    
+    console.log('Extracted fields:', { name, email, bio, location, website });
+    
     const user = await User.findById(req.userId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Update name and email if provided
-    if (name) user.name = name;
+    // Update basic profile fields if provided
+    if (name !== undefined) user.name = name;
+    if (bio !== undefined) user.bio = bio || null;
+    if (location !== undefined) user.location = location || null;
+    if (website !== undefined) user.website = website || null;
+    if (profilePicture !== undefined) user.profilePicture = profilePicture || null;
+    
+    // Update preferences if provided
+    if (preferences) {
+      if (preferences.theme !== undefined) user.preferences.theme = preferences.theme;
+      if (preferences.units !== undefined) user.preferences.units = preferences.units;
+      if (preferences.language !== undefined) user.preferences.language = preferences.language;
+      if (preferences.timezone !== undefined) user.preferences.timezone = preferences.timezone;
+    }
+    
+    // Update notifications if provided
+    if (notifications) {
+      if (notifications.email !== undefined) user.notifications.email = notifications.email;
+      if (notifications.push !== undefined) user.notifications.push = notifications.push;
+      if (notifications.mealReminders !== undefined) user.notifications.mealReminders = notifications.mealReminders;
+      if (notifications.shoppingReminders !== undefined) user.notifications.shoppingReminders = notifications.shoppingReminders;
+    }
+
+    // Update email if provided (with duplicate check)
     if (email) {
       // Check if email is already taken by another user
       const existingUser = await User.findOne({ email, _id: { $ne: req.userId } });
@@ -340,13 +385,26 @@ router.put('/profile', auth, async (req, res) => {
 
     // Save updated user
     await user.save();
+    console.log('User saved with fields:', { 
+      name: user.name, 
+      bio: user.bio, 
+      location: user.location, 
+      website: user.website 
+    });
 
     // Return updated user data (without password)
     res.json({
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        bio: user.bio,
+        location: user.location,
+        website: user.website,
+        profilePicture: user.profilePicture,
+        preferences: user.preferences,
+        notifications: user.notifications,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {

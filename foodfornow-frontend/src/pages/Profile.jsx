@@ -166,9 +166,30 @@ const Profile = () => {
     if (!authLoading && user) {
       setFormData(prev => ({
         ...prev,
-        name: user.name,
-        email: user.email,
+        name: user.name || '',
+        email: user.email || '',
+        bio: user.bio || '',
+        location: user.location || '',
+        website: user.website || '',
+        notifications: {
+          email: user.notifications?.email ?? true,
+          push: user.notifications?.push ?? true,
+          mealReminders: user.notifications?.mealReminders ?? true,
+          shoppingReminders: user.notifications?.shoppingReminders ?? true,
+        },
+        preferences: {
+          theme: user.preferences?.theme || 'auto',
+          language: user.preferences?.language || 'en',
+          units: user.preferences?.units || 'metric',
+          timezone: user.preferences?.timezone || 'UTC',
+        },
       }));
+      
+      // Set profile picture if user has one
+      if (user.profilePicture) {
+        setImagePreview(user.profilePicture);
+      }
+      
       setLoading(false);
       fetchUserStats();
     }
@@ -245,7 +266,8 @@ const Profile = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    console.log('Form submitted!');
     setError('');
     setSuccess('');
 
@@ -273,20 +295,36 @@ const Profile = () => {
         bio: formData.bio,
         location: formData.location,
         website: formData.website,
+        preferences: formData.preferences,
+        notifications: formData.notifications,
       };
+
+      // Add profile picture if uploaded
+      if (imagePreview && imagePreview.startsWith('data:')) {
+        // For now, we'll store the base64 image directly
+        // In production, you'd want to upload to a cloud service like AWS S3
+        updateData.profilePicture = imagePreview;
+      }
 
       if (formData.newPassword) {
         updateData.currentPassword = formData.currentPassword;
         updateData.newPassword = formData.newPassword;
       }
 
+      console.log('Sending profile update data:', updateData);
       const response = await api.put('/auth/profile', updateData);
+      console.log('Profile update response:', response.data);
       
       // Update form data with the response
       setFormData(prev => ({
         ...prev,
         name: response.data.user.name,
         email: response.data.user.email,
+        bio: response.data.user.bio || '',
+        location: response.data.user.location || '',
+        website: response.data.user.website || '',
+        preferences: response.data.user.preferences || prev.preferences,
+        notifications: response.data.user.notifications || prev.notifications,
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
@@ -513,25 +551,37 @@ const Profile = () => {
                         Quick Actions
                       </Typography>
                       <List dense>
-                        <ListItemButton sx={{ borderRadius: 2, mb: 1 }}>
+                        <ListItemButton 
+                          sx={{ borderRadius: 2, mb: 1 }}
+                          onClick={() => navigate('/recipes')}
+                        >
                           <ListItemIcon>
                             <RestaurantIcon color="primary" />
                           </ListItemIcon>
                           <ListItemText primary="View My Recipes" />
                         </ListItemButton>
-                        <ListItemButton sx={{ borderRadius: 2, mb: 1 }}>
+                        <ListItemButton 
+                          sx={{ borderRadius: 2, mb: 1 }}
+                          onClick={() => navigate('/dashboard')}
+                        >
                           <ListItemIcon>
                             <CalendarTodayIcon color="secondary" />
                           </ListItemIcon>
                           <ListItemText primary="Meal Plans" />
                         </ListItemButton>
-                        <ListItemButton sx={{ borderRadius: 2, mb: 1 }}>
+                        <ListItemButton 
+                          sx={{ borderRadius: 2, mb: 1 }}
+                          onClick={() => navigate('/shopping-list')}
+                        >
                           <ListItemIcon>
                             <ShoppingCartIcon color="info" />
                           </ListItemIcon>
                           <ListItemText primary="Shopping List" />
                         </ListItemButton>
-                        <ListItemButton sx={{ borderRadius: 2 }}>
+                        <ListItemButton 
+                          sx={{ borderRadius: 2 }}
+                          onClick={() => navigate('/pantry')}
+                        >
                           <ListItemIcon>
                             <KitchenIcon color="warning" />
                           </ListItemIcon>
@@ -613,148 +663,146 @@ const Profile = () => {
 
                       {/* Profile Tab */}
                       {activeTab === 0 && (
-                        <Box component="form" onSubmit={handleSubmit}>
-                          <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6}>
-                              <TextField
-                                fullWidth
-                                label="Full Name"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleChange}
-                                required
-                                disabled={saving}
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    borderRadius: 2,
-                                    '& fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.1)'
-                                        : 'rgba(0, 0, 0, 0.1)',
-                                    },
-                                    '&:hover fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.2)'
-                                        : 'rgba(0, 0, 0, 0.2)',
-                                    },
+                        <Grid container spacing={3}>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Full Name"
+                              name="name"
+                              value={formData.name}
+                              onChange={handleChange}
+                              required
+                              disabled={saving}
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                  '& fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.1)'
+                                      : 'rgba(0, 0, 0, 0.1)',
                                   },
-                                }}
-                              />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <TextField
-                                fullWidth
-                                label="Email Address"
-                                name="email"
-                                type="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                                disabled={saving}
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    borderRadius: 2,
-                                    '& fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.1)'
-                                        : 'rgba(0, 0, 0, 0.1)',
-                                    },
-                                    '&:hover fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.2)'
-                                        : 'rgba(0, 0, 0, 0.2)',
-                                    },
+                                  '&:hover fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.2)'
+                                      : 'rgba(0, 0, 0, 0.2)',
                                   },
-                                }}
-                              />
-                            </Grid>
-                            <Grid item xs={12}>
-                              <TextField
-                                fullWidth
-                                label="Bio"
-                                name="bio"
-                                value={formData.bio}
-                                onChange={handleChange}
-                                multiline
-                                rows={3}
-                                disabled={saving}
-                                placeholder="Tell us about yourself..."
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    borderRadius: 2,
-                                    '& fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.1)'
-                                        : 'rgba(0, 0, 0, 0.1)',
-                                    },
-                                    '&:hover fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.2)'
-                                        : 'rgba(0, 0, 0, 0.2)',
-                                    },
-                                  },
-                                }}
-                              />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <TextField
-                                fullWidth
-                                label="Location"
-                                name="location"
-                                value={formData.location}
-                                onChange={handleChange}
-                                disabled={saving}
-                                placeholder="City, Country"
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    borderRadius: 2,
-                                    '& fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.1)'
-                                        : 'rgba(0, 0, 0, 0.1)',
-                                    },
-                                    '&:hover fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.2)'
-                                        : 'rgba(0, 0, 0, 0.2)',
-                                    },
-                                  },
-                                }}
-                              />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <TextField
-                                fullWidth
-                                label="Website"
-                                name="website"
-                                value={formData.website}
-                                onChange={handleChange}
-                                disabled={saving}
-                                placeholder="https://yourwebsite.com"
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    borderRadius: 2,
-                                    '& fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.1)'
-                                        : 'rgba(0, 0, 0, 0.1)',
-                                    },
-                                    '&:hover fieldset': {
-                                      borderColor: theme.palette.mode === 'dark'
-                                        ? 'rgba(255, 255, 255, 0.2)'
-                                        : 'rgba(0, 0, 0, 0.2)',
-                                    },
-                                  },
-                                }}
-                              />
-                            </Grid>
+                                },
+                              }}
+                            />
                           </Grid>
-                        </Box>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Email Address"
+                              name="email"
+                              type="email"
+                              value={formData.email}
+                              onChange={handleChange}
+                              required
+                              disabled={saving}
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                  '& fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.1)'
+                                      : 'rgba(0, 0, 0, 0.1)',
+                                  },
+                                  '&:hover fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.2)'
+                                      : 'rgba(0, 0, 0, 0.2)',
+                                  },
+                                },
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField
+                              fullWidth
+                              label="Bio"
+                              name="bio"
+                              value={formData.bio}
+                              onChange={handleChange}
+                              multiline
+                              rows={3}
+                              disabled={saving}
+                              placeholder="Tell us about yourself..."
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                  '& fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.1)'
+                                      : 'rgba(0, 0, 0, 0.1)',
+                                  },
+                                  '&:hover fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.2)'
+                                      : 'rgba(0, 0, 0, 0.2)',
+                                  },
+                                },
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Location"
+                              name="location"
+                              value={formData.location}
+                              onChange={handleChange}
+                              disabled={saving}
+                              placeholder="City, Country"
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                  '& fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.1)'
+                                      : 'rgba(0, 0, 0, 0.1)',
+                                  },
+                                  '&:hover fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.2)'
+                                      : 'rgba(0, 0, 0, 0.2)',
+                                  },
+                                },
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Website"
+                              name="website"
+                              value={formData.website}
+                              onChange={handleChange}
+                              disabled={saving}
+                              placeholder="https://yourwebsite.com"
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                  '& fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.1)'
+                                      : 'rgba(0, 0, 0, 0.1)',
+                                  },
+                                  '&:hover fieldset': {
+                                    borderColor: theme.palette.mode === 'dark'
+                                      ? 'rgba(255, 255, 255, 0.2)'
+                                      : 'rgba(0, 0, 0, 0.2)',
+                                  },
+                                },
+                              }}
+                            />
+                          </Grid>
+                        </Grid>
                       )}
 
                       {/* Security Tab */}
                       {activeTab === 1 && (
-                        <Box component="form" onSubmit={handleSubmit}>
+                        <Box>
                           <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                             Change Password
                           </Typography>
@@ -1122,7 +1170,7 @@ const Profile = () => {
                           Cancel
                         </Button>
                         <Button
-                          type="submit"
+                          onClick={handleSubmit}
                           variant="contained"
                           disabled={saving || (formData.newPassword && passwordStrength < 60)}
                           startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
