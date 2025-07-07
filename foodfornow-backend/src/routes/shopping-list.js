@@ -81,12 +81,16 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
 
     console.log('Found meal plans:', mealPlans.length);
 
-    if (mealPlans.length === 0) {
+    // Filter out cooked meals - only count ingredients from uncooked meals
+    const uncookedMealPlans = mealPlans.filter(mealPlan => !mealPlan.cooked);
+    console.log('Uncooked meal plans:', uncookedMealPlans.length);
+
+    if (uncookedMealPlans.length === 0) {
       return res.json([]);
     }
 
     // Debug log for recipe ingredients
-    mealPlans.forEach(mealPlan => {
+    uncookedMealPlans.forEach(mealPlan => {
       if (mealPlan.recipe && mealPlan.recipe.ingredients) {
         console.log('Recipe:', mealPlan.recipe.name);
         console.log('Ingredients:', JSON.stringify(mealPlan.recipe.ingredients, null, 2));
@@ -94,18 +98,18 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
     });
 
     // Step 2: Get current pantry items
-    const pantryItems = await PantryItem.find({ user: req.userId })
+    const pantry = await PantryItem.findOne({ user: req.userId })
       .populate({
         path: 'items.ingredient',
         model: 'Ingredient',
         select: 'name category'
       });
 
-    console.log('Found pantry items:', pantryItems.length);
+    console.log('Found pantry:', pantry ? 'yes' : 'no');
 
     // Step 3: Create a map of current pantry quantities
     const pantryQuantities = new Map();
-    pantryItems.forEach(pantry => {
+    if (pantry && pantry.items) {
       pantry.items.forEach(item => {
         if (item.ingredient) {
           const key = `${item.ingredient._id}-${item.unit}`;
@@ -113,11 +117,11 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
           console.log(`Pantry item: ${item.ingredient.name}, Quantity: ${item.quantity} ${item.unit}`);
         }
       });
-    });
+    }
 
     // Step 4: Calculate needed ingredients
     const neededIngredients = new Map();
-    mealPlans.forEach(mealPlan => {
+    uncookedMealPlans.forEach(mealPlan => {
       if (!mealPlan.recipe || !mealPlan.recipe.ingredients) {
         console.log('Skipping meal plan with no recipe or ingredients:', mealPlan._id);
         return;
@@ -199,18 +203,18 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       .populate('recipe');
 
     // Add pantry quantities to the response
-    const pantryItemsResponse = await PantryItem.find({ user: req.userId })
+    const pantryResponse = await PantryItem.findOne({ user: req.userId })
       .populate('items.ingredient');
 
     const pantryQuantitiesResponse = new Map();
-    pantryItemsResponse.forEach(pantry => {
-      pantry.items.forEach(item => {
+    if (pantryResponse && pantryResponse.items) {
+      pantryResponse.items.forEach(item => {
         if (item.ingredient) {
           const key = `${item.ingredient._id}-${item.unit}`;
           pantryQuantitiesResponse.set(key, item.quantity);
         }
       });
-    });
+    }
 
     const responseWithPantryQuantities = updatedList.map(item => {
       const key = `${item.ingredient._id}-${item.unit}`;

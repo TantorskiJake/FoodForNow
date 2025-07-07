@@ -265,14 +265,31 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
       const ShoppingListItem = require('../models/shopping-list-item');
       
       for (const missing of missingIngredients) {
-        const shoppingListItem = new ShoppingListItem({
+        // Check if this ingredient already exists in the shopping list
+        const existingItem = await ShoppingListItem.findOne({
           user: req.userId,
           ingredient: missing.ingredient._id,
-          quantity: missing.quantity,
           unit: missing.unit,
           completed: false
         });
-        await shoppingListItem.save();
+        
+        if (existingItem) {
+          // Update existing item by adding the missing quantity
+          existingItem.quantity += missing.quantity;
+          await existingItem.save();
+          console.log(`Updated existing shopping list item: ${missing.ingredient.name} - added ${missing.quantity} ${missing.unit}`);
+        } else {
+          // Create new shopping list item
+          const shoppingListItem = new ShoppingListItem({
+            user: req.userId,
+            ingredient: missing.ingredient._id,
+            quantity: missing.quantity,
+            unit: missing.unit,
+            completed: false
+          });
+          await shoppingListItem.save();
+          console.log(`Created new shopping list item: ${missing.ingredient.name} - ${missing.quantity} ${missing.unit}`);
+        }
       }
       
       // Don't mark as cooked if there were missing ingredients

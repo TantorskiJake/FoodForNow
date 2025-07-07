@@ -843,8 +843,8 @@ const Dashboard = () => {
                                 sx={{
                                   fontWeight: 600,
                                   mb: 1.5,
-                                  color: isComplete ? 'text.disabled' : 'text.primary',
-                                  textDecoration: isComplete ? 'line-through' : 'none',
+                                  color: isComplete ? 'success.main' : 'text.primary',
+                                  textDecoration: isComplete ? 'none' : 'none',
                                   fontSize: '1.1rem'
                                 }}
                               >
