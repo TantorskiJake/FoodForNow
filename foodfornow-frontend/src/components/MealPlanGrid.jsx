@@ -175,15 +175,15 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
   };
 
   return (
-    <Box sx={{ mt: 4 }}>
-      <Grid container spacing={2}>
+    <Box sx={{ mt: 2 }}>
+      <Grid container spacing={1}>
         {/* Header row with days */}
         <Grid item xs={12}>
-          <Grid container spacing={1}>
+          <Grid container spacing={0.5}>
             <Grid item xs={1.5} /> {/* Spacer for meal type labels */}
             {days.map((day) => (
               <Grid item xs={1.5} key={day}>
-                <Typography variant="subtitle1" align="center" sx={{ fontWeight: 'bold' }}>
+                <Typography variant="subtitle1" align="center" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1 }}>
                   {day}
                 </Typography>
               </Grid>
@@ -194,10 +194,10 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
         {/* Meal rows */}
         {mealTypes.map((mealType) => (
           <Grid item xs={12} key={mealType}>
-            <Grid container spacing={1}>
+            <Grid container spacing={0.5}>
               {/* Meal type label */}
-              <Grid item xs={1.5}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>
+              <Grid item xs={1.5} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 0 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1, px: 1 }}>
                   {mealType}
                 </Typography>
               </Grid>
@@ -210,11 +210,11 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                 const isCooked = meal?.cooked || false;
                 
                 return (
-                  <Grid item xs={1.5} key={`${day}-${mealType}`}>
+                  <Grid item xs={1.5} key={`${day}-${mealType}`} sx={{ p: 0 }}>
                     <Card 
                       sx={{ 
                         height: '100%',
-                        minHeight: 100,
+                        minHeight: 90,
                         bgcolor: meal 
                           ? (isCooked ? 'success.light' : 'primary.light')
                           : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100',
@@ -226,24 +226,27 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                         },
                         border: theme.palette.mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : 'none',
                         position: 'relative',
-                        overflow: 'visible'
+                        overflow: 'visible',
+                        m: 0
                       }}
                       onClick={(e) => meal ? handleMealClick(meal, e) : onAddMeal(day, mealType)}
                     >
                       <CardContent sx={{ 
-                        p: 1.5,
+                        p: 0.5,
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
-                        position: 'relative'
+                        position: 'relative',
+                        justifyContent: 'center',
+                        m: 0
                       }}>
                         {meal ? (
                           <>
                             {/* Cooking status indicator - positioned top-left */}
                             <Box sx={{ 
                               position: 'absolute',
-                              top: 4,
-                              left: 4,
+                              top: 2,
+                              left: 2,
                               zIndex: 1
                             }}>
                               <IconButton
@@ -252,17 +255,18 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                                 sx={{
                                   bgcolor: isCooked ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
                                   color: 'white',
-                                  width: 24,
-                                  height: 24,
+                                  width: 20,
+                                  height: 20,
                                   '&:hover': {
                                     bgcolor: isCooked ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)',
-                                  }
+                                  },
+                                  p: 0
                                 }}
                               >
                                 {isCooked ? (
-                                  <CheckCircleIcon sx={{ fontSize: 16 }} />
+                                  <CheckCircleIcon sx={{ fontSize: 14 }} />
                                 ) : (
-                                  <RestaurantMenuIcon sx={{ fontSize: 16 }} />
+                                  <RestaurantMenuIcon sx={{ fontSize: 14 }} />
                                 )}
                               </IconButton>
                             </Box>
@@ -272,20 +276,21 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               sx={{
                                 wordBreak: 'break-word',
                                 overflow: 'hidden',
-                                WebkitLineClamp: 3,
+                                WebkitLineClamp: 2,
                                 WebkitBoxOrient: 'vertical',
-                                lineHeight: 1.2,
+                                lineHeight: 1.1,
                                 fontSize: getDynamicFontSize(getMealName(meal)),
                                 pt: 2,
                                 color: 'white',
-                                pl: 3, // Left padding to avoid status indicator
-                                pr: 3, // Right padding to avoid delete button
+                                pl: 0.75, // theme.spacing(0.75) ~6px
+                                pr: 0.75, // theme.spacing(0.75) ~6px
                                 textAlign: 'center',
-                                minHeight: '60px',
+                                minHeight: '32px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontWeight: 500
+                                fontWeight: 500,
+                                m: 0
                               }}
                             >
                               {getMealName(meal)}
@@ -303,8 +308,9 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                                 position: 'absolute', 
                                 top: 0, 
                                 right: 0,
-                                p: 0.5,
-                                color: 'white'
+                                p: 0.25,
+                                color: 'white',
+                                m: 0
                               }}
                             >
                               <DeleteIcon fontSize="small" />
@@ -319,7 +325,8 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              height: '100%'
+                              height: '100%',
+                              m: 0
                             }}
                           >
                             Click to add meal
