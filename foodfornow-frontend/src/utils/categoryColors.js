@@ -1,9 +1,9 @@
 // Category colors for ingredients
 export const categoryColors = {
   Produce: {
-    main: '#4caf50', // Green
-    light: '#81c784',
-    dark: '#388e3c'
+    main: '#43a047', // Green 600
+    light: '#66bb6a',
+    dark: '#2e7031'
   },
   Dairy: {
     main: '#2196f3', // Blue

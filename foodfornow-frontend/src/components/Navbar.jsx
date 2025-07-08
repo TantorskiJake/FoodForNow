@@ -76,8 +76,19 @@ const Navbar = () => {
   return (
     <AppBar position="static">
       <Toolbar>
-        <img src={FFNLogo} alt="Food For Now Logo" style={{ height: 40, marginRight: 16 }} />
-        <Typography 
+        <img 
+          src={FFNLogo} 
+          alt="Food For Now Logo" 
+          style={{ 
+            maxHeight: 72, // Increased logo height
+            width: 'auto',
+            marginRight: 24, // More spacing from nav items
+            display: 'block',
+            objectFit: 'contain',
+            verticalAlign: 'middle'
+          }} 
+        />
+        {/* <Typography 
           variant="h6" 
           component="div" 
           sx={{ 
@@ -87,9 +98,9 @@ const Navbar = () => {
           onClick={() => navigate('/dashboard')}
         >
           FoodForNow
-        </Typography>
+        </Typography> */}
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginLeft: 'auto' }}>
           {pages.map((page) => (
             <Button
               key={page.name}

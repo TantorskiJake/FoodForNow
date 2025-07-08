@@ -55,22 +55,22 @@ export const ThemeProvider = ({ children }) => {
   const theme = createTheme({
     palette: {
       mode: darkMode ? 'dark' : 'light',
-      // Primary colors (green theme for food/apple)
+      // Primary colors (Material UI Green 600)
       primary: {
-        main: '#228B22',    // Forest green
-        light: '#4caf50',   // Light green
-        dark: '#1b5e20',    // Dark green
+        main: '#43a047',    // Green 600
+        light: '#66bb6a',   // Green 400
+        dark: '#2e7031',    // Green 800
       },
-      // Secondary colors
+      // Secondary colors (same palette for consistency)
       secondary: {
-        main: '#006400',    // Dark green
-        light: '#2e7d32',   // Medium green
-        dark: '#004d00',    // Very dark green
+        main: '#43a047',    // Green 600
+        light: '#66bb6a',   // Green 400
+        dark: '#2e7031',    // Green 800
       },
       // Background colors for dark/light modes
       background: {
-        default: darkMode ? '#121212' : '#f5f5f7', // Dark gray / Light gray
-        paper: darkMode ? '#1e1e1e' : '#ffffff',   // Dark gray / White
+        default: darkMode ? '#121212' : '#f5f5f7',
+        paper: darkMode ? '#1e1e1e' : '#ffffff',
       },
     },
     // Typography configuration
