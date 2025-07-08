@@ -22,6 +22,7 @@ import LocalDiningIcon from '@mui/icons-material/LocalDining';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import FFNLogo from '../assets/FFNLogoTrans.png';
 
 const pages = [
   { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
@@ -75,7 +76,7 @@ const Navbar = () => {
   return (
     <AppBar position="static">
       <Toolbar>
-        <RestaurantIcon sx={{ mr: 2 }} />
+        <img src={FFNLogo} alt="Food For Now Logo" style={{ height: 40, marginRight: 16 }} />
         <Typography 
           variant="h6" 
           component="div" 
