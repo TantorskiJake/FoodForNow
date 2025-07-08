@@ -87,7 +87,6 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme as useCustomTheme } from '../context/ThemeContext';
 import worldCities from '../utils/worldCities.json';
 import { matchSorter } from 'match-sorter';
-// Remove GeoNames import
 
 // Add a helper to find the city object from a string
 function findCityObj(locationStr) {
@@ -424,41 +423,6 @@ const Profile = () => {
       </Box>
     );
   }
-
-  // Restore WORLD_LOCATIONS
-  const WORLD_LOCATIONS = [
-    { city: '', country: 'United States' },
-    { city: '', country: 'Canada' },
-    { city: '', country: 'United Kingdom' },
-    { city: '', country: 'Australia' },
-    { city: '', country: 'Germany' },
-    { city: '', country: 'France' },
-    { city: '', country: 'Japan' },
-    { city: '', country: 'Brazil' },
-    { city: '', country: 'India' },
-    { city: '', country: 'South Africa' },
-    { city: 'New York', country: 'United States' },
-    { city: 'Los Angeles', country: 'United States' },
-    { city: 'London', country: 'United Kingdom' },
-    { city: 'Paris', country: 'France' },
-    { city: 'Berlin', country: 'Germany' },
-    { city: 'Tokyo', country: 'Japan' },
-    { city: 'Sydney', country: 'Australia' },
-    { city: 'Toronto', country: 'Canada' },
-    { city: 'Rio de Janeiro', country: 'Brazil' },
-    { city: 'Mumbai', country: 'India' },
-    { city: 'Cape Town', country: 'South Africa' },
-    { city: 'Beijing', country: 'China' },
-    { city: 'Moscow', country: 'Russia' },
-    { city: 'Rome', country: 'Italy' },
-    { city: 'Madrid', country: 'Spain' },
-    { city: 'Mexico City', country: 'Mexico' },
-    { city: 'Istanbul', country: 'Turkey' },
-    { city: 'Seoul', country: 'South Korea' },
-    { city: 'Singapore', country: 'Singapore' },
-    { city: 'Dubai', country: 'United Arab Emirates' },
-    // ...add more as needed
-  ];
 
   return (
     <Box

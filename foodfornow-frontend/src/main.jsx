@@ -39,7 +39,7 @@ try {
     <div style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
       <h1>Failed to load application</h1>
       <p>Please refresh the page or contact support if the problem persists.</p>
-      <button onclick="window.location.reload()" style="padding: 10px 20px; background-color: #228B22; color: white; border: none; border-radius: 5px; cursor: pointer;">
+      <button onclick="window.location.reload()" style="padding: 10px 20px; background-color: #43a047; color: white; border: none; border-radius: 5px; cursor: pointer;">
         Refresh Page
       </button>
       ${import.meta.env.DEV ? `<details style="margin-top: 20px; text-align: left;"><summary>Error Details (Development)</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto;">${error.toString()}</pre></details>` : ''}

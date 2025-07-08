@@ -30,22 +30,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import TimerIcon from '@mui/icons-material/Timer';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-
-const getCategoryColor = (category) => {
-  const colors = {
-    'Produce': { main: '#4CAF50', dark: '#388E3C' },
-    'Dairy': { main: '#2196F3', dark: '#1976D2' },
-    'Meat': { main: '#F44336', dark: '#D32F2F' },
-    'Seafood': { main: '#00BCD4', dark: '#0097A7' },
-    'Pantry': { main: '#FF9800', dark: '#F57C00' },
-    'Spices': { main: '#9C27B0', dark: '#7B1FA2' },
-    'Beverages': { main: '#795548', dark: '#5D4037' },
-    'Frozen': { main: '#607D8B', dark: '#455A64' },
-    'Bakery': { main: '#FFC107', dark: '#FFA000' },
-    'Other': { main: '#9E9E9E', dark: '#757575' },
-  };
-  return colors[category] || colors['Other'];
-};
+import { getCategoryColor } from '../utils/categoryColors';
 
 const Ingredients = () => {
   const theme = useTheme();
