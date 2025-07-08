@@ -47,7 +47,6 @@ router.get('/', auth, async (req, res) => {
       'recipe-mastery': allAchievements.filter(a => a.category === 'recipe-mastery'),
       'meal-planning': allAchievements.filter(a => a.category === 'meal-planning'),
       'pantry-shopping': allAchievements.filter(a => a.category === 'pantry-shopping'),
-      'fun': allAchievements.filter(a => a.category === 'fun'),
       'milestone': allAchievements.filter(a => a.category === 'milestone')
     };
 
@@ -67,7 +66,6 @@ router.get('/', auth, async (req, res) => {
           'recipe-mastery': groupedAchievements['recipe-mastery'].filter(a => a.completed).length,
           'meal-planning': groupedAchievements['meal-planning'].filter(a => a.completed).length,
           'pantry-shopping': groupedAchievements['pantry-shopping'].filter(a => a.completed).length,
-          'fun': groupedAchievements['fun'].filter(a => a.completed).length,
           'milestone': groupedAchievements['milestone'].filter(a => a.completed).length
         }
       }

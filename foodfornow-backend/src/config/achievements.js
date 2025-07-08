@@ -133,106 +133,36 @@ const achievements = {
     requiredProgress: 50
   },
 
-  // Fun/Special Achievements
-  'night-owl-cooking': {
-    name: 'Night Owl',
-    description: 'Cook a meal after 10 PM',
-    category: 'fun',
-    icon: '🌙',
-    requiredProgress: 1
-  },
-  'early-bird-cooking': {
-    name: 'Early Bird',
-    description: 'Cook breakfast before 8 AM',
-    category: 'fun',
-    icon: '🌅',
-    requiredProgress: 1
-  },
-  'party-planner': {
-    name: 'Party Planner',
-    description: 'Plan meals for 4+ people',
-    category: 'fun',
-    icon: '🎉',
-    requiredProgress: 1
-  },
-  'pizza-lover': {
-    name: 'Pizza Lover',
-    description: 'Create 3 pizza recipes',
-    category: 'fun',
-    icon: '🍕',
-    requiredProgress: 3
-  },
-  'sweet-tooth': {
-    name: 'Sweet Tooth',
-    description: 'Create 5 dessert recipes',
-    category: 'fun',
-    icon: '🍰',
-    requiredProgress: 5
-  },
-  'health-nut': {
-    name: 'Health Nut',
-    description: 'Create 10 vegetarian recipes',
-    category: 'fun',
-    icon: '🌱',
-    requiredProgress: 10
-  },
-  'world-cuisine': {
-    name: 'World Cuisine',
-    description: 'Create recipes from 5 different cuisines',
-    category: 'fun',
-    icon: '🌍',
-    requiredProgress: 5
-  },
-  'holiday-cooking': {
-    name: 'Celebration Chef',
-    description: 'Cook on a holiday',
-    category: 'fun',
-    icon: '🎊',
-    requiredProgress: 1
-  },
-  'speed-demon': {
-    name: 'Speed Demon',
-    description: 'Cook 3 meals in under 2 hours total',
-    category: 'fun',
-    icon: '🔥',
-    requiredProgress: 3
-  },
-  'the-improviser': {
-    name: 'The Improviser',
-    description: 'Cook a meal with only 3 ingredients',
-    category: 'fun',
-    icon: '🎭',
-    requiredProgress: 1
-  },
+
 
   // Milestone Achievements
   'bronze-chef': {
     name: 'Bronze Chef',
-    description: 'Complete 10 achievements',
+    description: 'Complete 5 achievements',
     category: 'milestone',
     icon: '🏅',
-    requiredProgress: 10
+    requiredProgress: 5
   },
   'silver-chef': {
     name: 'Silver Chef',
-    description: 'Complete 25 achievements',
+    description: 'Complete 10 achievements',
     category: 'milestone',
     icon: '🥈',
-    requiredProgress: 25
+    requiredProgress: 10
   },
   'gold-chef': {
     name: 'Gold Chef',
-    description: 'Complete 50 achievements',
+    description: 'Complete 15 achievements',
     category: 'milestone',
     icon: '🥇',
-    requiredProgress: 50
+    requiredProgress: 15
   },
   'master-chef': {
     name: 'Master Chef',
     description: 'Complete all achievements',
     category: 'milestone',
     icon: '👑',
-    requiredProgress: 1
+    requiredProgress: 17
   }
 };
 

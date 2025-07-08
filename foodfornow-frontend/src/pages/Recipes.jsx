@@ -35,6 +35,8 @@ import { useAchievements } from '../context/AchievementContext';
 import { getCategoryColor } from '../utils/categoryColors';
 import { useNavigate } from 'react-router-dom';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
   const theme = useTheme();
@@ -366,7 +368,10 @@ const Recipes = () => {
     }
   }, [tab, searchTerm, authenticated]);
 
-  const handleOpenDialog = (recipe = null) => {
+  const handleOpenDialog = async (recipe = null) => {
+    // Refresh ingredients list when opening the dialog
+    await fetchIngredients();
+    
     if (recipe) {
       setEditingRecipe(recipe);
       setFormData({
@@ -432,12 +437,62 @@ const Recipes = () => {
     });
   };
 
+  // Move instruction up
+  const handleMoveInstructionUp = (index) => {
+    if (index === 0) return;
+    const newInstructions = [...formData.instructions];
+    [newInstructions[index - 1], newInstructions[index]] = [newInstructions[index], newInstructions[index - 1]];
+    setFormData({ ...formData, instructions: newInstructions });
+  };
+  // Move instruction down
+  const handleMoveInstructionDown = (index) => {
+    if (index === formData.instructions.length - 1) return;
+    const newInstructions = [...formData.instructions];
+    [newInstructions[index + 1], newInstructions[index]] = [newInstructions[index], newInstructions[index + 1]];
+    setFormData({ ...formData, instructions: newInstructions });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.name?.trim()) {
+      setError('Recipe name is required');
+      return;
+    }
+    if (!formData.description?.trim()) {
+      setError('Recipe description is required');
+      return;
+    }
+    if (!formData.prepTime || formData.prepTime <= 0) {
+      setError('Prep time must be greater than 0');
+      return;
+    }
+    if (!formData.cookTime || formData.cookTime <= 0) {
+      setError('Cook time must be greater than 0');
+      return;
+    }
+    if (!formData.servings || formData.servings <= 0) {
+      setError('Servings must be greater than 0');
+      return;
+    }
+    if (!formData.instructions || formData.instructions.length === 0 || !formData.instructions[0]?.trim()) {
+      setError('At least one instruction is required');
+      return;
+    }
+    if (!formData.ingredients || formData.ingredients.length === 0 || !formData.ingredients[0]?.ingredient) {
+      setError('At least one ingredient is required');
+      return;
+    }
+    
     try {
       setLoading(true);
       const recipeData = {
         ...formData,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        instructions: formData.instructions.filter(instruction => instruction.trim()),
+        ingredients: formData.ingredients.filter(ing => ing.ingredient && ing.quantity && ing.unit),
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
       };
 
@@ -457,7 +512,11 @@ const Recipes = () => {
       setError('');
     } catch (err) {
       console.error('Error saving recipe:', err);
-      setError('Failed to save recipe. Please try again.');
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError('Failed to save recipe. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -559,7 +618,7 @@ const Recipes = () => {
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
-            onClick={() => setOpenDialog(true)}
+            onClick={() => handleOpenDialog()}
             size="small"
           >
             Add Recipe
@@ -772,7 +831,7 @@ const Recipes = () => {
             </Typography>
             <Button
               variant="contained"
-              onClick={handleOpenDialog}
+              onClick={() => { console.log('Middle Add Recipe button clicked'); handleOpenDialog(); }}
               sx={{
                 textTransform: 'none',
                 background: theme.palette.mode === 'dark'
@@ -1057,7 +1116,7 @@ const Recipes = () => {
                   Instructions
                 </Typography>
                 {formData.instructions.map((instruction, index) => (
-                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
                     <TextField
                       label={`Step ${index + 1}`}
                       value={instruction}
@@ -1070,8 +1129,23 @@ const Recipes = () => {
                       required
                     />
                     <IconButton
+                      onClick={() => handleMoveInstructionUp(index)}
+                      disabled={index === 0}
+                      size="small"
+                    >
+                      <ArrowUpwardIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => handleMoveInstructionDown(index)}
+                      disabled={index === formData.instructions.length - 1}
+                      size="small"
+                    >
+                      <ArrowDownwardIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
                       onClick={() => handleRemoveInstruction(index)}
                       disabled={formData.instructions.length === 1}
+                      size="small"
                     >
                       <DeleteIcon />
                     </IconButton>

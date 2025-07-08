@@ -142,7 +142,9 @@ const Ingredients = () => {
     });
   };
 
-  const handleSaveIngredient = async () => {
+  const handleSaveIngredient = async (e) => {
+    e.preventDefault(); // Prevent form from submitting normally
+    
     try {
       const ingredientData = {
         name: editingIngredient.name,
@@ -270,7 +272,7 @@ const Ingredients = () => {
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
-            onClick={() => setOpenDialog(true)}
+            onClick={() => handleOpenDialog()}
             size="small"
           >
             Add Ingredient

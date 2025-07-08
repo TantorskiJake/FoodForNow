@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Paper, IconButton, Slide } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
-import { useCustomTheme } from '../context/ThemeContext';
+import { useTheme as useCustomTheme } from '../context/ThemeContext';
 
 /**
  * AchievementNotification Component
@@ -11,7 +11,7 @@ import { useCustomTheme } from '../context/ThemeContext';
  */
 const AchievementNotification = ({ achievement, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const { theme } = useCustomTheme();
+  const { darkMode } = useCustomTheme();
 
   useEffect(() => {
     // Show notification after a brief delay
@@ -44,10 +44,10 @@ const AchievementNotification = ({ achievement, onClose }) => {
           minWidth: 320,
           maxWidth: 400,
           p: 2,
-          background: theme === 'dark' ? '#2d3748' : '#ffffff',
-          border: `2px solid ${theme === 'dark' ? '#4a5568' : '#e2e8f0'}`,
+          background: darkMode ? '#2d3748' : '#ffffff',
+          border: `2px solid ${darkMode ? '#4a5568' : '#e2e8f0'}`,
           borderRadius: 2,
-          boxShadow: theme === 'dark' 
+          boxShadow: darkMode 
             ? '0 10px 25px rgba(0, 0, 0, 0.5)' 
             : '0 10px 25px rgba(0, 0, 0, 0.15)'
         }}
@@ -77,7 +77,7 @@ const AchievementNotification = ({ achievement, onClose }) => {
               variant="h6"
               sx={{
                 fontWeight: 600,
-                color: theme === 'dark' ? '#f7fafc' : '#1a202c',
+                color: darkMode ? '#f7fafc' : '#1a202c',
                 mb: 0.5,
                 fontSize: '1rem'
               }}
@@ -88,7 +88,7 @@ const AchievementNotification = ({ achievement, onClose }) => {
               variant="subtitle1"
               sx={{
                 fontWeight: 500,
-                color: theme === 'dark' ? '#e2e8f0' : '#2d3748',
+                color: darkMode ? '#e2e8f0' : '#2d3748',
                 mb: 1,
                 fontSize: '0.95rem'
               }}
@@ -98,7 +98,7 @@ const AchievementNotification = ({ achievement, onClose }) => {
             <Typography
               variant="body2"
               sx={{
-                color: theme === 'dark' ? '#a0aec0' : '#4a5568',
+                color: darkMode ? '#a0aec0' : '#4a5568',
                 fontSize: '0.875rem',
                 lineHeight: 1.4
               }}
@@ -112,10 +112,10 @@ const AchievementNotification = ({ achievement, onClose }) => {
             size="small"
             onClick={handleClose}
             sx={{
-              color: theme === 'dark' ? '#a0aec0' : '#718096',
+              color: darkMode ? '#a0aec0' : '#718096',
               '&:hover': {
-                color: theme === 'dark' ? '#e2e8f0' : '#2d3748',
-                background: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+                color: darkMode ? '#e2e8f0' : '#2d3748',
+                background: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
               }
             }}
           >

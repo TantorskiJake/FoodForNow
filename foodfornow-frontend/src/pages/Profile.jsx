@@ -42,6 +42,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Autocomplete,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -84,6 +85,21 @@ import { toast } from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme as useCustomTheme } from '../context/ThemeContext';
+import worldCities from '../utils/worldCities.json';
+import { matchSorter } from 'match-sorter';
+// Remove GeoNames import
+
+// Add a helper to find the city object from a string
+function findCityObj(locationStr) {
+  if (!locationStr) return null;
+  // Try to match city, subcountry, country
+  const [city, rest] = locationStr.split(',').map(s => s.trim());
+  if (!city || !rest) return null;
+  // Try to match city and country (ignore subcountry for now)
+  return worldCities.find(
+    c => c.city.toLowerCase() === city.toLowerCase() && rest.toLowerCase().includes(c.country.toLowerCase())
+  ) || null;
+}
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -144,6 +160,7 @@ const Profile = () => {
   });
 
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [locationOptions, setLocationOptions] = useState([]);
 
   // Update password validation on password change
   useEffect(() => {
@@ -166,12 +183,18 @@ const Profile = () => {
 
   useEffect(() => {
     if (!authLoading && user) {
+      // Try to pre-select the city object if location is a string
+      let locationObj = null;
+      if (typeof user.location === 'string' && user.location) {
+        locationObj = findCityObj(user.location);
+      }
       setFormData(prev => ({
         ...prev,
         name: user.name || '',
         email: user.email || '',
         bio: user.bio || '',
-        location: user.location || '',
+        location: typeof user.location === 'string' ? user.location : '',
+        locationObj,
         website: user.website || '',
         notifications: {
           email: user.notifications?.email ?? true,
@@ -246,6 +269,19 @@ const Profile = () => {
       reader.onload = (e) => setImagePreview(e.target.result);
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleLocationInputChange = (_, value) => {
+    if (!value) {
+      setLocationOptions([]);
+      return;
+    }
+    // Fuzzy search cities and countries
+    const matches = matchSorter(worldCities, value, {
+      keys: ['city', 'country', 'subcountry'],
+      threshold: matchSorter.rankings.CONTAINS,
+    });
+    setLocationOptions(matches.slice(0, 10));
   };
 
   const generateAvatar = () => {
@@ -328,7 +364,7 @@ const Profile = () => {
         name: response.data.user.name,
         email: response.data.user.email,
         bio: response.data.user.bio || '',
-        location: response.data.user.location || '',
+        location: response.data.user.location || prev.location,
         website: response.data.user.website || '',
         preferences: response.data.user.preferences || prev.preferences,
         notifications: response.data.user.notifications || prev.notifications,
@@ -388,6 +424,41 @@ const Profile = () => {
       </Box>
     );
   }
+
+  // Restore WORLD_LOCATIONS
+  const WORLD_LOCATIONS = [
+    { city: '', country: 'United States' },
+    { city: '', country: 'Canada' },
+    { city: '', country: 'United Kingdom' },
+    { city: '', country: 'Australia' },
+    { city: '', country: 'Germany' },
+    { city: '', country: 'France' },
+    { city: '', country: 'Japan' },
+    { city: '', country: 'Brazil' },
+    { city: '', country: 'India' },
+    { city: '', country: 'South Africa' },
+    { city: 'New York', country: 'United States' },
+    { city: 'Los Angeles', country: 'United States' },
+    { city: 'London', country: 'United Kingdom' },
+    { city: 'Paris', country: 'France' },
+    { city: 'Berlin', country: 'Germany' },
+    { city: 'Tokyo', country: 'Japan' },
+    { city: 'Sydney', country: 'Australia' },
+    { city: 'Toronto', country: 'Canada' },
+    { city: 'Rio de Janeiro', country: 'Brazil' },
+    { city: 'Mumbai', country: 'India' },
+    { city: 'Cape Town', country: 'South Africa' },
+    { city: 'Beijing', country: 'China' },
+    { city: 'Moscow', country: 'Russia' },
+    { city: 'Rome', country: 'Italy' },
+    { city: 'Madrid', country: 'Spain' },
+    { city: 'Mexico City', country: 'Mexico' },
+    { city: 'Istanbul', country: 'Turkey' },
+    { city: 'Seoul', country: 'South Korea' },
+    { city: 'Singapore', country: 'Singapore' },
+    { city: 'Dubai', country: 'United Arab Emirates' },
+    // ...add more as needed
+  ];
 
   return (
     <Box
@@ -759,29 +830,33 @@ const Profile = () => {
                             />
                           </Grid>
                           <Grid item xs={12} sm={6}>
-                            <TextField
-                              fullWidth
-                              label="Location"
-                              name="location"
-                              value={formData.location}
-                              onChange={handleChange}
-                              disabled={saving}
-                              placeholder="City, Country"
-                              sx={{
-                                '& .MuiOutlinedInput-root': {
-                                  borderRadius: 2,
-                                  '& fieldset': {
-                                    borderColor: theme.palette.mode === 'dark'
-                                      ? 'rgba(255, 255, 255, 0.1)'
-                                      : 'rgba(0, 0, 0, 0.1)',
-                                  },
-                                  '&:hover fieldset': {
-                                    borderColor: theme.palette.mode === 'dark'
-                                      ? 'rgba(255, 255, 255, 0.2)'
-                                      : 'rgba(0, 0, 0, 0.2)',
-                                  },
-                                },
+                            <Autocomplete
+                              options={locationOptions}
+                              getOptionLabel={(option) =>
+                                option.city && option.country
+                                  ? `${option.city}, ${option.subcountry ? option.subcountry + ', ' : ''}${option.country}`
+                                  : ''
+                              }
+                              value={formData.locationObj || null}
+                              onInputChange={handleLocationInputChange}
+                              onChange={(_, newValue) => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  locationObj: newValue,
+                                  location: newValue ? `${newValue.city}, ${newValue.country}` : '', // store as string for backend
+                                }));
                               }}
+                              isOptionEqualToValue={(option, value) =>
+                                option.city === value.city && option.country === value.country && option.subcountry === value.subcountry
+                              }
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label="Location"
+                                  placeholder="Type your city"
+                                  disabled={saving}
+                                />
+                              )}
                             />
                           </Grid>
                           <Grid item xs={12} sm={6}>

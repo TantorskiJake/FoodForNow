@@ -31,7 +31,7 @@ const achievementSchema = new mongoose.Schema({
   // Achievement category
   category: {
     type: String,
-    enum: ['getting-started', 'recipe-mastery', 'meal-planning', 'pantry-shopping', 'fun', 'milestone'],
+    enum: ['getting-started', 'recipe-mastery', 'meal-planning', 'pantry-shopping', 'milestone'],
     required: true
   },
   // Achievement icon/emoji

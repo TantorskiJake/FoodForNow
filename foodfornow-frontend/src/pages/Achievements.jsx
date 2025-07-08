@@ -85,7 +85,6 @@ const Achievements = () => {
       'recipe-mastery': <RestaurantIcon />,
       'meal-planning': <CalendarTodayIcon />,
       'pantry-shopping': <ShoppingCartIcon />,
-      'fun': <CelebrationIcon />,
       'milestone': <MilitaryTechIcon />
     };
     return icons[category] || <TrophyIcon />;
@@ -97,7 +96,6 @@ const Achievements = () => {
       'recipe-mastery': '#ff9800',
       'meal-planning': '#2196f3',
       'pantry-shopping': '#9c27b0',
-      'fun': '#f44336',
       'milestone': '#ffd700'
     };
     return colors[category] || '#757575';
@@ -109,14 +107,17 @@ const Achievements = () => {
       'recipe-mastery': 'Recipe Mastery',
       'meal-planning': 'Meal Planning',
       'pantry-shopping': 'Pantry & Shopping',
-      'fun': 'Fun & Special',
       'milestone': 'Milestones'
     };
     return names[category] || category;
   };
 
   const renderAchievementCard = (achievement) => {
-    const progress = (achievement.progress / achievement.requiredProgress) * 100;
+    // For milestone achievements, cap progress at 100% when completed
+    let progress = (achievement.progress / achievement.requiredProgress) * 100;
+    if (achievement.category === 'milestone' && achievement.completed) {
+      progress = 100;
+    }
     const isCompleted = achievement.completed;
     const isStarted = achievement.progress > 0;
 
@@ -185,7 +186,10 @@ const Achievements = () => {
                   Progress
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {achievement.progress} / {achievement.requiredProgress}
+                  {achievement.category === 'milestone' && achievement.completed 
+                    ? `${achievement.requiredProgress} / ${achievement.requiredProgress}`
+                    : `${achievement.progress} / ${achievement.requiredProgress}`
+                  }
                 </Typography>
               </Box>
               <LinearProgress

@@ -20,7 +20,9 @@ import {
   Button,
   List,
   ListItem,
-  ListItemText as MuiListItemText
+  ListItemText as MuiListItemText,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -39,6 +41,9 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
   const [missingIngredientsDialog, setMissingIngredientsDialog] = useState(false);
   const [missingIngredients, setMissingIngredients] = useState([]);
   const [selectedMealForCooking, setSelectedMealForCooking] = useState(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('error');
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
 
@@ -95,8 +100,18 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
         setMissingIngredients(error.response.data.missingIngredients);
         setSelectedMealForCooking(meal);
         setMissingIngredientsDialog(true);
+      } else if (error.response?.data?.error === 'Pantry not found') {
+        setSnackbarMessage('You need to add at least one item to your pantry before you can cook meals!');
+        setSnackbarSeverity('warning');
+        setSnackbarOpen(true);
+      } else if (error.response?.data?.error) {
+        setSnackbarMessage(error.response.data.error);
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
       } else {
-        console.error('Error cooking meal:', error);
+        setSnackbarMessage('Failed to cook meal. Please try again.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
       }
     }
   };
@@ -353,6 +368,25 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={snackbarMessage.includes('pantry') ? null : 4000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}
+          action={
+            snackbarMessage.includes('pantry') ? (
+              <Button color="inherit" size="small" onClick={() => { setSnackbarOpen(false); navigate('/pantry'); }}>
+                Go to Pantry
+              </Button>
+            ) : null
+          }
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
 
       <Menu
         anchorEl={menuAnchor}

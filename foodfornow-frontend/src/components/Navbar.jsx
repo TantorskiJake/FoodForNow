@@ -53,7 +53,20 @@ const Navbar = () => {
     navigate('/login');
   };
 
-  if (loading || !authenticated) {
+  if (loading) {
+    return (
+      <AppBar position="static">
+        <Toolbar>
+          <RestaurantIcon sx={{ mr: 2 }} />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            FoodForNow
+          </Typography>
+        </Toolbar>
+      </AppBar>
+    );
+  }
+
+  if (!authenticated) {
     return null;
   }
 

@@ -220,12 +220,12 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Recipe has no ingredients' });
     }
 
-    // Get user's pantry
     const Pantry = require('../models/pantry');
-    const pantry = await Pantry.findOne({ user: req.userId });
-    
+    let pantry = await Pantry.findOne({ user: req.userId });
+    // Auto-create pantry if it doesn't exist
     if (!pantry) {
-      return res.status(404).json({ error: 'Pantry not found' });
+      pantry = new Pantry({ user: req.userId, items: [] });
+      await pantry.save();
     }
 
     const missingIngredients = [];

@@ -85,6 +85,10 @@ class AchievementService {
     const welcomeAboard = await this.checkAchievement(userId, 'welcome-aboard');
     if (welcomeAboard) results.push(welcomeAboard);
 
+    // Check milestone achievements
+    const milestoneResults = await this.checkMilestoneAchievements(userId);
+    results.push(...milestoneResults);
+
     return results;
   }
 
@@ -111,29 +115,9 @@ class AchievementService {
       if (master) results.push(master);
     }
 
-    // Check cuisine-based achievements
-    if (recipe.category) {
-      const cuisineResults = await this.checkCuisineAchievements(userId);
-      results.push(...cuisineResults);
-    }
-
-    // Check dessert recipes
-    if (recipe.category === 'Dessert') {
-      const dessertResults = await this.checkDessertAchievements(userId);
-      results.push(...dessertResults);
-    }
-
-    // Check pizza recipes
-    if (recipe.name && recipe.name.toLowerCase().includes('pizza')) {
-      const pizzaResults = await this.checkPizzaAchievements(userId);
-      results.push(...pizzaResults);
-    }
-
-    // Check vegetarian recipes
-    if (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes('vegetarian'))) {
-      const vegResults = await this.checkVegetarianAchievements(userId);
-      results.push(...vegResults);
-    }
+    // Check milestone achievements
+    const milestoneResults = await this.checkMilestoneAchievements(userId);
+    results.push(...milestoneResults);
 
     return results;
   }
@@ -161,16 +145,7 @@ class AchievementService {
       if (seasonedChef) results.push(seasonedChef);
     }
 
-    // Check time-based achievements
-    const cookingHour = new Date().getHours();
-    if (cookingHour >= 22) {
-      const nightOwl = await this.checkAchievement(userId, 'night-owl-cooking');
-      if (nightOwl) results.push(nightOwl);
-    }
-    if (cookingHour < 8) {
-      const earlyBird = await this.checkAchievement(userId, 'early-bird-cooking');
-      if (earlyBird) results.push(earlyBird);
-    }
+
 
     // Check consecutive cooking days
     const consecutiveResults = await this.checkConsecutiveCookingDays(userId);
@@ -179,6 +154,10 @@ class AchievementService {
     // Check meals per day
     const mealsPerDayResults = await this.checkMealsPerDay(userId);
     results.push(...mealsPerDayResults);
+
+    // Check milestone achievements
+    const milestoneResults = await this.checkMilestoneAchievements(userId);
+    results.push(...milestoneResults);
 
     return results;
   }
@@ -207,6 +186,10 @@ class AchievementService {
         if (groceryGuru) results.push(groceryGuru);
       }
     }
+
+    // Check milestone achievements
+    const milestoneResults = await this.checkMilestoneAchievements(userId);
+    results.push(...milestoneResults);
 
     return results;
   }
@@ -237,6 +220,10 @@ class AchievementService {
       if (stockMaster) results.push(stockMaster);
     }
 
+    // Check milestone achievements
+    const milestoneResults = await this.checkMilestoneAchievements(userId);
+    results.push(...milestoneResults);
+
     return results;
   }
 
@@ -251,12 +238,16 @@ class AchievementService {
     const firstPlan = await this.checkAchievement(userId, 'first-meal-plan');
     if (firstPlan) results.push(firstPlan);
 
-    // Check full week planning
+    // Check full week planning (all 21 slots)
     const weekMeals = await this.getWeekMealsCount(userId);
-    if (weekMeals >= 7) {
+    if (weekMeals >= 21) {
       const weeklyWarrior = await this.checkAchievement(userId, 'full-week-planned');
       if (weeklyWarrior) results.push(weeklyWarrior);
     }
+
+    // Check milestone achievements
+    const milestoneResults = await this.checkMilestoneAchievements(userId);
+    results.push(...milestoneResults);
 
     return results;
   }
@@ -270,16 +261,21 @@ class AchievementService {
 
     const completedCount = await this.getCompletedAchievementsCount(userId);
     
-    if (completedCount === 10) {
-      const bronze = await this.checkAchievement(userId, 'bronze-chef');
+    // Check Bronze Chef (5 achievements)
+    if (completedCount >= 5) {
+      const bronze = await this.checkAchievement(userId, 'bronze-chef', completedCount);
       if (bronze) results.push(bronze);
     }
-    if (completedCount === 25) {
-      const silver = await this.checkAchievement(userId, 'silver-chef');
+    
+    // Check Silver Chef (10 achievements)
+    if (completedCount >= 10) {
+      const silver = await this.checkAchievement(userId, 'silver-chef', completedCount);
       if (silver) results.push(silver);
     }
-    if (completedCount === 50) {
-      const gold = await this.checkAchievement(userId, 'gold-chef');
+    
+    // Check Gold Chef (15 achievements)
+    if (completedCount >= 15) {
+      const gold = await this.checkAchievement(userId, 'gold-chef', completedCount);
       if (gold) results.push(gold);
     }
 
@@ -324,93 +320,22 @@ class AchievementService {
     const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
-    
-    return await MealPlan.countDocuments({
+
+    // Find all meal plans for the user in the current week
+    const meals = await MealPlan.find({
       user: userId,
       weekStart: { $gte: weekStart, $lt: weekEnd }
     });
+    // Count unique (day, meal) pairs
+    const uniqueSlots = new Set(meals.map(m => `${m.day}|${m.meal}`));
+    return uniqueSlots.size;
   }
 
   static async getCompletedAchievementsCount(userId) {
     return await Achievement.countDocuments({ userId, completed: true });
   }
 
-  static async checkCuisineAchievements(userId) {
-    const results = [];
-    
-    // Get all user recipes
-    const recipes = await Recipe.find({ createdBy: userId });
-    const cuisines = new Set();
-    
-    recipes.forEach(recipe => {
-      if (recipe.tags) {
-        recipe.tags.forEach(tag => {
-          const lowerTag = tag.toLowerCase();
-          if (lowerTag.includes('italian') || lowerTag.includes('chinese') || 
-              lowerTag.includes('mexican') || lowerTag.includes('indian') || 
-              lowerTag.includes('japanese') || lowerTag.includes('french') ||
-              lowerTag.includes('thai') || lowerTag.includes('greek')) {
-            cuisines.add(tag);
-          }
-        });
-      }
-    });
-    
-    if (cuisines.size >= 5) {
-      const worldCuisine = await this.checkAchievement(userId, 'world-cuisine');
-      if (worldCuisine) results.push(worldCuisine);
-    }
-    
-    return results;
-  }
 
-  static async checkDessertAchievements(userId) {
-    const results = [];
-    
-    const dessertRecipes = await Recipe.countDocuments({
-      createdBy: userId,
-      category: 'Dessert'
-    });
-    
-    if (dessertRecipes >= 5) {
-      const sweetTooth = await this.checkAchievement(userId, 'sweet-tooth');
-      if (sweetTooth) results.push(sweetTooth);
-    }
-    
-    return results;
-  }
-
-  static async checkPizzaAchievements(userId) {
-    const results = [];
-    
-    const pizzaRecipes = await Recipe.countDocuments({
-      createdBy: userId,
-      name: { $regex: /pizza/i }
-    });
-    
-    if (pizzaRecipes >= 3) {
-      const pizzaLover = await this.checkAchievement(userId, 'pizza-lover');
-      if (pizzaLover) results.push(pizzaLover);
-    }
-    
-    return results;
-  }
-
-  static async checkVegetarianAchievements(userId) {
-    const results = [];
-    
-    const vegetarianRecipes = await Recipe.countDocuments({
-      createdBy: userId,
-      tags: { $regex: /vegetarian/i }
-    });
-    
-    if (vegetarianRecipes >= 10) {
-      const healthNut = await this.checkAchievement(userId, 'health-nut');
-      if (healthNut) results.push(healthNut);
-    }
-    
-    return results;
-  }
 
   static async checkConsecutiveCookingDays(userId) {
     const results = [];
