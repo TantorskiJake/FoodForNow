@@ -32,9 +32,11 @@ import MealPlanGrid from '../components/MealPlanGrid';
 import { getCategoryColor } from '../utils/categoryColors';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 const Dashboard = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [recipes, setRecipes] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
   const [ingredients, setIngredients] = useState([]);
@@ -505,8 +507,8 @@ const Dashboard = () => {
     <Container 
       maxWidth={false}
       sx={{ 
-        py: 4,
-        px: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8 },
+        py: { xs: 2, sm: 4 },
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
@@ -969,11 +971,15 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      <Dialog open={openMealDialog} onClose={handleCloseMealDialog}>
+      <Dialog
+        open={openMealDialog}
+        onClose={handleCloseMealDialog}
+        fullScreen={isMobile}
+      >
         <DialogTitle>
           {mealFormData._id ? 'Edit Meal' : `Add Meal - ${mealFormData.day} ${mealFormData.meal}`}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
           {mealFormData._id ? (
             // Editing existing meal - show all fields
             <>
@@ -1045,9 +1051,13 @@ const Dashboard = () => {
       </Dialog>
 
       {/* Reset Week Confirmation Dialog */}
-      <Dialog open={resetWeekDialog} onClose={handleCloseResetWeekDialog}>
-        <DialogTitle>Reset Week</DialogTitle>
-        <DialogContent>
+      <Dialog
+        open={resetWeekDialog}
+        onClose={handleCloseResetWeekDialog}
+        fullScreen={isMobile}
+      >
+        <DialogTitle>Reset Meal Plan</DialogTitle>
+        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
           <Typography variant="body1" sx={{ mb: 2 }}>
             Are you sure you want to reset your meal plan for this week?
           </Typography>

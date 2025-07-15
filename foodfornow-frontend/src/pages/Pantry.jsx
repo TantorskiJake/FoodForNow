@@ -22,7 +22,8 @@ import {
   Paper,
   useTheme,
   CircularProgress,
-  Grid
+  Grid,
+  useMediaQuery
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -52,6 +53,7 @@ const Pantry = () => {
   const [ingredients, setIngredients] = useState([]);
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
   const [sortBy, setSortBy] = useState('name');
@@ -364,7 +366,14 @@ const Pantry = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container 
+      maxWidth={false}
+      sx={{ 
+        py: { xs: 2, sm: 4 },
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
+        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+      }}
+    >
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Pantry
@@ -594,9 +603,9 @@ const Pantry = () => {
         </Grid>
       )}
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={handleCloseDialog} fullScreen={isMobile}>
         <DialogTitle>{editingItem ? 'Edit Pantry Item' : 'Add Pantry Item'}</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
             <FormControl fullWidth required sx={{ mb: 2 }}>
               <InputLabel>Ingredient</InputLabel>
@@ -661,11 +670,10 @@ const Pantry = () => {
       <Dialog
         open={openClearConfirmDialog}
         onClose={() => setOpenClearConfirmDialog(false)}
-        maxWidth="sm"
-        fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle>Clear All Pantry Items</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
           <Typography>
             Are you sure you want to remove all items from your pantry? This action cannot be undone.
           </Typography>

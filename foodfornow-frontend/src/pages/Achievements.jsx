@@ -27,6 +27,7 @@ import {
   ListItemText,
   Divider,
   Paper,
+  useMediaQuery,
 } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
@@ -49,6 +50,7 @@ import api from '../services/api';
 
 const Achievements = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [achievements, setAchievements] = useState({});
@@ -300,7 +302,7 @@ const Achievements = () => {
         background: theme.palette.mode === 'dark' 
           ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)'
           : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%)',
-        py: 4,
+        py: { xs: 2, sm: 4 },
       }}
     >
       <Container maxWidth="lg">

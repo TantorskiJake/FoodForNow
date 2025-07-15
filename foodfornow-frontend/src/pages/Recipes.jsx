@@ -37,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
   const theme = useTheme();
@@ -179,6 +180,7 @@ const Recipes = () => {
   });
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
 
   // Shared recipes and tab state
@@ -568,8 +570,8 @@ const Recipes = () => {
     <Container 
       maxWidth={false}
       sx={{ 
-        py: 4,
-        px: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8 },
+        py: { xs: 2, sm: 4 },
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
@@ -1015,12 +1017,14 @@ const Recipes = () => {
         )
       )}
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {editingRecipe ? 'Edit Recipe' : 'Add Recipe'}
-        </DialogTitle>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        fullScreen={isMobile}
+      >
+        <DialogTitle>{editingRecipe ? 'Edit Recipe' : 'Add Recipe'}</DialogTitle>
         <form onSubmit={handleSubmit}>
-          <DialogContent>
+          <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField

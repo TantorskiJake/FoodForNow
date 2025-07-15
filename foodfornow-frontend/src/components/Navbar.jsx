@@ -23,6 +23,13 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import FFNLogo from '../assets/FFNLogoTrans.png';
+import MenuIcon from '@mui/icons-material/Menu';
+import Drawer from '@mui/material/Drawer';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 const pages = [
   { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
@@ -35,9 +42,11 @@ const pages = [
 
 const Navbar = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   const location = useLocation();
   const [anchorEl, setAnchorEl] = React.useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { authenticated, loading, refreshAuth, user } = useAuth();
 
   const handleMenu = (event) => {
@@ -80,95 +89,121 @@ const Navbar = () => {
           src={FFNLogo} 
           alt="Food For Now Logo" 
           style={{ 
-            maxHeight: 72, // Increased logo height
+            maxHeight: isMobile ? 40 : 72, // Smaller logo on mobile
             width: 'auto',
-            marginRight: 24, // More spacing from nav items
+            marginRight: isMobile ? 8 : 24, // Less spacing on mobile
             display: 'block',
             objectFit: 'contain',
             verticalAlign: 'middle'
           }} 
         />
-        {/* <Typography 
-          variant="h6" 
-          component="div" 
-          sx={{ 
-            flexGrow: 1,
-            cursor: 'pointer'
-          }}
-          onClick={() => navigate('/dashboard')}
-        >
-          FoodForNow
-        </Typography> */}
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginLeft: 'auto' }}>
-          {pages.map((page) => (
-            <Button
-              key={page.name}
+        {isMobile ? (
+          <>
+            <IconButton
               color="inherit"
-              onClick={() => navigate(page.path)}
-              startIcon={page.icon}
-              sx={{
-                mx: 0.5,
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                },
-                backgroundColor: location.pathname === page.path ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-              }}
+              edge="end"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ marginLeft: 'auto' }}
             >
-              {page.name}
-            </Button>
-          ))}
+              <MenuIcon />
+            </IconButton>
+            <Drawer
+              anchor="right"
+              open={drawerOpen}
+              onClose={() => setDrawerOpen(false)}
+            >
+              <Box
+                sx={{ width: 250 }}
+                role="presentation"
+                onClick={() => setDrawerOpen(false)}
+                onKeyDown={() => setDrawerOpen(false)}
+              >
+                <List>
+                  {pages.map((page) => (
+                    <ListItem button key={page.name} onClick={() => navigate(page.path)} selected={location.pathname === page.path}>
+                      <ListItemIcon>{page.icon}</ListItemIcon>
+                      <ListItemText primary={page.name} />
+                    </ListItem>
+                  ))}
+                  <ListItem button onClick={handleLogout}>
+                    <ListItemIcon><AccountCircle /></ListItemIcon>
+                    <ListItemText primary="Logout" />
+                  </ListItem>
+                </List>
+              </Box>
+            </Drawer>
+          </>
+        ) : (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginLeft: 'auto' }}>
+            {pages.map((page) => (
+              <Button
+                key={page.name}
+                color="inherit"
+                onClick={() => navigate(page.path)}
+                startIcon={page.icon}
+                sx={{
+                  mx: 0.5,
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  backgroundColor: location.pathname === page.path ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                }}
+              >
+                {page.name}
+              </Button>
+            ))}
 
-          <IconButton
-            size="large"
-            aria-label="account of current user"
-            aria-controls="menu-appbar"
-            aria-haspopup="true"
-            onClick={handleMenu}
-            color="inherit"
-            sx={{
-              width: 40,
-              height: 40,
-              '& .MuiAvatar-root': {
+            <IconButton
+              size="large"
+              aria-label="account of current user"
+              aria-controls="menu-appbar"
+              aria-haspopup="true"
+              onClick={handleMenu}
+              color="inherit"
+              sx={{
                 width: 40,
                 height: 40,
-                fontSize: '1.2rem',
-                fontWeight: 600,
-                background: theme.palette.mode === 'dark'
-                  ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                  : '#228B22',
-              },
-            }}
-          >
-            {user?.profilePicture ? (
-              <Avatar src={user.profilePicture} alt={user.name} />
-            ) : userInitial ? (
-              <Avatar>{userInitial}</Avatar>
-            ) : (
-              <AccountCircle />
-            )}
-          </IconButton>
-          <Menu
-            id="menu-appbar"
-            anchorEl={anchorEl}
-            anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right',
-            }}
-            keepMounted
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
-            }}
-            open={Boolean(anchorEl)}
-            onClose={handleClose}
-          >
-            <MenuItem onClick={() => { handleClose(); navigate('/profile'); }}>
-              Edit Profile
-            </MenuItem>
-            <MenuItem onClick={handleLogout}>Logout</MenuItem>
-          </Menu>
-        </Box>
+                '& .MuiAvatar-root': {
+                  width: 40,
+                  height: 40,
+                  fontSize: '1.2rem',
+                  fontWeight: 600,
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                    : '#228B22',
+                },
+              }}
+            >
+              {user?.profilePicture ? (
+                <Avatar src={user.profilePicture} alt={user.name} />
+              ) : userInitial ? (
+                <Avatar>{userInitial}</Avatar>
+              ) : (
+                <AccountCircle />
+              )}
+            </IconButton>
+            <Menu
+              id="menu-appbar"
+              anchorEl={anchorEl}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              keepMounted
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              open={Boolean(anchorEl)}
+              onClose={handleClose}
+            >
+              <MenuItem onClick={() => { handleClose(); navigate('/profile'); }}>
+                Edit Profile
+              </MenuItem>
+              <MenuItem onClick={handleLogout}>Logout</MenuItem>
+            </Menu>
+          </Box>
+        )}
       </Toolbar>
     </AppBar>
   );

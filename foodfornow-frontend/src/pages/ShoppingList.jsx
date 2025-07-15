@@ -42,9 +42,11 @@ import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 const ShoppingList = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
   const [shoppingItems, setShoppingItems] = useState([]);
@@ -286,7 +288,14 @@ const ShoppingList = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container 
+      maxWidth={false}
+      sx={{ 
+        py: { xs: 2, sm: 4 },
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
+        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+      }}
+    >
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Shopping List
@@ -588,11 +597,10 @@ const ShoppingList = () => {
       <Dialog
         open={openClearConfirmDialog}
         onClose={() => setOpenClearConfirmDialog(false)}
-        maxWidth="sm"
-        fullWidth
+        fullScreen={isMobile}
       >
-        <DialogTitle>Clear All Shopping List Items</DialogTitle>
-        <DialogContent>
+        <DialogTitle>Clear Shopping List</DialogTitle>
+        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
           <Typography>
             Are you sure you want to remove all items from your shopping list? This action cannot be undone.
           </Typography>

@@ -87,6 +87,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme as useCustomTheme } from '../context/ThemeContext';
 import worldCities from '../utils/worldCities.json';
 import { matchSorter } from 'match-sorter';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 // Add a helper to find the city object from a string
 function findCityObj(locationStr) {
@@ -103,6 +104,7 @@ function findCityObj(locationStr) {
 const Profile = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { user, loading: authLoading, refreshAuth } = useAuth();
   const { setThemeFromPreference } = useCustomTheme();
   const [loading, setLoading] = useState(true);
@@ -431,7 +433,7 @@ const Profile = () => {
         background: theme.palette.mode === 'dark' 
           ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)'
           : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%)',
-        py: 4,
+        py: { xs: 2, sm: 4 },
       }}
     >
       <Container maxWidth="lg">
