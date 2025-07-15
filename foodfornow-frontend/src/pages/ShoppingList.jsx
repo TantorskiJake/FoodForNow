@@ -43,6 +43,7 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 const ShoppingList = () => {
   const theme = useTheme();
@@ -62,6 +63,7 @@ const ShoppingList = () => {
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [searchTerm, setSearchTerm] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
 
@@ -255,6 +257,28 @@ const ShoppingList = () => {
     }
   };
 
+  const handleBarcodeDetected = (barcode) => {
+    setScannerOpen(false);
+    const match = ingredients.find(ing => ing.barcode === barcode);
+    if (match) {
+      setFormData({
+        ingredient: match._id,
+        quantity: '',
+        unit: match.unit || '',
+      });
+      setOpenDialog(true);
+      toast.success(`Found ingredient: ${match.name}`);
+    } else {
+      toast.error(`No matching ingredient found for barcode: ${barcode}`);
+      setFormData({
+        ingredient: '',
+        quantity: '',
+        unit: '',
+      });
+      setOpenDialog(true);
+    }
+  };
+
   // Sort shopping items based on current sort setting
   const sortedShoppingItems = [...shoppingItems]
     .filter((item) => 
@@ -361,6 +385,15 @@ const ShoppingList = () => {
             size="small"
           >
             Auto Update
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => setScannerOpen(true)}
+            size="small"
+            sx={{ minWidth: 0, ml: 1 }}
+          >
+            Scan Barcode
           </Button>
         </Box>
       </Box>
@@ -614,6 +647,11 @@ const ShoppingList = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <BarcodeScanner
+        open={scannerOpen}
+        onDetected={handleBarcodeDetected}
+        onClose={() => setScannerOpen(false)}
+      />
     </Container>
   );
 };

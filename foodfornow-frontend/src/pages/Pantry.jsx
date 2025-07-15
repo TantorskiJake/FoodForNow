@@ -38,6 +38,7 @@ import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 const Pantry = () => {
   const [pantryItems, setPantryItems] = useState([]);
@@ -58,6 +59,7 @@ const Pantry = () => {
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [searchTerm, setSearchTerm] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
@@ -262,6 +264,32 @@ const Pantry = () => {
     }
   };
 
+  const handleBarcodeDetected = (barcode) => {
+    setScannerOpen(false);
+    const match = ingredients.find(ing => ing.barcode === barcode);
+    if (match) {
+      setFormData({
+        ingredient: match._id,
+        quantity: '',
+        unit: match.unit || '',
+        expiryDate: '',
+      });
+      setEditingItem(null);
+      setOpenDialog(true);
+      toast.success(`Found ingredient: ${match.name}`);
+    } else {
+      toast.error(`No matching ingredient found for barcode: ${barcode}`);
+      setFormData({
+        ingredient: '',
+        quantity: '',
+        unit: '',
+        expiryDate: '',
+      });
+      setEditingItem(null);
+      setOpenDialog(true);
+    }
+  };
+
   // Filter and sort pantry items
   const filteredItems = pantryItems
     .filter(item => {
@@ -420,6 +448,15 @@ const Pantry = () => {
             size="small"
           >
             Add Item
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => setScannerOpen(true)}
+            size="small"
+            sx={{ minWidth: 0, ml: 1 }}
+          >
+            Scan Barcode
           </Button>
         </Box>
       </Box>
@@ -687,6 +724,12 @@ const Pantry = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <BarcodeScanner
+        open={scannerOpen}
+        onDetected={handleBarcodeDetected}
+        onClose={() => setScannerOpen(false)}
+      />
     </Container>
   );
 };

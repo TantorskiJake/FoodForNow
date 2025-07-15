@@ -14,12 +14,15 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.12",
     "@mui/material": "^5.15.12",
+    "@zxing/browser": "^0.1.5",
     "axios": "^1.6.7",
     "match-sorter": "^8.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hot-toast": "^2.5.2",
-    "react-router-dom": "^6.22.3"
+    "react-qr-barcode-scanner": "^2.1.8",
+    "react-router-dom": "^6.22.3",
+    "react-zxing": "^2.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
