@@ -176,8 +176,8 @@ function App() {
                 } 
               />
               
-              {/* Default route - redirect to dashboard */}
-              <Route path="/" element={<Navigate to="/dashboard" />} />
+              {/* Default route - redirect to login */}
+              <Route path="/" element={<Navigate to="/login" />} />
             </Routes>
             
             {/* Global toast notifications */}
