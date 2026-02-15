@@ -152,7 +152,7 @@ const Profile = () => {
 
   // Password validation states
   const [passwordChecks, setPasswordChecks] = useState({
-    length: false,
+    minLength: false,
     lowercase: false,
     uppercase: false,
     number: false,
@@ -167,7 +167,7 @@ const Profile = () => {
   useEffect(() => {
     const { newPassword, confirmPassword } = formData;
     const checks = {
-      length: newPassword.length >= 8,
+      minLength: newPassword.length >= 8,
       lowercase: /[a-z]/.test(newPassword),
       uppercase: /[A-Z]/.test(newPassword),
       number: /[0-9]/.test(newPassword),
@@ -311,7 +311,7 @@ const Profile = () => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    console.log('Form submitted!');
+    if (import.meta.env.DEV) console.log('Form submitted!');
     setError('');
     setSuccess('');
 
@@ -355,9 +355,9 @@ const Profile = () => {
         updateData.newPassword = formData.newPassword;
       }
 
-      console.log('Sending profile update data:', updateData);
+      if (import.meta.env.DEV) console.log('Sending profile update data:', updateData);
       const response = await api.put('/auth/profile', updateData);
-      console.log('Profile update response:', response.data);
+      if (import.meta.env.DEV) console.log('Profile update response:', response.data);
       
       // Update form data with the response
       setFormData(prev => ({
@@ -1005,7 +1005,7 @@ const Profile = () => {
                                   <List dense>
                                     <ListItem sx={{ py: 0.5 }}>
                                       <ListItemIcon sx={{ minWidth: 36 }}>
-                                        {passwordChecks.length ? (
+                                        {passwordChecks.minLength ? (
                                           <CheckCircleIcon sx={{ color: '#34C759' }} />
                                         ) : (
                                           <CancelIcon sx={{ color: '#FF3B30' }} />

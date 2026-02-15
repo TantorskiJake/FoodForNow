@@ -4,7 +4,7 @@
 The backend of FoodForNow is built using Node.js and Express, providing a robust API for the frontend application. It handles user authentication, data management, and business logic.
 
 ## Features
-- **User Authentication**: Secure login and registration using JWT.
+- **User Authentication**: Secure login, registration, password reset (forgot/reset), and token refresh using JWT.
 - **API Routes**: Endpoints for managing pantry, recipes, and shopping lists.
 - **MongoDB Integration**: Data storage and retrieval using MongoDB.
 - **Middleware**: Custom middleware for authentication and error handling.
@@ -18,8 +18,8 @@ The backend of FoodForNow is built using Node.js and Express, providing a robust
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- npm (v6 or higher)
+- Node.js (v18 or higher)
+- npm (v8 or higher)
 - MongoDB (local or Atlas)
 
 ### Installation
@@ -67,6 +67,10 @@ The backend of FoodForNow is built using Node.js and Express, providing a robust
   - `POST /api/auth/login`: Login a user
   - `GET /api/auth/me`: Get current user info
   - `POST /api/auth/logout`: Logout a user
+  - `POST /api/auth/token`: Refresh access token
+  - `POST /api/auth/forgot-password`: Request password reset
+  - `POST /api/auth/reset-password`: Reset password with token
+  - `PUT /api/auth/profile`: Update user profile
 
 - **Pantry**
   - `GET /api/pantry`: Get all pantry items
@@ -76,6 +80,8 @@ The backend of FoodForNow is built using Node.js and Express, providing a robust
 
 - **Recipes**
   - `GET /api/recipes`: Get all recipes
+  - `GET /api/recipes/popular`: Get user's popular recipes
+  - `GET /api/recipes/shared`: Get shared recipes from other users
   - `POST /api/recipes`: Add a new recipe
   - `GET /api/recipes/:id`: Get a specific recipe
   - `PUT /api/recipes/:id`: Update a recipe
@@ -86,6 +92,21 @@ The backend of FoodForNow is built using Node.js and Express, providing a robust
   - `POST /api/shopping-list`: Add items to the shopping list
   - `PUT /api/shopping-list/:id`: Update a shopping list item
   - `DELETE /api/shopping-list/:id`: Delete a shopping list item
+
+- **Meal Plan**
+  - `GET /api/mealplan`: Get meal plan for date range
+  - `POST /api/mealplan`: Add meal to plan
+  - `PUT /api/mealplan/:id`: Update meal
+  - `PATCH /api/mealplan/:id/cook`: Mark meal as cooked
+  - `DELETE /api/mealplan/:id`: Remove meal
+  - `POST /api/mealplan/populate-week`: Auto-populate week
+  - `DELETE /api/mealplan/reset-week`: Clear week
+
+- **Achievements**
+  - `GET /api/achievements`: Get achievements (grouped by category)
+  - `GET /api/achievements/recent`: Get recently completed
+  - `POST /api/achievements/check`: Manually check achievement
+  - `GET /api/achievements/leaderboard`: Get leaderboard
 
 ## Contributing
 1. Fork the repository

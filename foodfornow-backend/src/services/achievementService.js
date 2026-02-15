@@ -4,6 +4,7 @@ const Recipe = require('../models/recipe');
 const MealPlan = require('../models/mealPlan');
 const Pantry = require('../models/pantry');
 const ShoppingListItem = require('../models/shopping-list-item');
+const User = require('../models/user');
 
 /**
  * Achievement Service
@@ -18,13 +19,13 @@ class AchievementService {
    * @param {string} userId - User ID
    * @param {string} achievementId - Achievement ID
    * @param {number} progress - Current progress value
+   * @param {string} progressMode - 'add' (default) to add progress, 'set' to set progress to max(current, progress)
    * @returns {Promise<Object>} - Achievement update result
    */
-  static async checkAchievement(userId, achievementId, progress = 1) {
+  static async checkAchievement(userId, achievementId, progress = 1, progressMode = 'add') {
     try {
       const achievementConfig = achievements[achievementId];
       if (!achievementConfig) {
-        console.log(`Achievement ${achievementId} not found in config`);
         return null;
       }
 
@@ -33,6 +34,7 @@ class AchievementService {
       
       if (!achievement) {
         // Create new achievement record
+        const initialProgress = Math.min(progress, achievementConfig.requiredProgress);
         achievement = new Achievement({
           userId,
           achievementId,
@@ -40,14 +42,19 @@ class AchievementService {
           description: achievementConfig.description,
           category: achievementConfig.category,
           icon: achievementConfig.icon,
-          progress: progress,
+          progress: initialProgress,
           requiredProgress: achievementConfig.requiredProgress,
-          completed: progress >= achievementConfig.requiredProgress,
-          completedAt: progress >= achievementConfig.requiredProgress ? new Date() : null
+          completed: initialProgress >= achievementConfig.requiredProgress,
+          completedAt: initialProgress >= achievementConfig.requiredProgress ? new Date() : null
         });
       } else {
         // Update existing achievement
-        const newProgress = Math.min(achievement.progress + progress, achievementConfig.requiredProgress);
+        let newProgress;
+        if (progressMode === 'set') {
+          newProgress = Math.min(Math.max(achievement.progress, progress), achievementConfig.requiredProgress);
+        } else {
+          newProgress = Math.min(achievement.progress + progress, achievementConfig.requiredProgress);
+        }
         const wasCompleted = achievement.completed;
         
         achievement.progress = newProgress;
@@ -104,14 +111,14 @@ class AchievementService {
     const firstRecipe = await this.checkAchievement(userId, 'first-recipe');
     if (firstRecipe) results.push(firstRecipe);
 
-    // Check recipe count achievements
+    // Check recipe count achievements (use >= so we don't miss when user creates 6+ at once)
     const recipeCount = await this.getUserRecipeCount(userId);
-    if (recipeCount === 5) {
-      const collector = await this.checkAchievement(userId, 'recipes-created-5');
+    if (recipeCount >= 5) {
+      const collector = await this.checkAchievement(userId, 'recipes-created-5', recipeCount, 'set');
       if (collector) results.push(collector);
     }
-    if (recipeCount === 10) {
-      const master = await this.checkAchievement(userId, 'recipes-created-10');
+    if (recipeCount >= 10) {
+      const master = await this.checkAchievement(userId, 'recipes-created-10', recipeCount, 'set');
       if (master) results.push(master);
     }
 
@@ -134,14 +141,14 @@ class AchievementService {
     const firstMeal = await this.checkAchievement(userId, 'first-meal-cooked');
     if (firstMeal) results.push(firstMeal);
 
-    // Check different recipes cooked
+    // Check different recipes cooked (pass actual count with set mode so progress tracks correctly)
     const uniqueRecipesCooked = await this.getUniqueRecipesCooked(userId);
-    if (uniqueRecipesCooked === 5) {
-      const chefTraining = await this.checkAchievement(userId, 'different-recipes-cooked-5');
+    if (uniqueRecipesCooked >= 5) {
+      const chefTraining = await this.checkAchievement(userId, 'different-recipes-cooked-5', uniqueRecipesCooked, 'set');
       if (chefTraining) results.push(chefTraining);
     }
-    if (uniqueRecipesCooked === 10) {
-      const seasonedChef = await this.checkAchievement(userId, 'different-recipes-cooked-10');
+    if (uniqueRecipesCooked >= 10) {
+      const seasonedChef = await this.checkAchievement(userId, 'different-recipes-cooked-10', uniqueRecipesCooked, 'set');
       if (seasonedChef) results.push(seasonedChef);
     }
 
@@ -176,15 +183,17 @@ class AchievementService {
 
     // Check completed shopping lists
     const completedItems = shoppingList.filter(item => item.completed);
-    if (completedItems.length > 0) {
+    const totalItems = shoppingList.length;
+    // "First shopping complete" = all items in list are completed
+    if (totalItems > 0 && completedItems.length === totalItems) {
       const firstComplete = await this.checkAchievement(userId, 'first-shopping-complete');
       if (firstComplete) results.push(firstComplete);
+    }
 
-      const completedCount = await this.getCompletedShoppingListsCount(userId);
-      if (completedCount === 10) {
-        const groceryGuru = await this.checkAchievement(userId, 'shopping-lists-completed-10');
-        if (groceryGuru) results.push(groceryGuru);
-      }
+    const completedCount = await this.getCompletedShoppingListsCount(userId);
+    if (completedCount >= 10) {
+      const groceryGuru = await this.checkAchievement(userId, 'shopping-lists-completed-10', completedCount, 'set');
+      if (groceryGuru) results.push(groceryGuru);
     }
 
     // Check milestone achievements
@@ -206,17 +215,17 @@ class AchievementService {
     const firstItem = await this.checkAchievement(userId, 'first-pantry-item');
     if (firstItem) results.push(firstItem);
 
-    // Check unique pantry items
+    // Check unique pantry items (use >= so we don't miss when user adds many at once)
     const uniqueItems = await this.getUniquePantryItemsCount(userId);
-    if (uniqueItems === 20) {
-      const pantryPro = await this.checkAchievement(userId, 'pantry-items-20');
+    if (uniqueItems >= 20) {
+      const pantryPro = await this.checkAchievement(userId, 'pantry-items-20', uniqueItems, 'set');
       if (pantryPro) results.push(pantryPro);
     }
 
     // Check total pantry items
     const totalItems = await this.getTotalPantryItemsCount(userId);
-    if (totalItems === 50) {
-      const stockMaster = await this.checkAchievement(userId, 'total-pantry-items-50');
+    if (totalItems >= 50) {
+      const stockMaster = await this.checkAchievement(userId, 'total-pantry-items-50', totalItems, 'set');
       if (stockMaster) results.push(stockMaster);
     }
 
@@ -279,6 +288,12 @@ class AchievementService {
       if (gold) results.push(gold);
     }
 
+    // Check Master Chef (all achievements - 17 non-milestone achievements)
+    if (completedCount >= 17) {
+      const master = await this.checkAchievement(userId, 'master-chef', completedCount);
+      if (master) results.push(master);
+    }
+
     return results;
   }
 
@@ -294,10 +309,9 @@ class AchievementService {
   }
 
   static async getCompletedShoppingListsCount(userId) {
-    // Count how many times user has completed shopping lists
-    // This is a simplified version - you might want to track this differently
-    const completedItems = await ShoppingListItem.find({ user: userId, completed: true });
-    return Math.floor(completedItems.length / 5); // Assume 5 items per shopping list
+    // Count how many times user has cleared completed items (each clear = 1 completed shopping trip)
+    const user = await User.findById(userId).select('completedShoppingListsCount');
+    return user?.completedShoppingListsCount ?? 0;
   }
 
   static async getUniquePantryItemsCount(userId) {
@@ -317,7 +331,11 @@ class AchievementService {
 
   static async getWeekMealsCount(userId) {
     const now = new Date();
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    // Use Monday as week start to match MealPlan schema (weekStart is Monday)
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
 
@@ -326,7 +344,7 @@ class AchievementService {
       user: userId,
       weekStart: { $gte: weekStart, $lt: weekEnd }
     });
-    // Count unique (day, meal) pairs
+    // Count unique (day, meal) pairs (21 = 7 days × 3 meals for full week)
     const uniqueSlots = new Set(meals.map(m => `${m.day}|${m.meal}`));
     return uniqueSlots.size;
   }
@@ -340,36 +358,35 @@ class AchievementService {
   static async checkConsecutiveCookingDays(userId) {
     const results = [];
     
-    // Get all cooked meals in the last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+    // Get all cooked meals (any time) - we need unique dates for consecutive day streak
     const cookedMeals = await MealPlan.find({
       user: userId,
-      cooked: true,
-      createdAt: { $gte: thirtyDaysAgo }
+      cooked: true
     }).sort({ createdAt: 1 });
     
-    // Find longest consecutive streak
-    let currentStreak = 0;
-    let maxStreak = 0;
-    let lastDate = null;
+    // Get unique dates when user cooked
+    const cookedDates = [...new Set(cookedMeals.map(m => new Date(m.createdAt).toDateString()))].sort();
     
-    cookedMeals.forEach(meal => {
-      const mealDate = new Date(meal.createdAt).toDateString();
+    // Find longest consecutive day streak
+    let maxStreak = 0;
+    let currentStreak = 1;
+    
+    for (let i = 1; i < cookedDates.length; i++) {
+      const prev = new Date(cookedDates[i - 1]);
+      const curr = new Date(cookedDates[i]);
+      const dayDiff = Math.round((curr - prev) / (24 * 60 * 60 * 1000));
       
-      if (!lastDate || new Date(meal.createdAt) - new Date(lastDate) <= 24 * 60 * 60 * 1000) {
+      if (dayDiff === 1) {
         currentStreak++;
-        maxStreak = Math.max(maxStreak, currentStreak);
       } else {
+        maxStreak = Math.max(maxStreak, currentStreak);
         currentStreak = 1;
       }
-      
-      lastDate = meal.createdAt;
-    });
+    }
+    maxStreak = Math.max(maxStreak, currentStreak);
     
     if (maxStreak >= 7) {
-      const consistentCook = await this.checkAchievement(userId, 'consecutive-cooking-7');
+      const consistentCook = await this.checkAchievement(userId, 'consecutive-cooking-7', maxStreak, 'set');
       if (consistentCook) results.push(consistentCook);
     }
     
@@ -379,20 +396,18 @@ class AchievementService {
   static async checkMealsPerDay(userId) {
     const results = [];
     
-    // Check if user cooked 3 meals in one day
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setDate(endOfDay.getDate() + 1);
-    
-    const todayMeals = await MealPlan.countDocuments({
-      user: userId,
-      cooked: true,
-      createdAt: { $gte: startOfDay, $lt: endOfDay }
+    // Check if user ever cooked 3+ meals in one day (aggregate by date)
+    const cookedMeals = await MealPlan.find({ user: userId, cooked: true });
+    const mealsByDate = {};
+    cookedMeals.forEach(meal => {
+      const dateStr = new Date(meal.createdAt).toDateString();
+      mealsByDate[dateStr] = (mealsByDate[dateStr] || 0) + 1;
     });
     
-    if (todayMeals >= 3) {
-      const mealPrepPro = await this.checkAchievement(userId, 'three-meals-one-day');
+    const maxMealsInOneDay = Math.max(0, ...Object.values(mealsByDate));
+    
+    if (maxMealsInOneDay >= 3) {
+      const mealPrepPro = await this.checkAchievement(userId, 'three-meals-one-day', maxMealsInOneDay, 'set');
       if (mealPrepPro) results.push(mealPrepPro);
     }
     

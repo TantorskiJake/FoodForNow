@@ -8,8 +8,6 @@ const router = express.Router();
 // Get meal plan for a specific week
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Fetching meal plan for user:', req.userId);
-    
     let query = { user: req.userId };
     
     // If weekStart is provided, filter by that week
@@ -25,7 +23,6 @@ router.get('/', authMiddleware, async (req, res) => {
     }
     
     const mealPlan = await MealPlan.find(query).populate('recipe');
-    console.log('Found meal plan:', mealPlan);
     res.json(mealPlan);
   } catch (error) {
     console.error('Error fetching meal plan:', error);
@@ -36,7 +33,6 @@ router.get('/', authMiddleware, async (req, res) => {
 // Add meal to plan
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Adding meal to plan:', req.body);
     const { weekStart, day, meal, recipeId, notes } = req.body;
 
     // Validate required fields
@@ -72,8 +68,6 @@ router.post('/', authMiddleware, async (req, res) => {
     });
 
     await mealPlanItem.save();
-    console.log('Meal plan item saved:', mealPlanItem);
-    
     // Check for meal planning achievements
     try {
       const AchievementService = require('../services/achievementService');
@@ -168,8 +162,6 @@ router.patch('/:id/cooked', authMiddleware, async (req, res) => {
 // Reset week - delete all meal plans
 router.delete('/reset-week', authMiddleware, async (req, res) => {
   try {
-    console.log('Resetting week for user:', req.userId);
-    
     let query = { user: req.userId };
     
     // If weekStart is provided, only delete meal plans for that week
@@ -186,9 +178,6 @@ router.delete('/reset-week', authMiddleware, async (req, res) => {
     
     // Delete meal plans matching the query
     const result = await MealPlan.deleteMany(query);
-    
-    console.log(`Deleted ${result.deletedCount} meal plans`);
-    
     res.json({
       message: `Reset week - deleted ${result.deletedCount} meal plans`,
       mealPlans: []
@@ -302,7 +291,6 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
           // Update existing item by adding the missing quantity
           existingItem.quantity += missing.quantity;
           await existingItem.save();
-          console.log(`Updated existing shopping list item: ${missing.ingredient.name} - added ${missing.quantity} ${missing.unit}`);
         } else {
           // Create new shopping list item
           const shoppingListItem = new ShoppingListItem({
@@ -313,7 +301,6 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
             completed: false
           });
           await shoppingListItem.save();
-          console.log(`Created new shopping list item: ${missing.ingredient.name} - ${missing.quantity} ${missing.unit}`);
         }
       }
       
@@ -332,13 +319,8 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
     for (const update of pantryUpdates) {
       const pantryItem = pantry.items.id(update.itemId);
       if (pantryItem) {
-        console.log(`Removing ${update.removeQuantity} from ${pantryItem.ingredient} (current: ${pantryItem.quantity})`);
         pantryItem.quantity -= update.removeQuantity;
-        console.log(`New quantity: ${pantryItem.quantity}`);
-        
         if (pantryItem.quantity <= 0) {
-          // Remove item if quantity is 0 or less
-          console.log(`Removing item with zero quantity: ${pantryItem.ingredient}`);
           pantry.items = pantry.items.filter(item => item._id.toString() !== update.itemId);
         }
       }
@@ -346,8 +328,6 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
 
     // Additional cleanup: remove any items that might have slipped through
     pantry.items = pantry.items.filter(item => item.quantity > 0);
-    console.log(`Final pantry items count: ${pantry.items.length}`);
-
     await pantry.save();
 
     // Mark meal as cooked only if all ingredients were available
@@ -396,7 +376,6 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
 // Delete meal from plan
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    console.log('Deleting meal plan item:', req.params.id);
     const mealPlanItem = await MealPlan.findOneAndDelete({
       _id: req.params.id,
       user: req.userId
@@ -414,8 +393,6 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 // Get ingredients needed for meal plans
 router.get('/ingredients', authMiddleware, async (req, res) => {
   try {
-    console.log('Fetching ingredients for user:', req.userId);
-    
     let query = { user: req.userId };
     
     // If weekStart is provided, filter by that week
@@ -438,13 +415,8 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
           path: 'ingredients.ingredient'
         }
       });
-
-    console.log('Found meal plans:', mealPlans.length);
-
     // Filter out cooked meals - only count ingredients from uncooked meals
     const uncookedMealPlans = mealPlans.filter(mealPlan => !mealPlan.cooked);
-    console.log('Uncooked meal plans:', uncookedMealPlans.length);
-
     // Aggregate needed ingredients (by ingredient+unit) from uncooked meals only
     const ingredients = new Map();
     uncookedMealPlans.forEach(mealPlan => {
@@ -489,8 +461,6 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
         pantryQuantity: pantryMap.get(key) || 0
       };
     });
-
-    console.log('Aggregated ingredients from uncooked meals:', result.length);
     res.json(result);
   } catch (error) {
     console.error('Error fetching ingredients:', error);
@@ -501,8 +471,6 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
 // Populate week with random recipes
 router.post('/populate-week', authMiddleware, async (req, res) => {
   try {
-    console.log('Populating week with random recipes for user:', req.userId);
-    
     // Get all recipes for the user
     const recipes = await Recipe.find({ createdBy: req.userId });
     
@@ -556,9 +524,6 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
         newMealPlans.push(mealPlanItem);
       }
     }
-
-    console.log(`Populated week with ${newMealPlans.length} meals`);
-    
     res.json({
       message: `Week populated with ${newMealPlans.length} random recipes`,
       mealPlans: newMealPlans

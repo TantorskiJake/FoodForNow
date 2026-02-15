@@ -122,6 +122,129 @@ Logout user and invalidate JWT token.
 
 ---
 
+### POST `/api/auth/token`
+
+Refresh access token using refresh token (stored in HTTP-only cookie).
+
+**Success Response (200):**
+```json
+{
+  "success": true
+}
+```
+
+**Error Responses:**
+- `401`: No refresh token or invalid token
+- `403`: Invalid or expired refresh token
+
+---
+
+### POST `/api/auth/forgot-password`
+
+Request a password reset for the given email address.
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "If that email exists, a reset link will be sent.",
+  "resetToken": "hex_token_string"
+}
+```
+
+**Note:** Returns success regardless of whether the email exists (prevents email enumeration). The `resetToken` is returned for development; in production, this would be sent via email.
+
+---
+
+### POST `/api/auth/reset-password`
+
+Reset password using the token from forgot-password.
+
+**Request Body:**
+```json
+{
+  "token": "reset_token_from_forgot_password",
+  "newPassword": "newSecurePassword123!"
+}
+```
+
+**Validation Rules:**
+- `token`: Required
+- `newPassword`: Required, minimum 8 characters, must contain uppercase, lowercase, digit, and special character
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Password has been reset. You can now sign in."
+}
+```
+
+**Error Responses:**
+- `400`: Invalid or expired token, or validation error
+
+---
+
+### PUT `/api/auth/profile`
+
+Update the authenticated user's profile. Requires authentication.
+
+**Request Body:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "bio": "Food enthusiast",
+  "location": "New York",
+  "website": "https://example.com",
+  "profilePicture": "https://example.com/avatar.jpg",
+  "preferences": {
+    "theme": "dark",
+    "units": "metric",
+    "language": "en",
+    "timezone": "America/New_York"
+  },
+  "notifications": {
+    "email": true,
+    "push": true,
+    "mealReminders": true,
+    "shoppingReminders": true
+  },
+  "currentPassword": "current_password",
+  "newPassword": "new_password"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "user": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "bio": "Food enthusiast",
+    "location": "New York",
+    "website": "https://example.com",
+    "profilePicture": "https://example.com/avatar.jpg",
+    "preferences": {...},
+    "notifications": {...},
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+**Note:** When changing password, both `currentPassword` and `newPassword` are required.
+
+---
+
 ### GET `/api/auth/me`
 
 Get current authenticated user information.
@@ -219,6 +342,49 @@ Get all recipes for the authenticated user.
     "hasPrev": false
   }
 }
+```
+
+---
+
+### GET `/api/recipes/popular`
+
+Get the authenticated user's most popular recipes (sorted by popularity).
+
+**Success Response (200):**
+```json
+[
+  {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Spaghetti Carbonara",
+    "description": "Classic Italian pasta dish",
+    "ingredients": [...],
+    "popularity": 10,
+    ...
+  }
+]
+```
+
+---
+
+### GET `/api/recipes/shared`
+
+Get recipes shared by other users (excluding recipes with names the user already has).
+
+**Query Parameters:**
+- `search` (string): Search shared recipes by name
+
+**Success Response (200):**
+```json
+[
+  {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Shared Recipe Name",
+    "description": "...",
+    "ingredients": [...],
+    "createdBy": "other_user_id",
+    ...
+  }
+]
 ```
 
 ---
@@ -920,27 +1086,54 @@ Create a new ingredient.
 
 ### GET `/api/achievements`
 
-Get all achievements for the authenticated user.
-
-**Query Parameters:**
-- `unread` (boolean): Filter unread achievements only
-- `type` (string): Filter by achievement type
+Get all achievements for the authenticated user, grouped by category with progress and stats.
 
 **Success Response (200):**
 ```json
 {
   "success": true,
-  "achievements": [
+  "achievements": {
+    "getting-started": [...],
+    "recipe-mastery": [...],
+    "meal-planning": [...],
+    "pantry-shopping": [...],
+    "milestone": [...]
+  },
+  "stats": {
+    "total": 25,
+    "completed": 10,
+    "completionPercentage": 40,
+    "categories": {
+      "getting-started": 3,
+      "recipe-mastery": 2,
+      "meal-planning": 2,
+      "pantry-shopping": 2,
+      "milestone": 1
+    }
+  }
+}
+```
+
+Each achievement object includes: `id`, `name`, `description`, `category`, `icon`, `requiredProgress`, `progress`, `completed`, `completedAt`, `unlockedAt`.
+
+---
+
+### GET `/api/achievements/recent`
+
+Get achievements completed in the last 7 days.
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "recentAchievements": [
     {
-      "id": "507f1f77bcf86cd799439011",
-      "type": "recipe_created",
-      "title": "First Recipe",
+      "id": "recipe_created",
+      "name": "First Recipe",
       "description": "You created your first recipe!",
+      "category": "getting-started",
       "icon": "🍳",
-      "unlockedAt": "2024-01-01T00:00:00.000Z",
-      "isRead": false,
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "updatedAt": "2024-01-01T00:00:00.000Z"
+      "completedAt": "2024-01-01T00:00:00.000Z"
     }
   ]
 }
@@ -948,35 +1141,45 @@ Get all achievements for the authenticated user.
 
 ---
 
-### PATCH `/api/achievements/:id/read`
+### POST `/api/achievements/check`
 
-Mark an achievement as read.
+Manually trigger achievement check (for testing).
+
+**Request Body:**
+```json
+{
+  "achievementId": "recipe_created",
+  "progress": 1
+}
+```
 
 **Success Response (200):**
 ```json
 {
   "success": true,
-  "message": "Achievement marked as read",
-  "achievement": {
-    "id": "507f1f77bcf86cd799439011",
-    "isRead": true,
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
+  "achievement": {...},
+  "newlyCompleted": true,
+  "message": "Achievement unlocked!"
 }
 ```
 
 ---
 
-### PATCH `/api/achievements/mark-all-read`
+### GET `/api/achievements/leaderboard`
 
-Mark all achievements as read.
+Get users ranked by achievement completion.
 
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "All achievements marked as read",
-  "updatedCount": 5
+  "leaderboard": [
+    {
+      "userId": "507f1f77bcf86cd799439011",
+      "name": "John Doe",
+      "completedCount": 15,
+      "lastCompleted": "2024-01-01T00:00:00.000Z"
+    }
+  ]
 }
 ```
 

@@ -61,7 +61,7 @@ function App() {
 **Key Features:**
 - **Error Boundary**: Catches and handles JavaScript errors gracefully
 - **Context Providers**: Manages global state (auth, theme, achievements)
-- **Routing**: Client-side navigation with protected routes
+- **Routing**: Client-side navigation with protected routes; public routes: `/login`, `/register`, `/forgot-password`, `/reset-password`
 - **Global Components**: Navbar and toast notifications
 
 ### Error Boundary
@@ -374,6 +374,7 @@ User authentication page.
 - Error handling
 - Remember me functionality
 - Link to registration
+- Link to forgot password
 
 **Form Validation:**
 - Email format validation
@@ -384,6 +385,39 @@ User authentication page.
 **Usage:**
 ```jsx
 <Route path="/login" element={<Login />} />
+```
+
+### ForgotPassword (`src/pages/ForgotPassword.jsx`)
+
+Password reset request page.
+
+**Features:**
+- Email input form
+- Request reset link
+- Success/error feedback
+- Link back to login
+
+**Usage:**
+```jsx
+<Route path="/forgot-password" element={<ForgotPassword />} />
+```
+
+### ResetPassword (`src/pages/ResetPassword.jsx`)
+
+Password reset completion page (accessed via token in URL).
+
+**Features:**
+- New password and confirmation form
+- Token validation from URL query params
+- Password strength requirements
+- Link to login after success
+
+**URL Parameters:**
+- `token`: Reset token from forgot-password flow (query param)
+
+**Usage:**
+```jsx
+<Route path="/reset-password" element={<ResetPassword />} />
 ```
 
 ### Register (`src/pages/Register.jsx`)
@@ -550,7 +584,11 @@ await api.delete(`/recipes/${id}`);
 
 ### Geonames Service (`src/services/geonames.js`)
 
-Location-based services for user profiles.
+Location-based services for user profiles (city search, timezone lookup).
+
+**Environment Requirement:**
+- `VITE_GEONAMES_USERNAME` must be set in the frontend `.env` for city search and timezone features. Get a free username at [geonames.org](https://www.geonames.org/).
+- If not configured, `searchCities` and `getTimezone` will throw. Callers should catch errors and show a user-friendly message (e.g. "Location services not configured").
 
 **Features:**
 - City and country data
@@ -562,8 +600,12 @@ Location-based services for user profiles.
 ```jsx
 import { searchCities, getTimezone } from '../services/geonames';
 
-const cities = await searchCities('New York');
-const timezone = await getTimezone(lat, lng);
+try {
+  const cities = await searchCities('New York');
+  const timezone = await getTimezone(lat, lng);
+} catch (err) {
+  // Show "Location services not configured" or similar
+}
 ```
 
 ## Utilities

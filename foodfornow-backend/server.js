@@ -34,10 +34,12 @@ const app = express();
  * Logs all incoming requests with timestamp, method, and URL
  * for debugging and monitoring purposes.
  */
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  next();
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    next();
+  });
+}
 
 /**
  * Security Middleware Configuration

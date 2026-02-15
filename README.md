@@ -6,7 +6,7 @@ FoodForNow is a comprehensive full-stack web application designed to help users 
 ## 🚀 Features
 
 ### Core Functionality
-- **User Authentication**: Secure JWT-based login and registration system
+- **User Authentication**: Secure JWT-based login, registration, and password reset (forgot/reset)
 - **Dashboard**: Comprehensive overview of pantry, recipes, meal plans, and shopping lists
 - **Pantry Management**: Add, edit, and remove items with quantity tracking
 - **Recipe Management**: Browse, add, and manage recipes with detailed ingredient lists
@@ -105,6 +105,12 @@ FoodForNow/
    PORT=3001
    CORS_ORIGIN=http://localhost:5173
    ```
+   
+   Create `.env` file in `foodfornow-frontend/` (optional, for location features):
+   ```env
+   VITE_API_URL=http://localhost:3001/api
+   VITE_GEONAMES_USERNAME=your_geonames_username
+   ```
 
 4. **Start development servers** (both frontend and backend concurrently)
    ```bash
@@ -181,9 +187,15 @@ npm run start        # Start production server
 - `POST /auth/login` - User login
 - `POST /auth/logout` - User logout
 - `GET /auth/me` - Get current user
+- `POST /auth/token` - Refresh access token
+- `POST /auth/forgot-password` - Request password reset
+- `POST /auth/reset-password` - Reset password with token
+- `PUT /auth/profile` - Update user profile
 
 ### Recipes
 - `GET /recipes` - Get all recipes
+- `GET /recipes/popular` - Get user's popular recipes
+- `GET /recipes/shared` - Get shared recipes from other users
 - `POST /recipes` - Create new recipe
 - `GET /recipes/:id` - Get recipe by ID
 - `PUT /recipes/:id` - Update recipe

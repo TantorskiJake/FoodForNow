@@ -7,7 +7,6 @@ const Recipe = require('../models/recipe');
 // Get all ingredients with search
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Fetching ingredients for user:', req.userId);
     let { search = '' } = req.query;
     const filter = { user: req.userId };
     if (search) {
@@ -94,7 +93,6 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
 // Add new ingredient
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Adding new ingredient:', { ...req.body, user: req.userId });
     const ingredient = new Ingredient({
       ...req.body,
       user: req.userId
@@ -110,7 +108,6 @@ router.post('/', authMiddleware, async (req, res) => {
 // Update ingredient
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    console.log('Updating ingredient:', { id: req.params.id, ...req.body });
     const ingredient = await Ingredient.findOneAndUpdate(
       { _id: req.params.id, user: req.userId },
       req.body,
@@ -129,8 +126,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // Delete ingredient
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    console.log('Deleting ingredient:', req.params.id);
-
     // Verify the ingredient exists and belongs to the user
     const ingredient = await Ingredient.findOne({
       _id: req.params.id,

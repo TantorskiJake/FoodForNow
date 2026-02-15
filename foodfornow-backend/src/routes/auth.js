@@ -1,8 +1,10 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/user");
 const RefreshToken = require("../models/refreshToken");
+const PasswordResetToken = require("../models/passwordResetToken");
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -78,18 +80,15 @@ const cookieOptions = {
  */
 router.post('/register', async (req, res) => {
   try {
-    console.log('Received registration request:', { ...req.body, password: '***' });
     const { name, email, password } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
-      console.log('Missing required fields:', { name: !!name, email: !!email, password: !!password });
       return res.status(400).json({ error: 'All fields are required' });
     }
 
     // Enforce minimum password length
     if (password.length < 8) {
-      console.log('Password too short');
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
@@ -97,21 +96,18 @@ router.post('/register', async (req, res) => {
     // Must contain: lowercase, uppercase, digit, and special character
     const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     if (!strongPasswordRegex.test(password)) {
-      console.log('Weak password provided');
       return res.status(400).json({ error: 'Password is too weak' });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log('Invalid email format:', email);
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('Email already registered:', email);
       return res.status(400).json({ error: 'Email already registered' });
     }
 
@@ -127,8 +123,6 @@ router.post('/register', async (req, res) => {
     });
 
     await user.save();
-    console.log('User created successfully:', { id: user._id, email: user.email });
-
     // Check for registration achievements
     try {
       const AchievementService = require('../services/achievementService');
@@ -202,26 +196,16 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
-    console.log('Received login request:', { email: req.body.email, password: '***' });
     const { email, password } = req.body;
-
-    // Validate required fields
     if (!email || !password) {
-      console.log('Missing required fields:', { email: !!email, password: !!password });
       return res.status(400).json({ error: 'Email and password are required' });
     }
-
-    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      console.log('User not found:', email);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-
-    // Verify password using bcrypt
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      console.log('Invalid password for user:', email);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -322,8 +306,98 @@ router.post("/token", async (req, res) => {
 });
 
 /**
+ * POST /auth/forgot-password - Request password reset
+ *
+ * Generates a reset token for the given email. Returns the token so the user
+ * can be redirected to the reset page (email integration can be added later).
+ */
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return res.json({ success: true, message: 'If that email exists, a reset link will be sent.' });
+    }
+
+    // Invalidate any existing reset tokens for this user
+    await PasswordResetToken.deleteMany({ user: user._id });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await new PasswordResetToken({
+      token,
+      user: user._id,
+      expiresAt,
+    }).save();
+
+    res.json({
+      success: true,
+      message: 'If that email exists, a reset link will be sent.',
+      resetToken: token, // For now, return token so user can reset (add email later)
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Failed to process request. Please try again.' });
+  }
+});
+
+/**
+ * POST /auth/reset-password - Reset password with token
+ *
+ * Validates the reset token and updates the user's password.
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    const resetDoc = await PasswordResetToken.findOne({
+      token,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!resetDoc) {
+      return res.status(400).json({ error: 'Invalid or expired reset link. Please request a new one.' });
+    }
+
+    const user = await User.findById(resetDoc.user);
+    if (!user) {
+      return res.status(400).json({ error: 'User not found.' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!strongPasswordRegex.test(newPassword)) {
+      return res.status(400).json({ error: 'Password is too weak. Use upper, lower, number, and special character.' });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    await PasswordResetToken.deleteOne({ _id: resetDoc._id });
+
+    res.json({ success: true, message: 'Password has been reset. You can now sign in.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password. Please try again.' });
+  }
+});
+
+/**
  * POST /auth/logout - Logout user
- * 
+ *
  * Clears authentication cookies to log out the user.
  * Note: This doesn't revoke the refresh token from the database.
  */
@@ -342,8 +416,6 @@ router.post("/logout", (req, res) => {
  */
 router.put('/profile', auth, async (req, res) => {
   try {
-    console.log('Profile update request body:', req.body);
-    
     const { 
       name, 
       email, 
@@ -356,9 +428,6 @@ router.put('/profile', auth, async (req, res) => {
       currentPassword, 
       newPassword 
     } = req.body;
-    
-    console.log('Extracted fields:', { name, email, bio, location, website });
-    
     const user = await User.findById(req.userId);
 
     if (!user) {
@@ -427,15 +496,7 @@ router.put('/profile', auth, async (req, res) => {
       user.password = await bcrypt.hash(newPassword, salt);
     }
 
-    // Save updated user
     await user.save();
-    console.log('User saved with fields:', { 
-      name: user.name, 
-      bio: user.bio, 
-      location: user.location, 
-      website: user.website 
-    });
-
     // Return updated user data (without password)
     res.json({
       user: {

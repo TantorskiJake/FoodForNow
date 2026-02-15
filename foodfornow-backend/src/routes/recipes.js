@@ -2,13 +2,15 @@ const express = require('express');
 const authMiddleware = require('../middleware/auth');
 const Recipe = require('../models/recipe');
 const Ingredient = require('../models/ingredient');
+const { parseRecipeFromUrl, transformToRecipeFormat } = require('../services/recipeParserService');
 
 const router = express.Router();
+
+const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
 
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Fetching recipes for user:', req.userId);
     const { search } = req.query;
     
     let query = { createdBy: req.userId };
@@ -29,10 +31,33 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 
-// Get popular recipes
+// Parse recipe from URL - returns pre-filled recipe data for the add form
+router.post('/parse-url', authMiddleware, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'URL is required' });
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      return res.status(400).json({ error: 'Please provide a valid URL starting with http:// or https://' });
+    }
+
+    const parsed = await parseRecipeFromUrl(trimmed);
+    const recipeData = await transformToRecipeFormat(parsed, req.userId, Ingredient, VALID_UNITS);
+    res.json(recipeData);
+  } catch (err) {
+    console.error('Error parsing recipe URL:', err);
+    const message = err.message || 'Failed to parse recipe from URL. The site may not be supported.';
+    res.status(400).json({ error: message });
+  }
+});
+
+// Get popular recipes (current user's recipes, sorted by popularity)
 router.get('/popular', authMiddleware, async (req, res) => {
   try {
-    const recipes = await Recipe.find()
+    const recipes = await Recipe.find({ createdBy: req.userId })
       .populate('ingredients.ingredient')
       .sort({ popularity: -1 })
       .limit(5);
@@ -304,11 +329,16 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 // Get recipe by ID
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const recipe = await Recipe.findById(req.params.id)
-      .populate('ingredients.ingredient');
+    // Only allow access to recipes owned by the authenticated user
+    const recipe = await Recipe.findOne({
+      _id: req.params.id,
+      createdBy: req.userId
+    }).populate('ingredients.ingredient');
+
     if (!recipe) {
       return res.status(404).json({ error: 'Recipe not found' });
     }
+
     res.json(recipe);
   } catch (error) {
     console.error('Error getting recipe:', error);

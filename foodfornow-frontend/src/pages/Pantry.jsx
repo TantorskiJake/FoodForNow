@@ -69,10 +69,8 @@ const Pantry = () => {
 
     const fetchAll = async () => {
       try {
-        console.log('Starting to fetch pantry data...');
         setLoading(true);
         await Promise.all([fetchPantryItems(), fetchIngredients()]);
-        console.log('Finished fetching pantry data');
       } catch (error) {
         console.error('Error in fetchAll:', error);
       } finally {
@@ -85,15 +83,10 @@ const Pantry = () => {
 
   const fetchPantryItems = async () => {
     try {
-      console.log('Fetching pantry items...');
       const response = await api.get('/pantry');
-      console.log('Raw pantry response:', response.data);
-      
       if (response.data && response.data.items) {
-        console.log('Setting pantry items:', response.data.items);
         setPantryItems(response.data.items);
       } else {
-        console.log('No items found, setting empty array');
         setPantryItems([]);
       }
     } catch (err) {
@@ -148,8 +141,6 @@ const Pantry = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted with data:', formData);
-    
     try {
       if (!formData.ingredient || !formData.quantity || !formData.unit) {
         setError('Please fill in all required fields');
@@ -166,18 +157,11 @@ const Pantry = () => {
         submitData.expiryDate = formData.expiryDate;
       }
 
-      console.log('Submitting pantry item:', submitData);
-      console.log('Editing item:', editingItem);
-
       let response;
       if (editingItem) {
-        console.log('Updating existing item with ID:', editingItem._id);
         response = await api.patch(`/pantry/items/${editingItem._id}`, submitData);
-        console.log('Update response:', response);
       } else {
-        console.log('Creating new item');
         response = await api.post('/pantry', submitData);
-        console.log('Create response:', response);
         
         // Check for achievements in response
         if (response.data.achievements && response.data.achievements.length > 0) {
@@ -186,7 +170,6 @@ const Pantry = () => {
       }
       
       if (response && response.data) {
-        console.log('Successfully saved pantry item');
         handleCloseDialog();
         await fetchPantryItems();
         setFormData({
@@ -237,11 +220,14 @@ const Pantry = () => {
 
   const handleAddToShoppingList = async (item) => {
     try {
-      await api.post('/shopping-list', {
+      const response = await api.post('/shopping-list', {
         ingredient: item.ingredient._id,
         quantity: item.quantity,
         unit: item.unit
       });
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
       toast.success(`Added ${item.quantity} ${item.unit} ${item.ingredient.name} to shopping list`);
     } catch (err) {
       console.error('Error adding to shopping list:', err);

@@ -169,8 +169,6 @@ const Ingredients = () => {
     'Pantry',
     'Spices',
     'Beverages',
-    'Frozen',
-    'Bakery',
     'Other',
   ];
 
@@ -433,7 +431,7 @@ const Ingredients = () => {
 
         <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
           <DialogTitle>
-            {editingIngredient ? 'Edit Ingredient' : 'Add New Ingredient'}
+            {editingIngredient?.id ? 'Edit Ingredient' : 'Add New Ingredient'}
           </DialogTitle>
           <form onSubmit={handleSaveIngredient}>
             <DialogContent>
@@ -486,7 +484,7 @@ const Ingredients = () => {
                   },
                 }}
               >
-                {editingIngredient ? 'Save Changes' : 'Add Ingredient'}
+                {editingIngredient?.id ? 'Save Changes' : 'Add Ingredient'}
               </Button>
             </DialogActions>
           </form>

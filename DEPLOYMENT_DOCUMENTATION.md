@@ -374,7 +374,10 @@ LOG_LEVEL=debug
 VITE_API_URL=http://localhost:3001/api
 VITE_APP_NAME=FoodForNow
 VITE_APP_VERSION=1.0.0
+VITE_GEONAMES_USERNAME=your_geonames_username
 ```
+
+**Note:** `VITE_GEONAMES_USERNAME` is required for location features (city search, timezone) in the Profile page. Get a free username at [geonames.org](https://www.geonames.org/). If not set, location-related features will throw; callers should handle errors gracefully.
 
 ### Staging Environment
 

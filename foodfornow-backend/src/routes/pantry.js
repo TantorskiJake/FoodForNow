@@ -10,14 +10,10 @@ const router = express.Router();
 // Get pantry
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Fetching pantry for user:', req.userId);
     const pantry = await Pantry.findOne({ user: req.userId })
       .populate('items.ingredient', 'name category');
     
-    console.log('Found pantry:', pantry);
-    
     if (!pantry) {
-      console.log('No pantry found, returning empty items array');
       return res.json({ items: [] });
     }
 
@@ -25,7 +21,6 @@ router.get('/', authMiddleware, async (req, res) => {
     const originalCount = pantry.items.length;
     pantry.items = pantry.items.filter(item => item.quantity > 0);
     if (pantry.items.length !== originalCount) {
-      console.log(`Cleaned up ${originalCount - pantry.items.length} zero-quantity items`);
       await pantry.save();
     }
 
@@ -41,8 +36,6 @@ router.get('/', authMiddleware, async (req, res) => {
       unit: item.unit,
       expiryDate: item.expiryDate
     }));
-
-    console.log('Returning items:', items);
     res.json({ items });
   } catch (err) {
     console.error('Error fetching pantry:', err);
@@ -54,17 +47,12 @@ router.get('/', authMiddleware, async (req, res) => {
 router.patch('/items/:itemId', authMiddleware, async (req, res) => {
   try {
     const { ingredient, quantity, unit, expiryDate } = req.body;
-    console.log('Updating pantry item:', { itemId: req.params.itemId, body: req.body });
-    
     const pantry = await Pantry.findOne({ user: req.userId });
     if (!pantry) {
-      console.log('Pantry not found for user:', req.userId);
       return res.status(404).json({ error: 'Pantry not found' });
     }
-    
     const item = pantry.items.id(req.params.itemId);
     if (!item) {
-      console.log('Item not found:', req.params.itemId);
       return res.status(404).json({ error: 'Item not found' });
     }
     
@@ -73,8 +61,6 @@ router.patch('/items/:itemId', authMiddleware, async (req, res) => {
     if (quantity !== undefined) item.quantity = Number(quantity);
     if (unit) item.unit = unit;
     if (expiryDate) item.expiryDate = new Date(expiryDate);
-    
-    console.log('Updated item:', item);
     await pantry.save();
     
     // Populate ingredient details before sending response
@@ -90,9 +76,6 @@ router.patch('/items/:itemId', authMiddleware, async (req, res) => {
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const { ingredient, quantity, unit, expiryDate } = req.body;
-
-    console.log("Pantry Item Add Request:", { ingredient, quantity, unit, expiryDate });
-
     // Validate required fields
     if (!ingredient || !quantity || !unit) {
       return res.status(400).json({ error: "Ingredient, quantity, and unit are required" });
@@ -125,10 +108,7 @@ router.post("/", authMiddleware, async (req, res) => {
           expiryDate: expiryDate ? new Date(expiryDate) : undefined
         }]
       });
-
-      console.log("Creating new pantry:", newPantry);
       const savedPantry = await newPantry.save();
-      console.log("New pantry saved:", savedPantry);
       return res.status(201).json(savedPantry);
     }
 
@@ -160,10 +140,7 @@ router.post("/", authMiddleware, async (req, res) => {
         expiryDate: expiryDate ? new Date(expiryDate) : undefined
       });
     }
-
-    console.log("Updating pantry:", pantry);
     const updatedPantry = await pantry.save();
-    console.log("Updated pantry saved:", updatedPantry);
     
     // Check for pantry-related achievements
     try {
@@ -262,14 +239,8 @@ router.delete("/", authMiddleware, async (req, res) => {
 router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
   try {
     const userId = req.userId;
-    console.log('Adding all shopping list items to pantry for user:', userId);
-
-    // Get all completed shopping list items
     const shoppingItems = await ShoppingListItem.find({ user: userId, completed: true })
       .populate('ingredient');
-
-    console.log('Found shopping items:', shoppingItems);
-
     if (!shoppingItems.length) {
       return res.status(200).json({ message: 'No completed items to add to pantry' });
     }
@@ -282,10 +253,7 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
 
     // Add each item to pantry
     for (const item of shoppingItems) {
-      if (!item.ingredient) {
-        console.log('Skipping item with no ingredient:', item);
-        continue;
-      }
+      if (!item.ingredient) continue;
 
       // Check if ingredient already exists in pantry
       const existingItem = pantry.items.find(
@@ -305,28 +273,28 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
       }
     }
 
-    // Save the updated pantry
     await pantry.save();
-    console.log('Updated pantry:', pantry);
-
-    // Delete all completed shopping list items
     await ShoppingListItem.deleteMany({ user: userId, completed: true });
-    console.log('Deleted completed shopping list items');
+
+    // Increment completed shopping lists count (user "completed" their shopping by adding to pantry)
+    const User = require('../models/user');
+    await User.findByIdAndUpdate(userId, { $inc: { completedShoppingListsCount: 1 } });
 
     // Get updated pantry with populated ingredients
     const updatedPantry = await Pantry.findOne({ user: userId })
       .populate('items.ingredient');
 
-    // Check for pantry-related achievements
+    // Check for pantry and shopping list achievements
     try {
       const AchievementService = require('../services/achievementService');
-      const achievements = await AchievementService.checkPantryAchievements(userId, updatedPantry);
-      
-      // Add achievement data to response if any were unlocked
-      if (achievements && achievements.length > 0) {
-        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+      const pantryAchievements = await AchievementService.checkPantryAchievements(userId, updatedPantry);
+      const shoppingAchievements = await AchievementService.checkShoppingListAchievements(userId, []);
+      const allAchievements = [...(pantryAchievements || []), ...(shoppingAchievements || [])];
+
+      if (allAchievements.length > 0) {
+        const newlyCompleted = allAchievements.filter(a => a.newlyCompleted);
         if (newlyCompleted.length > 0) {
-          res.json({
+          return res.json({
             pantry: updatedPantry,
             achievements: newlyCompleted.map(a => ({
               name: a.config.name,
@@ -334,7 +302,6 @@ router.post('/add-all-from-shopping-list', authMiddleware, async (req, res) => {
               icon: a.config.icon
             }))
           });
-          return;
         }
       }
     } catch (achievementError) {

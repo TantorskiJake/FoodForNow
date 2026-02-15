@@ -25,11 +25,13 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import DeleteIcon from '@mui/icons-material/Delete';
+import KitchenIcon from '@mui/icons-material/Kitchen';
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import CasinoIcon from '@mui/icons-material/Casino';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import api from '../services/api';
+import { toast } from 'react-hot-toast';
 import MealPlanGrid from '../components/MealPlanGrid';
-import { getCategoryColor } from '../utils/categoryColors';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -107,21 +109,22 @@ const Dashboard = () => {
   const fetchIngredients = async () => {
     try {
       const response = await api.get(`/mealplan/ingredients?weekStart=${selectedWeekStart}`);
-      console.log('Ingredients response:', response.data);
-      if (response.data && typeof response.data === 'object') {
-        // Convert the object to an array of ingredients
-        const ingredientsArray = Object.entries(response.data).map(([key, value]) => ({
+      let ingredientsArray = [];
+
+      if (Array.isArray(response.data)) {
+        ingredientsArray = response.data;
+      } else if (response.data && typeof response.data === 'object') {
+        // Fallback for any legacy object-shaped responses
+        ingredientsArray = Object.entries(response.data).map(([key, value]) => ({
           _id: key,
           ...value
         }));
-        
-        // Aggregate ingredients by name to handle duplicates
-        const aggregatedIngredients = aggregateIngredientsByName(ingredientsArray);
-        setIngredients(aggregatedIngredients);
       } else {
         console.error('Invalid ingredients data format:', response.data);
-        setIngredients([]);
       }
+
+      const aggregatedIngredients = aggregateIngredientsByName(ingredientsArray);
+      setIngredients(aggregatedIngredients);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
       setError('Failed to fetch ingredients. Please try again.');
@@ -134,6 +137,9 @@ const Dashboard = () => {
     const ingredientMap = new Map();
     
     ingredients.forEach(ingredient => {
+      if (!ingredient || !ingredient.name) {
+        return;
+      }
       const name = ingredient.name;
       
       if (ingredientMap.has(name)) {
@@ -273,8 +279,7 @@ const Dashboard = () => {
   const handleAddAllToShoppingList = async () => {
     try {
       setLoading(true);
-      const response = await api.post('/shopping-list/update-from-meal-plan');
-      console.log('Added ingredients to shopping list:', response.data);
+      await api.post('/shopping-list/update-from-meal-plan');
       setError(null);
       await fetchIngredients();
     } catch (err) {
@@ -288,9 +293,7 @@ const Dashboard = () => {
   const handleResetWeek = async () => {
     try {
       setLoading(true);
-      const response = await api.delete(`/mealplan/reset-week?weekStart=${selectedWeekStart}`);
-      console.log('Reset week:', response.data);
-      
+      await api.delete(`/mealplan/reset-week?weekStart=${selectedWeekStart}`);
       // Clear the meal plan state
       setMealPlan([]);
       
@@ -322,11 +325,9 @@ const Dashboard = () => {
   const handlePopulateWeek = async () => {
     try {
       setLoading(true);
-      const response = await api.post('/mealplan/populate-week', {
+      await api.post('/mealplan/populate-week', {
         weekStart: selectedWeekStart
       });
-      console.log('Populated week:', response.data);
-      
       // Refresh meal plan and ingredients
       await Promise.all([
         fetchMealPlan(),
@@ -478,7 +479,6 @@ const Dashboard = () => {
       
       // If the meal was cooked (status changed to cooked), refresh ingredients
       if (updatedMeal.cooked) {
-        console.log('Meal was cooked, refreshing ingredients...');
         await fetchIngredients();
       }
     } catch (err) {
@@ -487,12 +487,51 @@ const Dashboard = () => {
     }
   };
 
-  const handleAddToPantry = () => {
-    // Implementation of adding to pantry
+  const handleAddToPantry = async (ingredient) => {
+    if (!ingredient?._id) {
+      toast.error('Cannot add to pantry: ingredient ID missing');
+      return;
+    }
+    try {
+      await api.post('/pantry', {
+        ingredient: ingredient._id,
+        quantity: ingredient.quantity,
+        unit: ingredient.unit,
+      });
+      toast.success(`Added ${ingredient.name} to pantry`);
+      await fetchIngredients();
+    } catch (err) {
+      console.error('Error adding to pantry:', err);
+      toast.error(err.response?.data?.error || 'Failed to add to pantry');
+    }
   };
 
-  const handleDeletePantryItem = (id) => {
-    // Implementation of deleting pantry item
+  const handleRemoveFromPantry = async (ingredient) => {
+    if (!ingredient?._id) {
+      toast.error('Cannot remove from pantry: ingredient ID missing');
+      return;
+    }
+    try {
+      const pantryRes = await api.get('/pantry');
+      const items = pantryRes.data?.items || [];
+      const ingredientIdStr = String(ingredient._id);
+      const matchingItem = items.find(
+        (item) => {
+          const itemIngredientId = item.ingredient?._id?.toString?.() ?? item.ingredient?.toString?.();
+          return itemIngredientId === ingredientIdStr && item.unit === ingredient.unit;
+        }
+      );
+      if (!matchingItem) {
+        toast.error('No matching pantry item found');
+        return;
+      }
+      await api.delete(`/pantry/${matchingItem._id}`);
+      toast.success(`Removed ${ingredient.name} from pantry`);
+      await fetchIngredients();
+    } catch (err) {
+      console.error('Error removing from pantry:', err);
+      toast.error(err.response?.data?.error || 'Failed to remove from pantry');
+    }
   };
 
   if (loading) {
@@ -806,7 +845,7 @@ const Dashboard = () => {
                       const isMissing = percentage === 0;
                       
                       return (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={ingredient._id}>
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={ingredient._id || ingredient.name}>
                           <Paper
                             elevation={1}
                             sx={{
@@ -881,7 +920,7 @@ const Dashboard = () => {
                                   {ingredient.quantity} {ingredient.unit}
                                 </Typography>
                                 
-                                {ingredient.pantryQuantity > 0 && (
+                                {(ingredient.pantryQuantity ?? 0) > 0 && (
                                   <Typography 
                                     variant="body2" 
                                     color="text.secondary"
@@ -939,6 +978,34 @@ const Dashboard = () => {
                               >
                                 {isComplete ? '✓ In Stock' : isPartial ? '⚠ Partial' : '✗ Missing'}
                               </Typography>
+                              
+                              {/* Add to Pantry / Remove from Pantry */}
+                              <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="primary"
+                                  startIcon={<KitchenIcon />}
+                                  onClick={() => handleAddToPantry(ingredient)}
+                                  disabled={loading}
+                                  sx={{ textTransform: 'none' }}
+                                >
+                                  Add to Pantry
+                                </Button>
+                                {(ingredient.pantryQuantity || 0) > 0 && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<RemoveCircleOutlineIcon />}
+                                    onClick={() => handleRemoveFromPantry(ingredient)}
+                                    disabled={loading}
+                                    sx={{ textTransform: 'none' }}
+                                  >
+                                    Remove from Pantry
+                                  </Button>
+                                )}
+                              </Box>
                             </Box>
                           </Paper>
                         </Grid>

@@ -21,146 +21,23 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  Autocomplete,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import TimerIcon from '@mui/icons-material/Timer';
-import RestaurantIcon from '@mui/icons-material/Restaurant';
+import LinkIcon from '@mui/icons-material/Link';
 import SortIcon from '@mui/icons-material/Sort';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
-import { getCategoryColor } from '../utils/categoryColors';
 import { useNavigate } from 'react-router-dom';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import useMediaQuery from '@mui/material/useMediaQuery';
-
-const RecipeItem = ({ recipe, onEdit, onDelete, onAdd, isShared }) => {
-  const theme = useTheme();
-  const navigate = useNavigate();
-  return (
-    <ListItem
-      sx={{
-        py: 2,
-        px: 3,
-      }}
-    >
-      <ListItemText
-        primary={
-          <Typography variant="h6" component="div" sx={{ fontWeight: 'medium' }}>
-            {recipe.name}
-          </Typography>
-        }
-        secondary={
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {recipe.description}
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <TimerIcon fontSize="small" color="action" />
-                <Typography variant="body2" color="text.secondary">
-                  {recipe.prepTime + recipe.cookTime} mins
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <RestaurantIcon fontSize="small" color="action" />
-                <Typography variant="body2" color="text.secondary">
-                  {recipe.servings} servings
-                </Typography>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {recipe.tags.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  size="small"
-                  sx={{
-                    backgroundColor: theme.palette.primary.main,
-                    color: theme.palette.primary.contrastText,
-                  }}
-                />
-              ))}
-            </Box>
-          </Box>
-        }
-      />
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        {!isShared && (
-          <>
-            <IconButton
-              edge="end"
-              aria-label="edit"
-              onClick={onEdit}
-              sx={{
-                color: theme.palette.primary.main,
-                '&:hover': {
-                  backgroundColor: theme.palette.primary.main + '20',
-                },
-              }}
-            >
-              <EditIcon />
-            </IconButton>
-            <IconButton
-              edge="end"
-              aria-label="delete"
-              onClick={onDelete}
-              sx={{
-                color: theme.palette.error.main,
-                '&:hover': {
-                  backgroundColor: theme.palette.error.main + '20',
-                },
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </>
-        )}
-        {isShared && (
-          <Button
-            variant="contained"
-            size="small"
-            onClick={onAdd}
-          >
-            Add
-          </Button>
-        )}
-      </Box>
-    </ListItem>
-  );
-};
-
-// MemoizedRecipeList component
-const MemoizedRecipeList = React.memo(({ recipes, onEdit, onDelete, theme }) => (
-  <List>
-    {recipes.map((recipe) => (
-      <Paper
-        key={recipe._id}
-        elevation={1}
-        sx={{
-          mb: 2,
-          '&:hover': {
-            backgroundColor:
-              theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.05)'
-                : 'rgba(0, 0, 0, 0.02)',
-          },
-        }}
-      >
-        <RecipeItem
-          recipe={recipe}
-          onEdit={() => onEdit(recipe)}
-          onDelete={() => onDelete(recipe._id)}
-        />
-      </Paper>
-    ))}
-  </List>
-));
 
 const Recipes = () => {
   const [recipes, setRecipes] = useState([]);
@@ -179,9 +56,22 @@ const Recipes = () => {
     tags: '',
   });
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+  const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
   const theme = useTheme();
+
+  // Inline create ingredient state
+  const [openCreateIngredient, setOpenCreateIngredient] = useState(false);
+  const [createIngredientForIndex, setCreateIngredientForIndex] = useState(null);
+  const [newIngredientData, setNewIngredientData] = useState({ name: '', category: '', description: '' });
+  const [creatingIngredient, setCreatingIngredient] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
+
+  // Import from URL state
+  const [openImportUrl, setOpenImportUrl] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [parsingUrl, setParsingUrl] = useState(false);
+  const [importUrlError, setImportUrlError] = useState('');
 
   // Shared recipes and tab state
   const [tab, setTab] = useState('mine');
@@ -370,6 +260,57 @@ const Recipes = () => {
     }
   }, [tab, searchTerm, authenticated]);
 
+  const handleImportFromUrl = async () => {
+    const url = importUrl?.trim();
+    if (!url) {
+      setImportUrlError('Please enter a recipe URL');
+      return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      setImportUrlError('Please enter a valid URL starting with http:// or https://');
+      return;
+    }
+
+    try {
+      setParsingUrl(true);
+      setImportUrlError('');
+      const response = await api.post('/recipes/parse-url', { url });
+      const recipeData = response.data;
+
+      setOpenImportUrl(false);
+      setImportUrl('');
+
+      await fetchIngredients();
+      setEditingRecipe(null);
+      const mappedIngredients = recipeData.ingredients?.length
+        ? recipeData.ingredients.map((ing) => ({
+            ingredient: ing.ingredient?._id ?? ing.ingredient,
+            quantity: String(ing.quantity ?? ''),
+            unit: ing.unit || 'piece',
+          }))
+        : [{ ingredient: '', quantity: '', unit: '' }];
+      setFormData({
+        name: recipeData.name,
+        description: recipeData.description || recipeData.name,
+        ingredients: mappedIngredients,
+        instructions: recipeData.instructions?.length
+          ? recipeData.instructions
+          : [''],
+        prepTime: recipeData.prepTime || '',
+        cookTime: recipeData.cookTime || '',
+        servings: recipeData.servings || '',
+        tags: Array.isArray(recipeData.tags) ? recipeData.tags.join(', ') : '',
+      });
+      setOpenDialog(true);
+    } catch (err) {
+      setImportUrlError(
+        err.response?.data?.error || 'Failed to parse recipe. The site may not be supported.'
+      );
+    } finally {
+      setParsingUrl(false);
+    }
+  };
+
   const handleOpenDialog = async (recipe = null) => {
     // Refresh ingredients list when opening the dialog
     await fetchIngredients();
@@ -423,6 +364,48 @@ const Recipes = () => {
       ...formData,
       ingredients: formData.ingredients.filter((_, i) => i !== index)
     });
+  };
+
+  const handleOpenCreateIngredient = (index, prefillName = '') => {
+    setCreateIngredientForIndex(index);
+    setNewIngredientData({ name: prefillName, category: '', description: '' });
+    setOpenCreateIngredient(true);
+  };
+
+  const handleCloseCreateIngredient = () => {
+    setOpenCreateIngredient(false);
+    setCreateIngredientForIndex(null);
+    setNewIngredientData({ name: '', category: '', description: '' });
+  };
+
+  const handleCreateIngredient = async (e) => {
+    e?.preventDefault();
+    if (!newIngredientData.name?.trim() || !newIngredientData.category) return;
+
+    try {
+      setCreatingIngredient(true);
+      const response = await api.post('/ingredients', {
+        name: newIngredientData.name.trim(),
+        category: newIngredientData.category,
+        description: newIngredientData.description?.trim() || undefined,
+      });
+      const newIng = response.data;
+      await fetchIngredients();
+      if (createIngredientForIndex !== null) {
+        const newIngredients = [...formData.ingredients];
+        newIngredients[createIngredientForIndex] = {
+          ...newIngredients[createIngredientForIndex],
+          ingredient: newIng._id,
+        };
+        setFormData({ ...formData, ingredients: newIngredients });
+      }
+      handleCloseCreateIngredient();
+    } catch (err) {
+      console.error('Error creating ingredient:', err);
+      setError(err.response?.data?.message || 'Failed to create ingredient.');
+    } finally {
+      setCreatingIngredient(false);
+    }
   };
 
   const handleAddInstruction = () => {
@@ -616,6 +599,19 @@ const Recipes = () => {
               ))}
             </Select>
           </FormControl>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<LinkIcon />}
+            onClick={() => {
+              setImportUrl('');
+              setImportUrlError('');
+              setOpenImportUrl(true);
+            }}
+            size="small"
+          >
+            Import from URL
+          </Button>
           <Button
             variant="contained"
             color="primary"
@@ -831,23 +827,45 @@ const Recipes = () => {
             <Typography variant="h6" color="text.secondary" gutterBottom>
               No recipes found
             </Typography>
-            <Button
-              variant="contained"
-              onClick={() => { console.log('Middle Add Recipe button clicked'); handleOpenDialog(); }}
-              sx={{
-                textTransform: 'none',
-                background: theme.palette.mode === 'dark'
-                  ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                  : '#228B22',
-                '&:hover': {
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <Button
+                variant="outlined"
+                startIcon={<LinkIcon />}
+                onClick={() => {
+                  setImportUrl('');
+                  setImportUrlError('');
+                  setOpenImportUrl(true);
+                }}
+                sx={{
+                  textTransform: 'none',
+                  borderColor: theme.palette.mode === 'dark' ? 'rgba(34, 139, 34, 0.5)' : '#228B22',
+                  color: '#228B22',
+                  '&:hover': {
+                    borderColor: '#228B22',
+                    background: theme.palette.mode === 'dark' ? 'rgba(34, 139, 34, 0.1)' : 'rgba(34, 139, 34, 0.05)',
+                  },
+                }}
+              >
+                Import from URL
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleOpenDialog}
+                sx={{
+                  textTransform: 'none',
                   background: theme.palette.mode === 'dark'
-                    ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
-                    : '#1B6B1B',
-                },
-              }}
-            >
-              Add Recipe
-            </Button>
+                    ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                    : '#228B22',
+                  '&:hover': {
+                    background: theme.palette.mode === 'dark'
+                      ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                      : '#1B6B1B',
+                  },
+                }}
+              >
+                Add Recipe
+              </Button>
+            </Box>
           </Box>
         )
       ) : (
@@ -1051,24 +1069,41 @@ const Recipes = () => {
                 </Typography>
                 {formData.ingredients.map((ingredient, index) => (
                   <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                    <FormControl sx={{ flex: 2 }}>
-                      <InputLabel>Ingredient</InputLabel>
-                      <Select
-                        value={ingredient.ingredient}
-                        onChange={(e) => {
+                    <Autocomplete
+                      sx={{ flex: 2 }}
+                      options={ingredients}
+                      value={ingredients.find((i) => i._id === ingredient.ingredient) || null}
+                      getOptionLabel={(option) => option.name}
+                      isOptionEqualToValue={(option, value) => option._id === value?._id}
+                      filterOptions={(options, state) => {
+                        const filtered = options.filter((opt) =>
+                          opt.name.toLowerCase().includes((state.inputValue || '').toLowerCase())
+                        );
+                        const createOption = {
+                          _id: '__create__',
+                          name: state.inputValue ? `Create "${state.inputValue}"` : '+ Create new ingredient',
+                          isCreate: true,
+                          prefillName: state.inputValue || '',
+                        };
+                        return [...filtered, createOption];
+                      }}
+                      onChange={(e, value) => {
+                        if (value?.isCreate) {
+                          handleOpenCreateIngredient(index, value.prefillName || '');
+                        } else if (value) {
                           const newIngredients = [...formData.ingredients];
-                          newIngredients[index].ingredient = e.target.value;
+                          newIngredients[index].ingredient = value._id;
                           setFormData({ ...formData, ingredients: newIngredients });
-                        }}
-                        required
-                      >
-                        {ingredients.map((ing) => (
-                          <MenuItem key={ing._id} value={ing._id}>
-                            {ing.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                        } else {
+                          const newIngredients = [...formData.ingredients];
+                          newIngredients[index].ingredient = '';
+                          setFormData({ ...formData, ingredients: newIngredients });
+                        }
+                      }}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Ingredient" required={!ingredient.ingredient} />
+                      )}
+                    />
                     <TextField
                       label="Quantity"
                       value={ingredient.quantity}
@@ -1207,6 +1242,94 @@ const Recipes = () => {
             <Button onClick={handleCloseDialog}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary" disabled={loading}>
               {editingRecipe ? 'Update' : 'Add'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={openImportUrl}
+        onClose={() => !parsingUrl && setOpenImportUrl(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Import Recipe from URL</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Paste a recipe URL from supported sites (e.g. AllRecipes, Food Network, BBC Good Food, Serious Eats).
+            The recipe will be parsed and you can review before saving.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Recipe URL"
+            placeholder="https://www.allrecipes.com/recipe/..."
+            value={importUrl}
+            onChange={(e) => {
+              setImportUrl(e.target.value);
+              setImportUrlError('');
+            }}
+            error={!!importUrlError}
+            helperText={importUrlError}
+            disabled={parsingUrl}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenImportUrl(false)} disabled={parsingUrl}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleImportFromUrl}
+            disabled={parsingUrl}
+            startIcon={parsingUrl ? <CircularProgress size={20} /> : <LinkIcon />}
+          >
+            {parsingUrl ? 'Parsing...' : 'Parse Recipe'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={openCreateIngredient} onClose={handleCloseCreateIngredient} maxWidth="xs" fullWidth>
+        <form onSubmit={handleCreateIngredient}>
+          <DialogTitle>Create New Ingredient</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+              <TextField
+                label="Name"
+                value={newIngredientData.name}
+                onChange={(e) => setNewIngredientData({ ...newIngredientData, name: e.target.value })}
+                fullWidth
+                required
+                autoFocus
+              />
+              <FormControl fullWidth required>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={newIngredientData.category}
+                  onChange={(e) => setNewIngredientData({ ...newIngredientData, category: e.target.value })}
+                  label="Category"
+                >
+                  {ingredientCategories.map((cat) => (
+                    <MenuItem key={cat} value={cat}>
+                      {cat}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Description (optional)"
+                value={newIngredientData.description}
+                onChange={(e) => setNewIngredientData({ ...newIngredientData, description: e.target.value })}
+                fullWidth
+                multiline
+                rows={2}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseCreateIngredient}>Cancel</Button>
+            <Button type="submit" variant="contained" color="primary" disabled={creatingIngredient}>
+              {creatingIngredient ? 'Creating...' : 'Create'}
             </Button>
           </DialogActions>
         </form>

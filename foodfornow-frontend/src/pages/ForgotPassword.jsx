@@ -11,62 +11,33 @@ import {
   useTheme,
   CircularProgress,
 } from '@mui/material';
-import PasswordField from '../components/PasswordField';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
 
-const Login = () => {
+const ForgotPassword = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { refreshAuth } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const { email, password } = formData;
-
-  const onChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
       setIsLoading(true);
       setError('');
-      await api.post('/auth/login', {
-        email,
-        password,
-      });
+      setSuccess('');
+      const response = await api.post('/auth/forgot-password', { email });
 
-      if ('PasswordCredential' in window && 'credentials' in navigator) {
-        try {
-          const cred = new window.PasswordCredential({
-            id: email,
-            password,
-            name: email,
-          });
-          await navigator.credentials.store(cred).catch((e) =>
-            console.error('Credential store failed:', e)
-          );
-        } catch (credErr) {
-          console.error('Credential store failed:', credErr);
-        }
-      }
-
-      await refreshAuth();
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      console.error('Login error:', err);
-      if (err.response) {
-        console.error('Error response:', err.response.data);
-        setError(err.response.data.error || 'Login failed. Please try again.');
+      if (response.data.resetToken) {
+        setSuccess('Redirecting you to set a new password...');
+        navigate(`/reset-password?token=${response.data.resetToken}`, { replace: true });
       } else {
-        setError('Login failed. Please try again.');
+        setSuccess('If that email exists in our system, a reset link would be sent. Please try again or contact support.');
       }
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +50,7 @@ const Login = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: theme.palette.mode === 'dark' 
+        background: theme.palette.mode === 'dark'
           ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
           : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
         py: 4,
@@ -104,7 +75,7 @@ const Login = () => {
               mb: 2,
             }}
           >
-            Welcome Back
+            Forgot Password
           </Typography>
 
           <Paper
@@ -113,7 +84,7 @@ const Login = () => {
               p: 4,
               width: '100%',
               borderRadius: 2,
-              background: theme.palette.mode === 'dark' 
+              background: theme.palette.mode === 'dark'
                 ? 'rgba(255, 255, 255, 0.05)'
                 : 'rgba(255, 255, 255, 0.8)',
               backdropFilter: 'blur(20px)',
@@ -123,18 +94,39 @@ const Login = () => {
                 : 'rgba(0, 0, 0, 0.1)',
             }}
           >
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 2,
+                color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+              }}
+            >
+              Enter your email address and we&apos;ll help you reset your password.
+            </Typography>
+
             {error && (
-              <Alert 
-                severity="error" 
-                sx={{ 
+              <Alert
+                severity="error"
+                sx={{
                   mb: 2,
                   borderRadius: 1,
-                  '& .MuiAlert-icon': {
-                    color: '#ff3b30',
-                  },
+                  '& .MuiAlert-icon': { color: '#ff3b30' },
                 }}
               >
                 {error}
+              </Alert>
+            )}
+
+            {success && (
+              <Alert
+                severity="success"
+                sx={{
+                  mb: 2,
+                  borderRadius: 1,
+                  '& .MuiAlert-icon': { color: '#228B22' },
+                }}
+              >
+                {success}
               </Alert>
             )}
 
@@ -146,10 +138,11 @@ const Login = () => {
                 id="email"
                 label="Email Address"
                 name="email"
-                autoComplete="username"
+                type="email"
+                autoComplete="email"
                 autoFocus
                 value={email}
-                onChange={onChange}
+                onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -167,50 +160,6 @@ const Login = () => {
                   },
                 }}
               />
-              <PasswordField
-                name="password"
-                label="Password"
-                id="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={onChange}
-                disabled={isLoading}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 1.5,
-                    '& fieldset': {
-                      borderColor: theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.1)'
-                        : 'rgba(0, 0, 0, 0.1)',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.2)'
-                        : 'rgba(0, 0, 0, 0.2)',
-                    },
-                  },
-                }}
-              />
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
-                <Button
-                  size="small"
-                  variant="text"
-                  onClick={() => navigate('/forgot-password')}
-                  disabled={isLoading}
-                  sx={{
-                    textTransform: 'none',
-                    fontSize: '0.875rem',
-                    color: theme.palette.mode === 'dark' ? '#228B22' : '#1B6B1B',
-                    '&:hover': {
-                      background: theme.palette.mode === 'dark'
-                        ? 'rgba(34, 139, 34, 0.1)'
-                        : 'rgba(34, 139, 34, 0.1)',
-                    },
-                  }}
-                >
-                  Forgot password?
-                </Button>
-              </Box>
               <Button
                 type="submit"
                 fullWidth
@@ -242,13 +191,13 @@ const Login = () => {
                 {isLoading ? (
                   <CircularProgress size={24} sx={{ color: 'white' }} />
                 ) : (
-                  'Sign In'
+                  'Send Reset Link'
                 )}
               </Button>
               <Button
                 fullWidth
                 variant="text"
-                onClick={() => navigate('/register')}
+                onClick={() => navigate('/login')}
                 disabled={isLoading}
                 sx={{
                   textTransform: 'none',
@@ -260,7 +209,7 @@ const Login = () => {
                   },
                 }}
               >
-                Don't have an account? Register
+                Back to Sign In
               </Button>
             </Box>
           </Paper>
@@ -270,4 +219,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default ForgotPassword;

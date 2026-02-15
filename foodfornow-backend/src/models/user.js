@@ -70,6 +70,11 @@ const userSchema = new mongoose.Schema({
       default: 'UTC'
     }
   },
+  // Achievement/stats tracking
+  completedShoppingListsCount: {
+    type: Number,
+    default: 0
+  },
   // Notification settings
   notifications: {
     email: {

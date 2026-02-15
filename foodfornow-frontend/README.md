@@ -4,7 +4,7 @@
 FoodForNow is a full-stack web application designed to help users manage their pantry, recipes, and shopping lists. The application is built using React for the frontend and Node.js with Express for the backend.
 
 ## Features
-- **User Authentication**: Secure login and registration system.
+- **User Authentication**: Secure login, registration, and password reset (forgot/reset).
 - **Dashboard**: Overview of user's pantry, recipes, and shopping lists.
 - **Pantry Management**: Add, edit, and remove items from your pantry.
 - **Recipe Management**: Browse, add, and manage recipes.
@@ -19,8 +19,8 @@ FoodForNow is a full-stack web application designed to help users manage their p
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- npm (v6 or higher)
+- Node.js (v18 or higher)
+- npm (v8 or higher)
 - MongoDB (local or Atlas)
 
 ### Installation
@@ -44,12 +44,17 @@ FoodForNow is a full-stack web application designed to help users manage their p
    ```
 
 4. **Set up environment variables**
-   - Create a `.env` file in the `foodfornow-backend` directory with the following variables:
+   - Create a `.env` file in the `foodfornow-backend` directory:
      ```
      MONGO_URI=your_mongodb_connection_string
      JWT_SECRET=your_jwt_secret
      PORT=3001
      CORS_ORIGIN=http://localhost:5173
+     ```
+   - Optionally create a `.env` file in `foodfornow-frontend` for location features:
+     ```
+     VITE_API_URL=http://localhost:3001/api
+     VITE_GEONAMES_USERNAME=your_geonames_username
      ```
 
 5. **Start the backend server**
@@ -76,7 +81,7 @@ FoodForNow is a full-stack web application designed to help users manage their p
   - `pages/`: Page components
   - `services/`: API service for backend communication
   - `App.jsx`: Main application component
-  - `index.jsx`: Entry point
+  - `main.jsx`: Entry point
 
 ### Backend
 - `src/`: Contains all backend source code

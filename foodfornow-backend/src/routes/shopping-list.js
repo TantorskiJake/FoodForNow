@@ -10,7 +10,6 @@ const MealPlan = require('../models/mealPlan');
 // Get shopping list
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Fetching shopping list for user:', req.userId);
     const items = await ShoppingListItem.find({ user: req.userId })
       .populate('ingredient')
       .populate('recipe')
@@ -25,7 +24,6 @@ router.get('/', authMiddleware, async (req, res) => {
 // Add item to shopping list
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Adding item to shopping list:', req.body);
     const { ingredient, quantity, unit } = req.body;
 
     // Validate required fields
@@ -56,6 +54,28 @@ router.post('/', authMiddleware, async (req, res) => {
 
     await shoppingListItem.save();
     await shoppingListItem.populate('ingredient');
+
+    // Check for first-shopping-item achievement
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkShoppingListAchievements(req.userId, [shoppingListItem]);
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          return res.status(201).json({
+            item: shoppingListItem,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+
     res.status(201).json(shoppingListItem);
   } catch (err) {
     console.error('Error adding item to shopping list:', err);
@@ -66,8 +86,6 @@ router.post('/', authMiddleware, async (req, res) => {
 // Update shopping list based on meal plan
 router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
   try {
-    console.log('Updating shopping list from meal plan for user:', req.userId);
-    
     // Step 1: Get all meal plans for the user with populated recipe ingredients
     const mealPlans = await MealPlan.find({ user: req.userId })
       .populate({
@@ -79,23 +97,10 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
         }
       });
 
-    console.log('Found meal plans:', mealPlans.length);
-
-    // Filter out cooked meals - only count ingredients from uncooked meals
     const uncookedMealPlans = mealPlans.filter(mealPlan => !mealPlan.cooked);
-    console.log('Uncooked meal plans:', uncookedMealPlans.length);
-
     if (uncookedMealPlans.length === 0) {
       return res.json([]);
     }
-
-    // Debug log for recipe ingredients
-    uncookedMealPlans.forEach(mealPlan => {
-      if (mealPlan.recipe && mealPlan.recipe.ingredients) {
-        console.log('Recipe:', mealPlan.recipe.name);
-        console.log('Ingredients:', JSON.stringify(mealPlan.recipe.ingredients, null, 2));
-      }
-    });
 
     // Step 2: Get current pantry items
     const pantry = await PantryItem.findOne({ user: req.userId })
@@ -105,8 +110,6 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
         select: 'name category'
       });
 
-    console.log('Found pantry:', pantry ? 'yes' : 'no');
-
     // Step 3: Create a map of current pantry quantities
     const pantryQuantities = new Map();
     if (pantry && pantry.items) {
@@ -114,7 +117,6 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
         if (item.ingredient) {
           const key = `${item.ingredient._id}-${item.unit}`;
           pantryQuantities.set(key, item.quantity);
-          console.log(`Pantry item: ${item.ingredient.name}, Quantity: ${item.quantity} ${item.unit}`);
         }
       });
     }
@@ -122,32 +124,14 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
     // Step 4: Calculate needed ingredients
     const neededIngredients = new Map();
     uncookedMealPlans.forEach(mealPlan => {
-      if (!mealPlan.recipe || !mealPlan.recipe.ingredients) {
-        console.log('Skipping meal plan with no recipe or ingredients:', mealPlan._id);
-        return;
-      }
-
-      console.log('Processing recipe:', mealPlan.recipe.name);
-
+      if (!mealPlan.recipe || !mealPlan.recipe.ingredients) return;
       mealPlan.recipe.ingredients.forEach(ing => {
-        if (!ing.ingredient) {
-          console.log('Skipping ingredient with no reference:', ing);
-          return;
-        }
-
+        if (!ing.ingredient) return;
         const ingredientId = ing.ingredient._id || ing.ingredient;
-        if (!ingredientId) {
-          console.log('Skipping ingredient with no ID:', ing);
-          return;
-        }
-
-        console.log(`Processing ingredient: ${ing.ingredient.name}, Quantity: ${ing.quantity} ${ing.unit}`);
-
+        if (!ingredientId) return;
         const key = `${ingredientId}-${ing.unit}`;
         const pantryQuantity = pantryQuantities.get(key) || 0;
         const neededQuantity = ing.quantity;
-        
-        console.log(`Pantry quantity: ${pantryQuantity}, Needed quantity: ${neededQuantity}`);
         
         if (!neededIngredients.has(key)) {
           neededIngredients.set(key, {
@@ -165,13 +149,6 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
         }
       });
     });
-
-    console.log('Calculated needed ingredients:', neededIngredients.size);
-    console.log('Needed ingredients details:', Array.from(neededIngredients.entries()).map(([key, value]) => ({
-      key,
-      ...value
-    })));
-
     // Step 5: Update shopping list
     await ShoppingListItem.deleteMany({ user: req.userId });
     
@@ -189,10 +166,6 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
         };
       })
       .filter(item => item.quantity > 0); // Only include items that still need to be bought
-
-    console.log('Creating shopping list items:', shoppingListItems.length);
-    console.log('Shopping list items:', shoppingListItems);
-
     if (shoppingListItems.length > 0) {
       await ShoppingListItem.insertMany(shoppingListItems);
     }
@@ -259,7 +232,6 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
 // Toggle item completion
 router.put('/:id/toggle', authMiddleware, async (req, res) => {
   try {
-    console.log('Toggling shopping list item:', req.params.id);
     const item = await ShoppingListItem.findOne({
       _id: req.params.id,
       user: req.userId
@@ -306,7 +278,6 @@ router.put('/:id/toggle', authMiddleware, async (req, res) => {
 // Remove item from shopping list
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    console.log('Removing shopping list item:', req.params.id);
     const item = await ShoppingListItem.findOneAndDelete({
       _id: req.params.id,
       user: req.userId
@@ -323,14 +294,46 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Clear completed items
+// Clear completed items (counts as 1 completed shopping list for achievements)
 router.delete('/clear-completed', authMiddleware, async (req, res) => {
   try {
-    console.log('Clearing completed items for user:', req.userId);
+    const deletedCount = await ShoppingListItem.countDocuments({
+      user: req.userId,
+      completed: true
+    });
+
     await ShoppingListItem.deleteMany({
       user: req.userId,
       completed: true
     });
+
+    // Increment completed shopping lists count when user clears (had completed items)
+    if (deletedCount > 0) {
+      const User = require('../models/user');
+      await User.findByIdAndUpdate(req.userId, { $inc: { completedShoppingListsCount: 1 } });
+
+      // Check for shopping list achievements
+      try {
+        const AchievementService = require('../services/achievementService');
+        const achievements = await AchievementService.checkShoppingListAchievements(req.userId, []);
+        if (achievements && achievements.length > 0) {
+          const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+          if (newlyCompleted.length > 0) {
+            return res.json({
+              message: 'Completed items cleared',
+              achievements: newlyCompleted.map(a => ({
+                name: a.config.name,
+                description: a.config.description,
+                icon: a.config.icon
+              }))
+            });
+          }
+        }
+      } catch (achievementError) {
+        console.error('Error checking achievements:', achievementError);
+      }
+    }
+
     res.json({ message: 'Completed items cleared' });
   } catch (err) {
     console.error('Error clearing completed items:', err);
@@ -384,7 +387,6 @@ router.patch('/:id', authMiddleware, async (req, res) => {
 // Clear all shopping list items
 router.delete('/', authMiddleware, async (req, res) => {
   try {
-    console.log('Clearing all shopping list items for user:', req.userId);
     await ShoppingListItem.deleteMany({ user: req.userId });
     res.json({ message: 'Shopping list cleared successfully' });
   } catch (err) {

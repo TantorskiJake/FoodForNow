@@ -25,19 +25,15 @@ const auth = async (req, res, next) => {
     // Using optional chaining to safely access cookies
     const token = req.cookies?.accessToken;
     if (!token) {
-      console.log('No accessToken cookie provided');
       return res.status(401).json({ error: 'Please login' });
     }
 
     // Verify the JWT token signature and decode payload
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('Token decoded:', decoded);
-    
     // Extract user ID from token payload
     // Handle both 'userId' and 'id' properties for compatibility
     const userId = decoded.userId || decoded.id;
     if (!userId) {
-      console.log('No user ID in token');
       return res.status(401).json({ error: 'Invalid token' });
     }
     
@@ -45,15 +41,11 @@ const auth = async (req, res, next) => {
     // This prevents access with tokens for deleted users
     const user = await User.findById(userId);
     if (!user) {
-      console.log('User not found:', userId);
       return res.status(401).json({ error: 'User no longer exists' });
     }
 
     // Add user ID to request object for use in route handlers
     req.userId = user._id;
-    console.log('User authenticated:', req.userId);
-    
-    // Continue to the next middleware or route handler
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);

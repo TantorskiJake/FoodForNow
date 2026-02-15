@@ -38,7 +38,6 @@ import {
   Sort as SortIcon,
 } from '@mui/icons-material';
 import api from '../services/api';
-import { getCategoryColor } from '../utils/categoryColors';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
@@ -242,6 +241,23 @@ const ShoppingList = () => {
     }
   };
 
+  const handleClearCompleted = async () => {
+    try {
+      setLoading(true);
+      const response = await api.delete('/shopping-list/clear-completed');
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      await fetchShoppingList();
+      toast.success('Completed items cleared');
+    } catch (err) {
+      console.error('Error clearing completed items:', err);
+      toast.error('Failed to clear completed items');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClearAll = async () => {
     try {
       setLoading(true);
@@ -348,6 +364,16 @@ const ShoppingList = () => {
               <MenuItem value="completed-desc">Not Completed First</MenuItem>
             </Select>
           </FormControl>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleClearCompleted}
+            startIcon={<DeleteIcon />}
+            size="small"
+            disabled={loading || !shoppingItems.some(item => item.completed)}
+          >
+            Clear Completed
+          </Button>
           <Button
             variant="contained"
             color="error"

@@ -31,7 +31,6 @@ const element = import.meta.env.DEV ? (
 
 try {
   root.render(element);
-  console.log('App rendered successfully');
 } catch (error) {
   console.error('Failed to render app:', error);
   // Show a fallback UI

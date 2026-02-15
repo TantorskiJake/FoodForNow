@@ -293,6 +293,18 @@ Authenticate user and return JWT token.
 #### POST `/api/auth/logout`
 Logout user and invalidate JWT token.
 
+#### POST `/api/auth/token`
+Refresh access token using refresh token (HTTP-only cookie).
+
+#### POST `/api/auth/forgot-password`
+Request password reset for the given email. Returns reset token (for development; production would send via email).
+
+#### POST `/api/auth/reset-password`
+Reset password using token from forgot-password. Requires `token` and `newPassword` in body.
+
+#### PUT `/api/auth/profile`
+Update authenticated user's profile (name, email, bio, location, preferences, notifications, password).
+
 #### GET `/api/auth/me`
 Get current authenticated user information.
 
@@ -306,6 +318,12 @@ Get all recipes for the authenticated user.
 - `tags`: Filter by tags
 - `limit`: Number of recipes to return
 - `page`: Page number for pagination
+
+#### GET `/api/recipes/popular`
+Get the authenticated user's popular recipes (sorted by popularity).
+
+#### GET `/api/recipes/shared`
+Get recipes from other users (excluding names the user already has). Query param: `search`.
 
 #### POST `/api/recipes`
 Create a new recipe.
@@ -426,10 +444,16 @@ Automatically update shopping list based on meal plan.
 ### Achievement Endpoints
 
 #### GET `/api/achievements`
-Get all achievements for the authenticated user.
+Get all achievements for the authenticated user, grouped by category with progress and stats.
 
-#### PATCH `/api/achievements/:id/read`
-Mark an achievement as read.
+#### GET `/api/achievements/recent`
+Get achievements completed in the last 7 days.
+
+#### POST `/api/achievements/check`
+Manually trigger achievement check (for testing). Body: `achievementId`, `progress`.
+
+#### GET `/api/achievements/leaderboard`
+Get users ranked by achievement completion.
 
 ## Frontend Documentation
 
