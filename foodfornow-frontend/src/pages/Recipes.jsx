@@ -263,6 +263,28 @@ const Recipes = () => {
     }
   }, [tab, searchTerm, authenticated]);
 
+  const openRecipeFormWithData = (recipeData) => {
+    const mappedIngredients = recipeData.ingredients?.length
+      ? recipeData.ingredients.map((ing) => ({
+          ingredient: ing.ingredient?._id ?? ing.ingredient,
+          quantity: String(ing.quantity ?? ''),
+          unit: ing.unit || 'piece',
+        }))
+      : [{ ingredient: '', quantity: '', unit: '' }];
+    setFormData({
+      name: recipeData.name,
+      description: recipeData.description || recipeData.name,
+      ingredients: mappedIngredients,
+      instructions: recipeData.instructions?.length ? recipeData.instructions : [''],
+      prepTime: recipeData.prepTime || '',
+      cookTime: recipeData.cookTime || '',
+      servings: recipeData.servings || '',
+      tags: Array.isArray(recipeData.tags) ? recipeData.tags.join(', ') : '',
+    });
+    setEditingRecipe(null);
+    setOpenDialog(true);
+  };
+
   const handleImportFromUrl = async () => {
     const url = importUrl?.trim();
     if (!url) {
@@ -283,32 +305,47 @@ const Recipes = () => {
       setOpenImportUrl(false);
       setImportUrl('');
 
-      await fetchIngredients();
-      setEditingRecipe(null);
-      const mappedIngredients = recipeData.ingredients?.length
-        ? recipeData.ingredients.map((ing) => ({
-            ingredient: ing.ingredient?._id ?? ing.ingredient,
-            quantity: String(ing.quantity ?? ''),
-            unit: ing.unit || 'piece',
-          }))
-        : [{ ingredient: '', quantity: '', unit: '' }];
-      setFormData({
-        name: recipeData.name,
-        description: recipeData.description || recipeData.name,
-        ingredients: mappedIngredients,
-        instructions: recipeData.instructions?.length
-          ? recipeData.instructions
-          : [''],
-        prepTime: recipeData.prepTime || '',
-        cookTime: recipeData.cookTime || '',
-        servings: recipeData.servings || '',
-        tags: Array.isArray(recipeData.tags) ? recipeData.tags.join(', ') : '',
-      });
-      setOpenDialog(true);
+      const uncertainIngredients = recipeData.ingredients?.filter((ing) => ing.uncertain) || [];
+      if (uncertainIngredients.length > 0) {
+        const initialOverrides = {};
+        uncertainIngredients.forEach((ing) => {
+          initialOverrides[ing.name] = ing.suggestedCategory || 'Other';
+        });
+        setCategoryOverrides(initialOverrides);
+        setPendingRecipeData(recipeData);
+        setOpenCategoryReview(true);
+      } else {
+        const prepResponse = await api.post('/recipes/prepare-import', {
+          recipeData,
+          categoryOverrides: {},
+        });
+        await fetchIngredients();
+        openRecipeFormWithData(prepResponse.data);
+      }
     } catch (err) {
       setImportUrlError(
         err.response?.data?.error || 'Failed to parse recipe. The site may not be supported.'
       );
+    } finally {
+      setParsingUrl(false);
+    }
+  };
+
+  const handleCategoryReviewContinue = async () => {
+    if (!pendingRecipeData) return;
+    try {
+      setParsingUrl(true);
+      const response = await api.post('/recipes/prepare-import', {
+        recipeData: pendingRecipeData,
+        categoryOverrides,
+      });
+      await fetchIngredients();
+      setOpenCategoryReview(false);
+      setPendingRecipeData(null);
+      setCategoryOverrides({});
+      openRecipeFormWithData(response.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to prepare recipe import.');
     } finally {
       setParsingUrl(false);
     }
@@ -1288,6 +1325,73 @@ const Recipes = () => {
             startIcon={parsingUrl ? <CircularProgress size={20} /> : <LinkIcon />}
           >
             {parsingUrl ? 'Parsing...' : 'Parse Recipe'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={openCategoryReview}
+        onClose={() => !parsingUrl && (setOpenCategoryReview(false), setPendingRecipeData(null))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Select categories for ingredients</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            We couldn&apos;t determine the category for these ingredients. Please select the best match.
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {pendingRecipeData?.ingredients
+              ?.filter((ing) => ing.uncertain)
+              .map((ing) => (
+                <Box
+                  key={ing.name}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <Typography sx={{ flex: '1 1 200px', minWidth: 0 }} noWrap>
+                    {ing.name}
+                  </Typography>
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      value={categoryOverrides[ing.name] ?? ing.suggestedCategory ?? 'Other'}
+                      onChange={(e) =>
+                        setCategoryOverrides((prev) => ({ ...prev, [ing.name]: e.target.value }))
+                      }
+                      label="Category"
+                    >
+                      {ingredientCategories.map((cat) => (
+                        <MenuItem key={cat} value={cat}>
+                          {cat}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+              ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setOpenCategoryReview(false);
+              setPendingRecipeData(null);
+            }}
+            disabled={parsingUrl}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCategoryReviewContinue}
+            disabled={parsingUrl}
+          >
+            {parsingUrl ? 'Preparing...' : 'Continue'}
           </Button>
         </DialogActions>
       </Dialog>
