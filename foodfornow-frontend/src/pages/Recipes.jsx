@@ -72,6 +72,9 @@ const Recipes = () => {
   const [importUrl, setImportUrl] = useState('');
   const [parsingUrl, setParsingUrl] = useState(false);
   const [importUrlError, setImportUrlError] = useState('');
+  const [openCategoryReview, setOpenCategoryReview] = useState(false);
+  const [pendingRecipeData, setPendingRecipeData] = useState(null);
+  const [categoryOverrides, setCategoryOverrides] = useState({});
 
   // Shared recipes and tab state
   const [tab, setTab] = useState('mine');

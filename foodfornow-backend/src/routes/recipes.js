@@ -2,7 +2,7 @@ const express = require('express');
 const authMiddleware = require('../middleware/auth');
 const Recipe = require('../models/recipe');
 const Ingredient = require('../models/ingredient');
-const { parseRecipeFromUrl, transformToRecipeFormat } = require('../services/recipeParserService');
+const { parseRecipeFromUrl, buildRawRecipeFormat, transformToRecipeFormat } = require('../services/recipeParserService');
 
 const router = express.Router();
 
@@ -31,7 +31,8 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 
-// Parse recipe from URL - returns pre-filled recipe data for the add form
+// Parse recipe from URL - returns recipe data with suggested categories (no ingredient creation)
+// Frontend may show a category review step for uncertain ingredients before calling prepare-import
 router.post('/parse-url', authMiddleware, async (req, res) => {
   try {
     const { url } = req.body;
@@ -45,12 +46,35 @@ router.post('/parse-url', authMiddleware, async (req, res) => {
     }
 
     const parsed = await parseRecipeFromUrl(trimmed);
-    const recipeData = await transformToRecipeFormat(parsed, req.userId, Ingredient, VALID_UNITS);
+    const recipeData = buildRawRecipeFormat(parsed, VALID_UNITS);
     res.json(recipeData);
   } catch (err) {
     console.error('Error parsing recipe URL:', err);
     const message = err.message || 'Failed to parse recipe from URL. The site may not be supported.';
     res.status(400).json({ error: message });
+  }
+});
+
+// Create ingredients from parsed recipe data with user-selected categories
+// Call after parse-url; use categoryOverrides for ingredients where uncertain was true
+router.post('/prepare-import', authMiddleware, async (req, res) => {
+  try {
+    const { recipeData, categoryOverrides = {} } = req.body;
+    if (!recipeData || !recipeData.name || !Array.isArray(recipeData.ingredients)) {
+      return res.status(400).json({ error: 'Invalid recipe data' });
+    }
+
+    const result = await transformToRecipeFormat(
+      recipeData,
+      req.userId,
+      Ingredient,
+      VALID_UNITS,
+      categoryOverrides
+    );
+    res.json(result);
+  } catch (err) {
+    console.error('Error preparing recipe import:', err);
+    res.status(400).json({ error: err.message || 'Failed to prepare recipe import' });
   }
 });
 
