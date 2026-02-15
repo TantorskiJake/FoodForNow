@@ -21,6 +21,7 @@ import {
   LinearProgress,
   Paper,
   TextField,
+  Autocomplete,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
@@ -1042,6 +1043,7 @@ const Dashboard = () => {
         open={openMealDialog}
         onClose={handleCloseMealDialog}
         fullScreen={isMobile}
+        disableScrollLock
       >
         <DialogTitle>
           {mealFormData._id ? 'Edit Meal' : `Add Meal - ${mealFormData.day} ${mealFormData.meal}`}
@@ -1092,20 +1094,31 @@ const Dashboard = () => {
             </Box>
           )}
 
-          <FormControl fullWidth>
-            <InputLabel>Recipe</InputLabel>
-            <Select
-              value={mealFormData.recipeId}
-              onChange={(e) => handleRecipeSelect(e.target.value)}
-              required
-            >
-              {recipes.map((recipe) => (
-                <MenuItem key={recipe._id} value={recipe._id}>
-                  {recipe.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            fullWidth
+            options={recipes}
+            value={recipes.find((r) => r._id === mealFormData.recipeId) || null}
+            getOptionLabel={(option) => (typeof option === 'string' ? option : option?.name) || ''}
+            isOptionEqualToValue={(option, value) => option?._id === value?._id}
+            filterOptions={(options, { inputValue }) =>
+              options.filter((opt) =>
+                (opt?.name || '').toLowerCase().includes((inputValue || '').toLowerCase())
+              )
+            }
+            onChange={(e, value) => {
+              if (value) {
+                handleRecipeSelect(value._id);
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Recipe"
+                placeholder="Type to search recipes..."
+                required={!mealFormData.recipeId}
+              />
+            )}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseMealDialog}>Cancel</Button>
