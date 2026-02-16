@@ -75,7 +75,7 @@ const Dashboard = () => {
   });
   const [resetWeekDialog, setResetWeekDialog] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
-  const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
+  const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
   const [selectedWeekStart, setSelectedWeekStart] = useState('');
   const [mealActionLoading, setMealActionLoading] = useState(false);
   const [calendarAnchorEl, setCalendarAnchorEl] = useState(null);
@@ -119,16 +119,37 @@ const Dashboard = () => {
     setSelectedWeekStart(monday.toISOString().split('T')[0]);
   }, []);
 
-  // Start ingredients section collapsed when empty or when many items (only on first load)
-  const ingredientsInitialized = useRef(false);
+  // Auto-expand Needed Ingredients only when user scrolls to the absolute bottom of the page
+  const wasAtBottomRef = useRef(false);
+  const userClosedManuallyRef = useRef(false);
   useEffect(() => {
-    if (!ingredientsInitialized.current && !showSkeleton) {
-      ingredientsInitialized.current = true;
-      if (ingredients.length === 0 || ingredients.length > 8) {
-        setIngredientsExpanded(false);
+    if (ingredients.length === 0) return;
+
+    const checkScroll = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = window.innerHeight;
+      const threshold = 80; // px from bottom to trigger
+      const atBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+
+      if (!atBottom) userClosedManuallyRef.current = false; // User scrolled away; allow expand next time
+      if (atBottom && !wasAtBottomRef.current && !userClosedManuallyRef.current) {
+        setIngredientsExpanded(true);
       }
-    }
-  }, [showSkeleton, ingredients.length]);
+      wasAtBottomRef.current = atBottom;
+    };
+
+    window.addEventListener('scroll', checkScroll, { passive: true });
+    checkScroll(); // Initial check
+    return () => window.removeEventListener('scroll', checkScroll);
+  }, [ingredients.length]);
+
+  const handleIngredientsToggle = useCallback(() => {
+    setIngredientsExpanded((prev) => {
+      if (prev) userClosedManuallyRef.current = true; // User closed; block scroll from re-expanding
+      return !prev;
+    });
+  }, []);
 
   useEffect(() => {
     if (!authenticated || !selectedWeekStart) return;
@@ -1024,7 +1045,7 @@ const Dashboard = () => {
                 alignItems="center"
                 mb={ingredientsExpanded ? 3 : 0}
                 sx={{ cursor: 'pointer' }}
-                onClick={() => setIngredientsExpanded((e) => !e)}
+                onClick={handleIngredientsToggle}
               >
                 <Box display="flex" alignItems="center" gap={1}>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
