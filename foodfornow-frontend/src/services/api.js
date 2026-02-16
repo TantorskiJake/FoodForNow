@@ -28,6 +28,80 @@ const api = axios.create({
 });
 
 /**
+ * Lightweight in-memory cache for GET requests so that we can keep the UI
+ * responsive even when multiple components ask for the same data at once.
+ * Entries expire automatically after the configured TTL.
+ */
+const responseCache = new Map();
+const inFlightRequests = new Map();
+const DEFAULT_CACHE_TTL = 60 * 1000; // 60 seconds keeps things fresh but helpful
+
+const buildCacheKey = (url, config = {}) => {
+  const paramsKey = config.params ? JSON.stringify(config.params) : '';
+  return `${config.baseURL || API_URL}:${url}?${paramsKey}`;
+};
+
+const fromCache = (key, cacheTtl) => {
+  const cached = responseCache.get(key);
+  if (!cached) return null;
+  const isFresh = Date.now() - cached.timestamp < cacheTtl;
+  return isFresh ? { ...cached.response } : null;
+};
+
+const storeCacheEntry = (key, response) => {
+  responseCache.set(key, {
+    timestamp: Date.now(),
+    response: { ...response },
+  });
+};
+
+const invalidateCache = (predicate = () => true) => {
+  for (const key of responseCache.keys()) {
+    if (predicate(key)) {
+      responseCache.delete(key);
+    }
+  }
+};
+
+api.cachedGet = async (url, config = {}) => {
+  const { cacheTtl = DEFAULT_CACHE_TTL, forceRefresh = false } = config;
+  const cacheKey = buildCacheKey(url, config);
+
+  if (!forceRefresh) {
+    const cachedResponse = fromCache(cacheKey, cacheTtl);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  }
+
+  if (inFlightRequests.has(cacheKey)) {
+    return inFlightRequests.get(cacheKey);
+  }
+
+  const requestPromise = api
+    .get(url, config)
+    .then((response) => {
+      storeCacheEntry(cacheKey, response);
+      inFlightRequests.delete(cacheKey);
+      return { ...response };
+    })
+    .catch((error) => {
+      inFlightRequests.delete(cacheKey);
+      throw error;
+    });
+
+  inFlightRequests.set(cacheKey, requestPromise);
+  return requestPromise;
+};
+
+api.prefetch = (url, config = {}) => api.cachedGet(url, config).catch(() => {});
+api.invalidateCache = (predicate) => invalidateCache(predicate);
+api.clearCache = () => {
+  responseCache.clear();
+  inFlightRequests.clear();
+};
+
+/**
  * Request Interceptor
  * 
  * Automatically sets Content-Type header for requests that send data.

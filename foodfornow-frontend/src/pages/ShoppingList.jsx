@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -22,7 +22,6 @@ import {
   TextField,
   MenuItem,
   Paper,
-  CircularProgress,
   Chip,
   useTheme,
   LinearProgress,
@@ -48,6 +47,8 @@ import BarcodeScanner from '../components/BarcodeScanner';
 import EmptyState from '../components/EmptyState';
 import { lookupBarcode, extractBarcode } from '../services/barcodeLookup';
 import { useNavigate } from 'react-router-dom';
+import PageLoader from '../components/PageLoader';
+import useProgressiveLoader from '../hooks/useProgressiveLoader';
 
 const ShoppingList = () => {
   const theme = useTheme();
@@ -57,7 +58,6 @@ const ShoppingList = () => {
   const { showAchievements } = useAchievements();
   const [shoppingItems, setShoppingItems] = useState([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [ingredients, setIngredients] = useState([]);
   const [formData, setFormData] = useState({
@@ -72,25 +72,58 @@ const ShoppingList = () => {
   const [scannerOpen, setScannerOpen] = useState(false);
 
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+
+  const runTask = useCallback(
+    async (task, options = {}) => {
+      const { hydrate = false } = options;
+      const stop = startTask();
+      try {
+        const result = await task();
+        if (hydrate) {
+          markHydrated();
+        }
+        return result;
+      } finally {
+        stop();
+      }
+    },
+    [startTask, markHydrated]
+  );
+
+  const disablePageActions = showSkeleton || showBusyBar;
+  const busyIndicator = showBusyBar ? (
+    <LinearProgress
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        zIndex: theme.zIndex.tooltip + 1,
+      }}
+    />
+  ) : null;
+  const invalidateShoppingCache = useCallback(() => {
+    api.invalidateCache((key) => key.includes('/shopping-list'));
+  }, []);
 
   useEffect(() => {
     if (!authenticated) return;
     const fetchAll = async () => {
-      try {
-        setLoading(true);
-        await Promise.all([fetchShoppingList(), fetchIngredients()]);
-      } finally {
-        setLoading(false);
-      }
+      await runTask(async () => {
+        await Promise.all([fetchShoppingList({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
+      }, { hydrate: true });
     };
     fetchAll();
-  }, [authenticated]);
+  }, [authenticated, runTask]);
 
-  const fetchShoppingList = async () => {
+  const fetchShoppingList = async ({ forceRefresh = false } = {}) => {
     try {
-      setLoading(true);
       setError('');
-      const response = await api.get('/shopping-list');
+      const response = await api.cachedGet('/shopping-list', {
+        cacheTtl: 45 * 1000,
+        forceRefresh,
+      });
       if (Array.isArray(response.data)) {
         setShoppingItems(response.data);
       } else {
@@ -99,14 +132,15 @@ const ShoppingList = () => {
     } catch (err) {
       console.error('Error fetching shopping list:', err);
       setError('Failed to fetch shopping list');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const fetchIngredients = async () => {
+  const fetchIngredients = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get('/ingredients');
+      const response = await api.cachedGet('/ingredients', {
+        cacheTtl: 5 * 60 * 1000,
+        forceRefresh,
+      });
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
@@ -123,7 +157,8 @@ const ShoppingList = () => {
         showAchievements(response.data.achievements);
       }
       
-      fetchShoppingList();
+      invalidateShoppingCache();
+      await fetchShoppingList({ forceRefresh: true });
     } catch (err) {
       toast.error('Failed to update item status');
     }
@@ -132,7 +167,8 @@ const ShoppingList = () => {
   const handleDeleteItem = async (id) => {
     try {
       await api.delete(`/shopping-list/${id}`);
-      fetchShoppingList();
+      invalidateShoppingCache();
+      await fetchShoppingList({ forceRefresh: true });
     } catch (err) {
       console.error('Error deleting item:', err);
       setError('Failed to delete item');
@@ -166,44 +202,38 @@ const ShoppingList = () => {
   };
 
   const handleAddAllToPantry = async () => {
+    const completedItems = shoppingItems.filter(item => item.completed);
+    if (completedItems.length === 0) {
+      toast.error('No completed items to add to pantry');
+      return;
+    }
+
     try {
-      setLoading(true);
-      
-      // Get all completed items
-      const completedItems = shoppingItems.filter(item => item.completed);
-      
-      if (completedItems.length === 0) {
-        toast.error('No completed items to add to pantry');
-        return;
-      }
-      
-      const response = await api.post('/pantry/add-all-from-shopping-list');
-      
-      // Check for achievements in response
-      if (response.data.achievements && response.data.achievements.length > 0) {
-        showAchievements(response.data.achievements);
-      }
-      
-      fetchShoppingList();
+      await runTask(async () => {
+        const response = await api.post('/pantry/add-all-from-shopping-list');
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
+        invalidateShoppingCache();
+        await fetchShoppingList({ forceRefresh: true });
+      });
       toast.success(`Added ${completedItems.length} item${completedItems.length !== 1 ? 's' : ''} to pantry!`);
     } catch (err) {
       console.error('Error adding items to pantry:', err);
       toast.error('Failed to add items to pantry');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleUpdateFromMealPlan = async () => {
     try {
-      const response = await api.post('/shopping-list/update-from-meal-plan');
-      
-      // Check for achievements in response
-      if (response.data.achievements && response.data.achievements.length > 0) {
-        showAchievements(response.data.achievements);
-      }
-      
-      fetchShoppingList();
+      await runTask(async () => {
+        const response = await api.post('/shopping-list/update-from-meal-plan');
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
+        invalidateShoppingCache();
+        await fetchShoppingList({ forceRefresh: true });
+      });
       toast.success('Updated from meal plan');
     } catch (err) {
       console.error('Error updating from meal plan:', err);
@@ -213,69 +243,61 @@ const ShoppingList = () => {
 
   const handleCheckAll = async () => {
     try {
-      setLoading(true);
-      // Check if all items are completed
-      const allCompleted = shoppingItems.every(item => item.completed);
-      
-      // Update all items in parallel and collect responses
-      const responses = await Promise.all(
-        shoppingItems.map(item =>
-          api.patch(`/shopping-list/${item._id}`, { completed: !allCompleted })
-        )
-      );
-      
-      // Check for achievements in any of the responses
-      const allAchievements = [];
-      responses.forEach(response => {
-        if (response.data.achievements && response.data.achievements.length > 0) {
-          allAchievements.push(...response.data.achievements);
+      await runTask(async () => {
+        const allCompleted = shoppingItems.every(item => item.completed);
+        const responses = await Promise.all(
+          shoppingItems.map(item =>
+            api.patch(`/shopping-list/${item._id}`, { completed: !allCompleted })
+          )
+        );
+        const allAchievements = [];
+        responses.forEach(response => {
+          if (response.data.achievements && response.data.achievements.length > 0) {
+            allAchievements.push(...response.data.achievements);
+          }
+        });
+        if (allAchievements.length > 0) {
+          showAchievements(allAchievements);
         }
+        invalidateShoppingCache();
+        await fetchShoppingList({ forceRefresh: true });
+        toast.success(allCompleted ? 'All items unchecked!' : 'All items checked!');
       });
-      
-      // Show achievements if any were unlocked
-      if (allAchievements.length > 0) {
-        showAchievements(allAchievements);
-      }
-      
-      // Refresh the shopping list
-      await fetchShoppingList();
-      toast.success(allCompleted ? 'All items unchecked!' : 'All items checked!');
     } catch (err) {
       console.error('Error updating items:', err);
       toast.error('Failed to update items');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleClearCompleted = async () => {
     try {
-      setLoading(true);
-      const response = await api.delete('/shopping-list/clear-completed');
-      if (response.data.achievements && response.data.achievements.length > 0) {
-        showAchievements(response.data.achievements);
-      }
-      await fetchShoppingList();
+      await runTask(async () => {
+        const response = await api.delete('/shopping-list/clear-completed');
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
+        invalidateShoppingCache();
+        await fetchShoppingList({ forceRefresh: true });
+      });
       toast.success('Completed items cleared');
     } catch (err) {
       console.error('Error clearing completed items:', err);
       toast.error('Failed to clear completed items');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleClearAll = async () => {
     try {
-      setLoading(true);
-      await api.delete('/shopping-list');
-      setShoppingItems([]); // Immediately clear the items in the state
+      await runTask(async () => {
+        await api.delete('/shopping-list');
+        invalidateShoppingCache();
+        setShoppingItems([]);
+      });
       toast.success('All shopping list items cleared successfully');
     } catch (err) {
       console.error('Error clearing shopping list:', err);
       toast.error('Failed to clear shopping list items');
     } finally {
-      setLoading(false);
       setOpenClearConfirmDialog(false);
     }
   };
@@ -379,7 +401,8 @@ const ShoppingList = () => {
       }
       setOpenDialog(false);
       setFormData({ ingredient: '', quantity: '', unit: '' });
-      await fetchShoppingList();
+      invalidateShoppingCache();
+      await fetchShoppingList({ forceRefresh: true });
       toast.success('Added to shopping list');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to add item');
@@ -415,11 +438,17 @@ const ShoppingList = () => {
       }
     });
 
-  if (loading) {
+  if (showSkeleton) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <CircularProgress />
-      </Box>
+      <PageLoader
+        headingWidth="35%"
+        maxWidth="xl"
+        blocks={[
+          { height: 140, xs: 12 },
+          { height: 320, xs: 12 },
+          { height: 320, xs: 12 },
+        ]}
+      />
     );
   }
 
@@ -432,6 +461,7 @@ const ShoppingList = () => {
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
+      {busyIndicator}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Shopping List
@@ -467,7 +497,7 @@ const ShoppingList = () => {
             startIcon={<DeleteIcon />}
             endIcon={<KeyboardArrowDownIcon />}
             size="small"
-            disabled={loading || shoppingItems.length === 0}
+            disabled={disablePageActions || shoppingItems.length === 0}
           >
             Clear
           </Button>
@@ -502,7 +532,7 @@ const ShoppingList = () => {
             onClick={handleCheckAll}
             startIcon={<CheckCircleIcon />}
             size="small"
-            disabled={loading || shoppingItems.length === 0}
+            disabled={disablePageActions || shoppingItems.length === 0}
           >
             {shoppingItems.every(item => item.completed) ? 'Uncheck All' : 'Check All'}
           </Button>
@@ -552,11 +582,7 @@ const ShoppingList = () => {
         </Alert>
       )}
 
-      {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-          <CircularProgress />
-        </Box>
-      ) : shoppingItems.length === 0 ? (
+      {shoppingItems.length === 0 ? (
         <EmptyState
           icon={<AddIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
           title="Your shopping list is empty"
@@ -607,7 +633,20 @@ const ShoppingList = () => {
                       gap: 1
                     }}
                   >
-                    {ingredientName}
+                    <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: 'block',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        {ingredientName}
+                      </Box>
+                    </Box>
                     {items.length > 1 && (
                       <Chip
                         label={`${items.length} units`}
@@ -717,6 +756,7 @@ const ShoppingList = () => {
                   </Box>
 
                   {/* Group Actions */}
+                  {items.length > 1 && (
                   <Box sx={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
@@ -726,46 +766,40 @@ const ShoppingList = () => {
                     borderColor: 'divider'
                   }}>
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {items.length} item{items.length !== 1 ? 's' : ''}
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Total: {items.reduce((sum, item) => sum + item.quantity, 0)} units
                       </Typography>
-                      {items.length > 1 && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                          Total: {items.reduce((sum, item) => sum + item.quantity, 0)} units
-                        </Typography>
-                      )}
                     </Box>
-                    {items.length > 1 && (
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => {
-                            items.forEach(item => {
-                              if (!item.completed) handleToggleComplete(item);
-                            });
-                          }}
-                          disabled={items.every(item => item.completed)}
-                          sx={{ fontSize: '0.75rem', py: 0.5 }}
-                        >
-                          Check All
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => {
-                            items.forEach(item => {
-                              if (item.completed) handleToggleComplete(item);
-                            });
-                          }}
-                          disabled={items.every(item => !item.completed)}
-                          sx={{ fontSize: '0.75rem', py: 0.5 }}
-                        >
-                          Uncheck All
-                        </Button>
-                      </Box>
-                    )}
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          items.forEach(item => {
+                            if (!item.completed) handleToggleComplete(item);
+                          });
+                        }}
+                        disabled={items.every(item => item.completed)}
+                        sx={{ fontSize: '0.75rem', py: 0.5 }}
+                      >
+                        Check All
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          items.forEach(item => {
+                            if (item.completed) handleToggleComplete(item);
+                          });
+                        }}
+                        disabled={items.every(item => !item.completed)}
+                        sx={{ fontSize: '0.75rem', py: 0.5 }}
+                      >
+                        Uncheck All
+                      </Button>
+                    </Box>
                   </Box>
+                  )}
                 </Paper>
               </Grid>
             ));

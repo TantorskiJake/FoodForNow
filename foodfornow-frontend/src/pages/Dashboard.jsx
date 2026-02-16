@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Container,
   Grid,
@@ -17,13 +17,13 @@ import {
   FormControl,
   InputLabel,
   useTheme,
-  CircularProgress,
   LinearProgress,
   Paper,
   TextField,
   Autocomplete,
   Tooltip,
   Collapse,
+  Skeleton,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -44,6 +44,7 @@ import MealPlanGrid from '../components/MealPlanGrid';
 import EmptyState from '../components/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
+import useProgressiveLoader from '../hooks/useProgressiveLoader';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useNavigate } from 'react-router-dom';
 
@@ -55,7 +56,6 @@ const Dashboard = () => {
   const [mealPlan, setMealPlan] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
   const [openMealDialog, setOpenMealDialog] = useState(false);
   const [mealFormData, setMealFormData] = useState({
     _id: '',
@@ -72,7 +72,33 @@ const Dashboard = () => {
 
   const { authenticated, user } = useAuth();
   const { showAchievements } = useAchievements();
+  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
   const cancelledOptimisticIds = useRef(new Set());
+  const MEALPLAN_CACHE_KEYS = ['/mealplan', '/mealplan/ingredients'];
+  const PANTRY_CACHE_KEYS = ['/pantry', '/mealplan/ingredients'];
+  const SHOPPING_CACHE_KEYS = ['/shopping-list', '/mealplan/ingredients'];
+
+  const runTask = useCallback(
+    async (task, options = {}) => {
+      const { hydrate = false } = options;
+      const stop = startTask();
+      try {
+        const result = await task();
+        if (hydrate) {
+          markHydrated();
+        }
+        return result;
+      } finally {
+        stop();
+      }
+    },
+    [startTask, markHydrated]
+  );
+
+  const invalidateCache = useCallback((fragments = []) => {
+    if (!fragments.length) return;
+    api.invalidateCache((key) => fragments.some((fragment) => key.includes(fragment)));
+  }, []);
 
   // Initialize selected week to current week's Monday
   useEffect(() => {
@@ -86,36 +112,36 @@ const Dashboard = () => {
   // Start ingredients section collapsed when empty or when many items (only on first load)
   const ingredientsInitialized = useRef(false);
   useEffect(() => {
-    if (!ingredientsInitialized.current && !loading) {
+    if (!ingredientsInitialized.current && !showSkeleton) {
       ingredientsInitialized.current = true;
       if (ingredients.length === 0 || ingredients.length > 8) {
         setIngredientsExpanded(false);
       }
     }
-  }, [loading, ingredients.length]);
+  }, [showSkeleton, ingredients.length]);
 
   useEffect(() => {
     if (!authenticated || !selectedWeekStart) return;
 
     const fetchAll = async () => {
-      try {
-        setLoading(true);
+      await runTask(async () => {
         await Promise.all([
           fetchRecipes(),
           fetchMealPlan(),
           fetchIngredients()
         ]);
-      } finally {
-        setLoading(false);
-      }
+      }, { hydrate: true });
     };
 
     fetchAll();
-  }, [authenticated, selectedWeekStart]);
+  }, [authenticated, selectedWeekStart, runTask]);
 
-  const fetchRecipes = async () => {
+  const fetchRecipes = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get('/recipes');
+      const response = await api.cachedGet('/recipes', {
+        cacheTtl: 5 * 60 * 1000,
+        forceRefresh,
+      });
       setRecipes(response.data || []);
     } catch (err) {
       console.error('Error fetching recipes:', err);
@@ -123,9 +149,12 @@ const Dashboard = () => {
     }
   };
 
-  const fetchMealPlan = async () => {
+  const fetchMealPlan = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get(`/mealplan?weekStart=${selectedWeekStart}`);
+      const response = await api.cachedGet(`/mealplan?weekStart=${selectedWeekStart}`, {
+        cacheTtl: 60 * 1000,
+        forceRefresh,
+      });
       setMealPlan(response.data || []);
     } catch (err) {
       console.error('Error fetching meal plan:', err);
@@ -133,9 +162,12 @@ const Dashboard = () => {
     }
   };
 
-  const fetchIngredients = async () => {
+  const fetchIngredients = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get(`/mealplan/ingredients?weekStart=${selectedWeekStart}`);
+      const response = await api.cachedGet(`/mealplan/ingredients?weekStart=${selectedWeekStart}`, {
+        cacheTtl: 45 * 1000,
+        forceRefresh,
+      });
       let ingredientsArray = [];
 
       if (Array.isArray(response.data)) {
@@ -305,34 +337,33 @@ const Dashboard = () => {
 
   const handleAddAllToShoppingList = async () => {
     try {
-      setLoading(true);
-      await api.post('/shopping-list/update-from-meal-plan');
-      setError(null);
-      await fetchIngredients();
+      await runTask(async () => {
+        await api.post('/shopping-list/update-from-meal-plan');
+        invalidateCache(['/shopping-list', '/mealplan/ingredients']);
+        setError(null);
+        await fetchIngredients({ forceRefresh: true });
+      });
     } catch (err) {
       console.error('Error adding ingredients to shopping list:', err);
       setError('Failed to add ingredients to shopping list');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleResetWeek = async () => {
     try {
-      setLoading(true);
-      await api.delete(`/mealplan/reset-week?weekStart=${selectedWeekStart}`);
-      // Clear the meal plan state
-      setMealPlan([]);
-      
-      // Refresh ingredients since clearing meals affects needed ingredients
-      await fetchIngredients();
-      
+      await runTask(async () => {
+        await api.delete(`/mealplan/reset-week?weekStart=${selectedWeekStart}`);
+        setMealPlan([]);
+        invalidateCache(['/mealplan', '/mealplan/ingredients']);
+        await Promise.all([
+          fetchMealPlan({ forceRefresh: true }),
+          fetchIngredients({ forceRefresh: true })
+        ]);
+      });
       setError('');
     } catch (err) {
       console.error('Error resetting week:', err);
       setError('Failed to reset week. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -351,20 +382,19 @@ const Dashboard = () => {
 
   const handlePopulateWeek = async () => {
     try {
-      setLoading(true);
-      const response = await api.post('/mealplan/populate-week', {
-        weekStart: selectedWeekStart
+      await runTask(async () => {
+        const response = await api.post('/mealplan/populate-week', {
+          weekStart: selectedWeekStart
+        });
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
+        invalidateCache(['/mealplan', '/mealplan/ingredients']);
+        await Promise.all([
+          fetchMealPlan({ forceRefresh: true }),
+          fetchIngredients({ forceRefresh: true })
+        ]);
       });
-      // Check for achievements in response
-      if (response.data.achievements && response.data.achievements.length > 0) {
-        showAchievements(response.data.achievements);
-      }
-      // Refresh meal plan and ingredients
-      await Promise.all([
-        fetchMealPlan(),
-        fetchIngredients()
-      ]);
-      
       setError('');
     } catch (err) {
       console.error('Error populating week:', err);
@@ -373,8 +403,6 @@ const Dashboard = () => {
       } else {
         setError('Failed to populate week. Please try again.');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -426,7 +454,8 @@ const Dashboard = () => {
         }
         return [...prev, mealItem];
       });
-      fetchIngredients();
+      invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
       setError('');
     } catch (err) {
       console.error('Error saving meal:', err);
@@ -491,7 +520,8 @@ const Dashboard = () => {
         }
         return prev.map(m => m._id === optimisticId ? mealItem : m);
       });
-      fetchIngredients();
+      invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
       setError('');
     } catch (err) {
       if (editingId && previousMeal) {
@@ -517,7 +547,8 @@ const Dashboard = () => {
     }
     try {
       await api.delete(`/mealplan/${id}`);
-      fetchIngredients();
+      invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
     } catch (err) {
       console.error('Error deleting meal:', err);
       if (deletedMeal) setMealPlan(prev => [...prev, deletedMeal]);
@@ -551,7 +582,8 @@ const Dashboard = () => {
         }
         return [...prev, mealItem];
       });
-      await fetchIngredients();
+      invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
       setError('');
       toast.success(`Added ${recipe.name} to ${day} ${mealType}`);
     } catch (err) {
@@ -575,7 +607,8 @@ const Dashboard = () => {
       
       // If the meal was cooked (status changed to cooked), refresh ingredients
       if (updatedMeal.cooked) {
-        await fetchIngredients();
+        invalidateCache(MEALPLAN_CACHE_KEYS);
+        await fetchIngredients({ forceRefresh: true });
       }
     } catch (err) {
       console.error('Error updating meal plan:', err);
@@ -595,7 +628,8 @@ const Dashboard = () => {
         unit: ingredient.unit,
       });
       toast.success(`Added ${ingredient.name} to pantry`);
-      await fetchIngredients();
+      invalidateCache(PANTRY_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
     } catch (err) {
       console.error('Error adding to pantry:', err);
       toast.error(err.response?.data?.error || 'Failed to add to pantry');
@@ -619,6 +653,8 @@ const Dashboard = () => {
         unit: ingredient.unit,
       });
       toast.success(`Added ${ingredient.name} to shopping list`);
+      invalidateCache(SHOPPING_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
     } catch (err) {
       console.error('Error adding to shopping list:', err);
       toast.error(err.response?.data?.error || 'Failed to add to shopping list');
@@ -631,7 +667,9 @@ const Dashboard = () => {
       return;
     }
     try {
-      const pantryRes = await api.get('/pantry');
+      const pantryRes = await api.cachedGet('/pantry', {
+        cacheTtl: 45 * 1000,
+      });
       const items = pantryRes.data?.items || [];
       const ingredientIdStr = String(ingredient._id);
       const matchingItem = items.find(
@@ -646,17 +684,55 @@ const Dashboard = () => {
       }
       await api.delete(`/pantry/${matchingItem._id}`);
       toast.success(`Removed ${ingredient.name} from pantry`);
-      await fetchIngredients();
+      invalidateCache(PANTRY_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
     } catch (err) {
       console.error('Error removing from pantry:', err);
       toast.error(err.response?.data?.error || 'Failed to remove from pantry');
     }
   };
 
-  if (loading) {
+  const disableGlobalActions = showSkeleton || showBusyBar;
+  const busyIndicator = showBusyBar ? (
+    <LinearProgress
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        zIndex: theme.zIndex.tooltip + 1,
+      }}
+    />
+  ) : null;
+
+  if (showSkeleton) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
+      <Container 
+        maxWidth={false}
+        sx={{ 
+          py: { xs: 1, sm: 2 },
+          px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
+          maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+        }}
+      >
+        {busyIndicator}
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Skeleton variant="text" height={48} width="40%" />
+          </Grid>
+          <Grid item xs={12}>
+            <Skeleton variant="rounded" height={120} />
+          </Grid>
+          <Grid item xs={12} md={8}>
+            <Skeleton variant="rounded" height={360} />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Skeleton variant="rounded" height={360} />
+          </Grid>
+          <Grid item xs={12}>
+            <Skeleton variant="rounded" height={280} />
+          </Grid>
+        </Grid>
       </Container>
     );
   }
@@ -670,6 +746,7 @@ const Dashboard = () => {
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
+      {busyIndicator}
       <Grid container spacing={3}>
         <Grid item xs={12}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={0}>
@@ -858,7 +935,7 @@ const Dashboard = () => {
                         color="primary"
                         startIcon={<CasinoIcon />}
                         onClick={handlePopulateWeek}
-                        disabled={loading || mealActionLoading || recipes.length === 0}
+                        disabled={disableGlobalActions || mealActionLoading || recipes.length === 0}
                         size="small"
                       >
                         Populate Week
@@ -869,7 +946,7 @@ const Dashboard = () => {
                     variant="outlined"
                     color="error"
                     onClick={handleOpenResetWeekDialog}
-                    disabled={loading || mealActionLoading || mealPlan.length === 0}
+                    disabled={disableGlobalActions || mealActionLoading || mealPlan.length === 0}
                     size="small"
                   >
                     Reset Week
@@ -923,7 +1000,7 @@ const Dashboard = () => {
                         color="primary"
                         startIcon={<ShoppingCartIcon />}
                         onClick={handleAddAllToShoppingList}
-                        disabled={loading || mealActionLoading || ingredients.length === 0}
+                        disabled={disableGlobalActions || mealActionLoading || ingredients.length === 0}
                         size="small"
                         sx={{ 
                           borderRadius: 2,
@@ -1040,15 +1117,18 @@ const Dashboard = () => {
                               borderColor: theme.palette.background.paper
                             }} />
                             
-                            <Box sx={{ flex: 1 }}>
+                            <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                               <Typography
                                 variant="subtitle1"
                                 sx={{
                                   fontWeight: 600,
                                   mb: 0.5,
                                   color: isComplete ? 'success.main' : 'text.primary',
-                                  fontSize: '1rem',
-                                  textTransform: 'capitalize'
+                                  fontSize: '0.9rem',
+                                  textTransform: 'capitalize',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
                                 }}
                               >
                                 {ingredient.name}

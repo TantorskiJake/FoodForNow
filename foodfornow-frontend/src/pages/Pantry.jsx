@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -21,7 +21,7 @@ import {
   InputLabel,
   Paper,
   useTheme,
-  CircularProgress,
+  LinearProgress,
   Grid,
   useMediaQuery
 } from '@mui/material';
@@ -42,6 +42,8 @@ import BarcodeScanner from '../components/BarcodeScanner';
 import EmptyState from '../components/EmptyState';
 import { lookupBarcode, extractBarcode } from '../services/barcodeLookup';
 import { useNavigate } from 'react-router-dom';
+import PageLoader from '../components/PageLoader';
+import useProgressiveLoader from '../hooks/useProgressiveLoader';
 
 const capitalizeWords = (str) => str ? str.replace(/\b\w/g, (c) => c.toUpperCase()) : str;
 
@@ -61,7 +63,6 @@ const Pantry = () => {
   const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [loading, setLoading] = useState(true);
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,27 +70,59 @@ const Pantry = () => {
 
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
+  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+
+  const runTask = useCallback(
+    async (task, options = {}) => {
+      const { hydrate = false } = options;
+      const stop = startTask();
+      try {
+        const result = await task();
+        if (hydrate) {
+          markHydrated();
+        }
+        return result;
+      } finally {
+        stop();
+      }
+    },
+    [startTask, markHydrated]
+  );
+
+  const disablePageActions = showSkeleton || showBusyBar;
+  const busyIndicator = showBusyBar ? (
+    <LinearProgress
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        zIndex: theme.zIndex.tooltip + 1,
+      }}
+    />
+  ) : null;
+  const invalidatePantryCache = useCallback(() => {
+    api.invalidateCache((key) => key.includes('/pantry'));
+  }, []);
 
   useEffect(() => {
     if (!authenticated) return;
 
     const fetchAll = async () => {
-      try {
-        setLoading(true);
-        await Promise.all([fetchPantryItems(), fetchIngredients()]);
-      } catch (error) {
-        console.error('Error in fetchAll:', error);
-      } finally {
-        setLoading(false);
-      }
+      await runTask(async () => {
+        await Promise.all([fetchPantryItems({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
+      }, { hydrate: true });
     };
 
     fetchAll();
-  }, [authenticated]);
+  }, [authenticated, runTask]);
 
-  const fetchPantryItems = async () => {
+  const fetchPantryItems = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get('/pantry');
+      const response = await api.cachedGet('/pantry', {
+        cacheTtl: 60 * 1000,
+        forceRefresh,
+      });
       if (response.data && response.data.items) {
         setPantryItems(response.data.items);
       } else {
@@ -98,14 +131,15 @@ const Pantry = () => {
     } catch (err) {
       console.error('Error fetching pantry items:', err);
       setError('Failed to fetch pantry items. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const fetchIngredients = async () => {
+  const fetchIngredients = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get('/ingredients');
+      const response = await api.cachedGet('/ingredients', {
+        cacheTtl: 5 * 60 * 1000,
+        forceRefresh,
+      });
       setIngredients(response.data);
     } catch (err) {
       console.error('Error fetching ingredients:', err);
@@ -177,7 +211,8 @@ const Pantry = () => {
       
       if (response && response.data) {
         handleCloseDialog();
-        await fetchPantryItems();
+        invalidatePantryCache();
+        await fetchPantryItems({ forceRefresh: true });
         setFormData({
           ingredient: '',
           quantity: '',
@@ -207,7 +242,8 @@ const Pantry = () => {
   const handleDeleteItem = async (id) => {
     try {
       await api.delete(`/pantry/${id}`);
-      fetchPantryItems();
+      invalidatePantryCache();
+      await fetchPantryItems({ forceRefresh: true });
     } catch (err) {
       console.error('Error deleting pantry item:', err);
       setError('Failed to delete pantry item. Please try again.');
@@ -217,7 +253,8 @@ const Pantry = () => {
   const handleUpdateQuantity = async (id, newQuantity) => {
     try {
       await api.put(`/pantry/${id}/quantity`, { quantity: newQuantity });
-      fetchPantryItems();
+      invalidatePantryCache();
+      await fetchPantryItems({ forceRefresh: true });
     } catch (err) {
       console.error('Error updating quantity:', err);
       setError('Failed to update quantity. Please try again.');
@@ -243,15 +280,16 @@ const Pantry = () => {
 
   const handleClearAll = async () => {
     try {
-      setLoading(true);
-      await api.delete('/pantry');
-      setPantryItems([]);
+      await runTask(async () => {
+        await api.delete('/pantry');
+        invalidatePantryCache();
+        setPantryItems([]);
+      });
       toast.success('All pantry items cleared successfully');
     } catch (err) {
       console.error('Error clearing pantry:', err);
       toast.error('Failed to clear pantry items');
     } finally {
-      setLoading(false);
       setOpenClearConfirmDialog(false);
     }
   };
@@ -449,6 +487,19 @@ const Pantry = () => {
     );
   };
 
+  if (showSkeleton) {
+    return (
+      <PageLoader
+        headingWidth="30%"
+        blocks={[
+          { height: 140, xs: 12 },
+          { height: 320, xs: 12 },
+          { height: 320, xs: 12 },
+        ]}
+      />
+    );
+  }
+
   return (
     <Container 
       maxWidth={false}
@@ -458,6 +509,7 @@ const Pantry = () => {
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
+      {busyIndicator}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Pantry
@@ -492,7 +544,7 @@ const Pantry = () => {
             onClick={() => setOpenClearConfirmDialog(true)}
             startIcon={<DeleteIcon />}
             size="small"
-            disabled={loading || pantryItems.length === 0}
+            disabled={disablePageActions || pantryItems.length === 0}
           >
             Clear All
           </Button>
@@ -522,11 +574,7 @@ const Pantry = () => {
         </Alert>
       )}
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : pantryItems.length === 0 ? (
+      {pantryItems.length === 0 ? (
         <EmptyState
           icon={<AddIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
           title="No items in your pantry"
@@ -577,7 +625,20 @@ const Pantry = () => {
                       gap: 1
                     }}
                   >
-                    {capitalizeWords(ingredientName)}
+                    <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: 'block',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        {capitalizeWords(ingredientName)}
+                      </Box>
+                    </Box>
                     {items.length > 1 && (
                       <Chip
                         label={`${items.length} units`}
@@ -670,7 +731,8 @@ const Pantry = () => {
                     ))}
                   </Box>
 
-                  {/* Group Summary */}
+                  {/* Group Summary - only show when multiple items */}
+                  {items.length > 1 && (
                   <Box sx={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
@@ -680,16 +742,12 @@ const Pantry = () => {
                     borderColor: 'divider'
                   }}>
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {items.length} item{items.length !== 1 ? 's' : ''}
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Total: {items.reduce((sum, item) => sum + item.quantity, 0)} units
                       </Typography>
-                      {items.length > 1 && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                          Total: {items.reduce((sum, item) => sum + item.quantity, 0)} units
-                        </Typography>
-                      )}
                     </Box>
                   </Box>
+                  )}
                 </Paper>
               </Grid>
             ));

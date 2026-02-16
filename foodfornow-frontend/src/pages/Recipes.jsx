@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Grid,
@@ -20,7 +20,7 @@ import {
   FormControl,
   InputLabel,
   Paper,
-  CircularProgress,
+  LinearProgress,
   Tabs,
   Tab,
   Autocomplete,
@@ -39,12 +39,15 @@ import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
+import PageLoader from '../components/PageLoader';
+import InlineLoaderIcon from '../components/InlineLoaderIcon';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { createWorker } from 'tesseract.js';
+import useProgressiveLoader from '../hooks/useProgressiveLoader';
 
 const Recipes = () => {
   const [recipes, setRecipes] = useState([]);
@@ -72,7 +75,6 @@ const Recipes = () => {
   const [newIngredientData, setNewIngredientData] = useState({ name: '', category: '', description: '' });
   const [creatingIngredient, setCreatingIngredient] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [loading, setLoading] = useState(true);
 
   // Import state
   const [anchorImportMenu, setAnchorImportMenu] = useState(null);
@@ -97,6 +99,29 @@ const Recipes = () => {
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
   const navigate = useNavigate();
+  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+
+  const runTask = useCallback(
+    async (task, options = {}) => {
+      const { hydrate = false } = options;
+      const stop = startTask();
+      try {
+        const result = await task();
+        if (hydrate) {
+          markHydrated();
+        }
+        return result;
+      } finally {
+        stop();
+      }
+    },
+    [startTask, markHydrated]
+  );
+
+  const disablePageActions = showSkeleton || showBusyBar;
+  const invalidateRecipesCache = useCallback(() => {
+    api.invalidateCache((key) => key.includes('/recipes'));
+  }, []);
 
   // Sort recipes based on current sort setting
   const sortedRecipes = [...recipes].sort((a, b) => {
@@ -216,10 +241,12 @@ const Recipes = () => {
     });
 
   // Fetch functions for recipes and ingredients
-  const fetchRecipes = async () => {
+  const fetchRecipes = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get('/recipes', {
+      const response = await api.cachedGet('/recipes', {
         params: { search: tab === 'mine' ? searchTerm : undefined },
+        cacheTtl: 5 * 60 * 1000,
+        forceRefresh,
       });
       setRecipes(response.data);
     } catch (err) {
@@ -227,18 +254,25 @@ const Recipes = () => {
     }
   };
 
-  const fetchIngredients = async () => {
+  const fetchIngredients = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get('/ingredients');
+      const response = await api.cachedGet('/ingredients', {
+        cacheTtl: 5 * 60 * 1000,
+        forceRefresh,
+      });
       setIngredients(response.data);
     } catch (err) {
       setError('Failed to fetch ingredients. Please try again.');
     }
   };
 
-  const fetchSharedRecipes = async () => {
+  const fetchSharedRecipes = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.get('/recipes/shared', { params: { search: searchTerm } });
+      const response = await api.cachedGet('/recipes/shared', {
+        params: { search: searchTerm },
+        cacheTtl: 2 * 60 * 1000,
+        forceRefresh,
+      });
       setSharedRecipes(response.data);
     } catch (err) {
       console.error('Error fetching shared recipes:', err);
@@ -251,29 +285,26 @@ const Recipes = () => {
 
     const fetchInitial = async () => {
       try {
-        setLoading(true);
-        await Promise.all([fetchRecipes(), fetchIngredients()]);
+        await runTask(async () => {
+          await Promise.all([fetchRecipes({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
+        }, { hydrate: true });
       } catch (err) {
         setError('Failed to fetch data. Please try again.');
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchInitial();
-  }, [authenticated]);
+  }, [authenticated, runTask]);
 
   // Fetch shared recipes when tab or searchTerm changes
   useEffect(() => {
     if (!authenticated) return;
     if (tab === 'shared') {
-      setLoading(true);
-      fetchSharedRecipes().finally(() => setLoading(false));
+      runTask(() => fetchSharedRecipes({ forceRefresh: true }));
     } else if (tab === 'mine') {
-      setLoading(true);
-      fetchRecipes().finally(() => setLoading(false));
+      runTask(() => fetchRecipes({ forceRefresh: true }));
     }
-  }, [tab, searchTerm, authenticated]);
+  }, [tab, searchTerm, authenticated, runTask]);
 
   const openRecipeFormWithData = (recipeData) => {
     const mappedIngredients = recipeData.ingredients?.length
@@ -562,29 +593,30 @@ const Recipes = () => {
     }
     
     try {
-      setLoading(true);
-      const recipeData = {
-        ...formData,
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        instructions: formData.instructions.filter(instruction => instruction.trim()),
-        ingredients: formData.ingredients.filter(ing => ing.ingredient && ing.quantity && ing.unit),
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
-      };
+      await runTask(async () => {
+        const recipeData = {
+          ...formData,
+          name: formData.name.trim(),
+          description: formData.description.trim(),
+          instructions: formData.instructions.filter(instruction => instruction.trim()),
+          ingredients: formData.ingredients.filter(ing => ing.ingredient && ing.quantity && ing.unit),
+          tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
+        };
 
-      if (editingRecipe) {
-        await api.put(`/recipes/${editingRecipe._id}`, recipeData);
-      } else {
-        const response = await api.post('/recipes', recipeData);
-        
-        // Check for achievements in response
-        if (response.data.achievements && response.data.achievements.length > 0) {
-          showAchievements(response.data.achievements);
+        if (editingRecipe) {
+          await api.put(`/recipes/${editingRecipe._id}`, recipeData);
+        } else {
+          const response = await api.post('/recipes', recipeData);
+          
+          if (response.data.achievements && response.data.achievements.length > 0) {
+            showAchievements(response.data.achievements);
+          }
         }
-      }
 
-      handleCloseDialog();
-      await fetchRecipes();
+        handleCloseDialog();
+        invalidateRecipesCache();
+        await fetchRecipes({ forceRefresh: true });
+      });
       setError('');
     } catch (err) {
       console.error('Error saving recipe:', err);
@@ -593,8 +625,6 @@ const Recipes = () => {
       } else {
         setError('Failed to save recipe. Please try again.');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -602,26 +632,28 @@ const Recipes = () => {
     if (!window.confirm('Are you sure you want to delete this recipe?')) return;
 
     try {
-      setLoading(true);
-      await api.delete(`/recipes/${id}`);
-      await fetchRecipes();
+      await runTask(async () => {
+        await api.delete(`/recipes/${id}`);
+        invalidateRecipesCache();
+        await fetchRecipes({ forceRefresh: true });
+      });
       setError('');
     } catch (err) {
       console.error('Error deleting recipe:', err);
       setError('Failed to delete recipe. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleDuplicateRecipe = async (id) => {
     try {
-      setLoading(true);
-      const response = await api.post(`/recipes/${id}/duplicate`);
-      if (response.data.achievements && response.data.achievements.length > 0) {
-        showAchievements(response.data.achievements);
-      }
-      await fetchRecipes();
+      await runTask(async () => {
+        const response = await api.post(`/recipes/${id}/duplicate`);
+        if (response.data.achievements && response.data.achievements.length > 0) {
+          showAchievements(response.data.achievements);
+        }
+        invalidateRecipesCache();
+        await fetchRecipes({ forceRefresh: true });
+      });
       setError('');
     } catch (err) {
       console.error('Error duplicating recipe:', err);
@@ -630,16 +662,32 @@ const Recipes = () => {
       } else {
         setError('Failed to add recipe. Please try again.');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
-  if (loading) {
+  const busyIndicator = showBusyBar ? (
+    <LinearProgress
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        zIndex: theme.zIndex.tooltip + 1,
+      }}
+    />
+  ) : null;
+
+  if (showSkeleton) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Container>
+      <PageLoader
+        maxWidth="xl"
+        headingWidth="45%"
+        blocks={[
+          { height: 160, xs: 12 },
+          { height: 360, xs: 12 },
+          { height: 360, xs: 12 },
+        ]}
+      />
     );
   }
 
@@ -652,6 +700,7 @@ const Recipes = () => {
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
+      {busyIndicator}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Recipes
@@ -1334,7 +1383,7 @@ const Recipes = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button type="submit" variant="contained" color="primary" disabled={loading}>
+            <Button type="submit" variant="contained" color="primary" disabled={disablePageActions}>
               {editingRecipe ? 'Update' : 'Add'}
             </Button>
           </DialogActions>
@@ -1376,7 +1425,7 @@ const Recipes = () => {
             variant="contained"
             onClick={handleImportFromUrl}
             disabled={parsingUrl}
-            startIcon={parsingUrl ? <CircularProgress size={20} /> : <LinkIcon />}
+            startIcon={parsingUrl ? <InlineLoaderIcon size={20} /> : <LinkIcon />}
           >
             {parsingUrl ? 'Parsing...' : 'Parse Recipe'}
           </Button>
@@ -1436,7 +1485,7 @@ const Recipes = () => {
             variant="contained"
             onClick={handleImportFromImage}
             disabled={parsingImage || !importImageFile}
-            startIcon={parsingImage ? <CircularProgress size={20} /> : <ImageIcon />}
+            startIcon={parsingImage ? <InlineLoaderIcon size={20} /> : <ImageIcon />}
           >
             {parsingImage ? 'Reading...' : 'Import recipe'}
           </Button>
