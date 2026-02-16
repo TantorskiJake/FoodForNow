@@ -143,7 +143,7 @@ const Profile = () => {
       shoppingReminders: true,
     },
     preferences: {
-      theme: 'auto',
+      theme: 'dark',
       language: 'en',
       units: 'metric',
       timezone: 'UTC',
@@ -184,6 +184,8 @@ const Profile = () => {
 
   useEffect(() => {
     if (!authLoading && user) {
+      const rawThemePreference = user.preferences?.theme;
+      const normalizedTheme = rawThemePreference === 'light' ? 'light' : 'dark';
       // Try to pre-select the city object if location is a string
       let locationObj = null;
       if (typeof user.location === 'string' && user.location) {
@@ -204,7 +206,7 @@ const Profile = () => {
           shoppingReminders: user.notifications?.shoppingReminders ?? true,
         },
         preferences: {
-          theme: user.preferences?.theme || 'auto',
+          theme: normalizedTheme,
           language: user.preferences?.language || 'en',
           units: user.preferences?.units || 'metric',
           timezone: user.preferences?.timezone || 'UTC',
@@ -220,9 +222,7 @@ const Profile = () => {
       fetchUserStats();
       
       // Apply current theme preference when component loads
-      if (user?.preferences?.theme) {
-        setThemeFromPreference(user.preferences.theme);
-      }
+      setThemeFromPreference(rawThemePreference || 'dark');
     }
   }, [authLoading, user, setThemeFromPreference]);
 
@@ -1177,7 +1177,6 @@ const Profile = () => {
                               >
                                 <MenuItem value="light">Light</MenuItem>
                                 <MenuItem value="dark">Dark</MenuItem>
-                                <MenuItem value="auto">Auto (System)</MenuItem>
                               </TextField>
                             </Grid>
                             <Grid item xs={12} sm={6}>

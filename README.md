@@ -21,7 +21,7 @@ FoodForNow is a comprehensive full-stack web application designed to help users 
 - **Missing Ingredient Detection**: Identifies missing ingredients when cooking meals
 - **Shopping List Integration**: Automatically add missing ingredients to shopping lists
 - **Pantry Integration**: Bulk add shopping list items to pantry
-- **Theme Support**: Light and dark mode with automatic system preference detection
+- **Theme Support**: Dark mode by default with an optional manual light mode toggle
 
 ## 🛠 Tech Stack
 

@@ -149,7 +149,7 @@ const userSchema = new mongoose.Schema({
   website: { type: String, maxlength: 200 },
   profilePicture: { type: String },
   preferences: {
-    theme: { type: String, enum: ['light', 'dark', 'auto'], default: 'auto' },
+    theme: { type: String, enum: ['light', 'dark', 'auto'], default: 'dark' },
     units: { type: String, enum: ['metric', 'imperial'], default: 'metric' },
     language: { type: String, default: 'en' },
     timezone: { type: String, default: 'UTC' }

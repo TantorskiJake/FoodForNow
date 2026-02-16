@@ -33,10 +33,13 @@ export const useTheme = () => useContext(ThemeContext);
  * @param {React.ReactNode} props.children - Child components to wrap
  */
 export const ThemeProvider = ({ children }) => {
-  // Initialize dark mode state from localStorage or default to light mode
+  // Initialize dark mode state from localStorage or default to dark mode
   const [darkMode, setDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
-    return savedMode ? JSON.parse(savedMode) : false;
+    if (savedMode !== null) {
+      return JSON.parse(savedMode);
+    }
+    return true;
   });
 
   // Persist theme preference to localStorage when it changes
@@ -116,13 +119,12 @@ export const ThemeProvider = ({ children }) => {
    * @param {string} themePreference - 'light', 'dark', or 'auto'
    */
   const setThemeFromPreference = (themePreference) => {
-    if (themePreference === 'dark') {
-      setDarkMode(true);
-    } else if (themePreference === 'light') {
+    if (themePreference === 'light') {
       setDarkMode(false);
-    } else if (themePreference === 'auto') {
-      setDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      return;
     }
+    // Default to dark mode for any non-explicit light preference
+    setDarkMode(true);
   };
 
   // Provide theme context and Material-UI theme to child components

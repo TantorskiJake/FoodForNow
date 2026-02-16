@@ -54,7 +54,7 @@ const userSchema = new mongoose.Schema({
     theme: {
       type: String,
       enum: ['light', 'dark', 'auto'],
-      default: 'auto'
+      default: 'dark'
     },
     units: {
       type: String,

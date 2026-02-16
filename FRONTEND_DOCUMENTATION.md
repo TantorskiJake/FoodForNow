@@ -136,29 +136,28 @@ if (!user) return <Navigate to="/login" />;
 
 ### ThemeContext (`src/context/ThemeContext.jsx`)
 
-Manages application theme (light/dark mode) and persists user preference.
+Manages application theme (dark by default) and persists the user's manual light/dark preference.
 
 **State:**
 ```jsx
-const [mode, setMode] = useState('auto');
-const [theme, setTheme] = useState(createTheme());
+const [darkMode, setDarkMode] = useState(true);
+const theme = createTheme({
+  palette: { mode: darkMode ? 'dark' : 'light' },
+});
 ```
 
 **Methods:**
-- `toggleTheme()`: Switch between light and dark modes
-- `setThemeMode(mode)`: Set specific theme mode
-- `getSystemTheme()`: Detect system theme preference
+- `toggleDarkMode()`: Switch between dark and light modes on demand
+- `setThemeFromPreference(preference)`: Apply the user's saved preference (treats anything but `'light'` as dark)
 
 **Usage:**
 ```jsx
-const { theme, toggleTheme, mode } = useTheme();
+const { darkMode, toggleDarkMode } = useTheme();
 
 return (
-  <ThemeProvider theme={theme}>
-    <IconButton onClick={toggleTheme}>
-      {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-    </IconButton>
-  </ThemeProvider>
+  <IconButton onClick={toggleDarkMode}>
+    {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+  </IconButton>
 );
 ```
 
