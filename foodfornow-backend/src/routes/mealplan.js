@@ -34,17 +34,28 @@ router.get('/', authMiddleware, async (req, res) => {
 // Add meal to plan
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { weekStart, day, meal, recipeId, notes } = req.body;
+    const { weekStart, day, meal, recipeId, notes, eatingOut, restaurant } = req.body;
 
     // Validate required fields
-    if (!weekStart || !day || !meal || !recipeId) {
-      return res.status(400).json({ error: 'Week start, day, meal, and recipe are required' });
+    if (!weekStart || !day || !meal) {
+      return res.status(400).json({ error: 'Week start, day, and meal are required' });
     }
 
-    // Verify recipe exists
-    const recipe = await Recipe.findById(recipeId);
-    if (!recipe) {
-      return res.status(404).json({ error: 'Recipe not found' });
+    if (eatingOut) {
+      // Eating out: require restaurant name
+      if (!restaurant?.name) {
+        return res.status(400).json({ error: 'Restaurant name is required when eating out' });
+      }
+    } else {
+      // Recipe-based: require recipeId
+      if (!recipeId) {
+        return res.status(400).json({ error: 'Recipe is required when not eating out' });
+      }
+      // Verify recipe exists
+      const recipe = await Recipe.findById(recipeId);
+      if (!recipe) {
+        return res.status(404).json({ error: 'Recipe not found' });
+      }
     }
 
     // Check if a meal already exists for this day and time
@@ -64,7 +75,17 @@ router.post('/', authMiddleware, async (req, res) => {
       weekStart: new Date(weekStart),
       day,
       meal,
-      recipe: recipeId,
+      ...(eatingOut
+        ? {
+            eatingOut: true,
+            restaurant: {
+              name: restaurant.name,
+              url: restaurant.url || undefined,
+              address: restaurant.address || undefined,
+              notes: restaurant.notes || undefined
+            }
+          }
+        : { recipe: recipeId }),
       notes
     });
 
@@ -110,24 +131,62 @@ router.post('/', authMiddleware, async (req, res) => {
 // Update meal in plan
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { recipeId, notes } = req.body;
-    
-    // Verify recipe exists if being updated
-    if (recipeId) {
+    const { recipeId, notes, eatingOut, restaurant } = req.body;
+    const existingMeal = await MealPlan.findOne({ _id: req.params.id, user: req.userId });
+
+    if (!existingMeal) {
+      return res.status(404).json({ error: 'Meal plan item not found' });
+    }
+
+    const update = {};
+    const unset = {};
+
+    if (notes !== undefined) update.notes = notes;
+
+    if (eatingOut !== undefined) {
+      if (eatingOut) {
+        if (!restaurant?.name) {
+          return res.status(400).json({ error: 'Restaurant name is required when eating out' });
+        }
+        update.eatingOut = true;
+        update.recipe = null;
+        update.restaurant = {
+          name: restaurant.name,
+          url: restaurant.url || undefined,
+          address: restaurant.address || undefined,
+          notes: restaurant.notes || undefined
+        };
+      } else {
+        if (!recipeId) {
+          return res.status(400).json({ error: 'Recipe is required when not eating out' });
+        }
+        const recipe = await Recipe.findById(recipeId);
+        if (!recipe) {
+          return res.status(404).json({ error: 'Recipe not found' });
+        }
+        update.eatingOut = false;
+        update.recipe = recipeId;
+        unset.restaurant = 1; // Must use $unset to remove - undefined doesn't remove in Mongoose
+      }
+    } else if (recipeId) {
       const recipe = await Recipe.findById(recipeId);
       if (!recipe) {
         return res.status(404).json({ error: 'Recipe not found' });
       }
+      update.recipe = recipeId;
     }
+
+    const updateOp = {};
+    if (Object.keys(update).length > 0) updateOp.$set = update;
+    if (Object.keys(unset).length > 0) updateOp.$unset = unset;
 
     const mealPlanItem = await MealPlan.findOneAndUpdate(
       { _id: req.params.id, user: req.userId },
-      { 
-        ...(recipeId && { recipe: recipeId }),
-        ...(notes !== undefined && { notes })
-      },
+      Object.keys(updateOp).length > 0 ? updateOp : { $set: update },
       { new: true }
-    ).populate('recipe');
+    )
+      .populate('recipe')
+      .lean();
 
     if (!mealPlanItem) {
       return res.status(404).json({ error: 'Meal plan item not found' });
@@ -204,6 +263,13 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
     
     if (!mealPlanItem) {
       return res.status(404).json({ error: 'Meal plan item not found' });
+    }
+
+    // Eating out meals: just toggle cooked status (no pantry/ingredients)
+    if (mealPlanItem.eatingOut) {
+      mealPlanItem.cooked = !mealPlanItem.cooked;
+      await mealPlanItem.save();
+      return res.json(mealPlanItem);
     }
 
     if (!mealPlanItem.recipe || !mealPlanItem.recipe.ingredients) {
@@ -419,8 +485,10 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
           path: 'ingredients.ingredient'
         }
       });
-    // Filter out cooked meals - only count ingredients from uncooked meals
-    const uncookedMealPlans = mealPlans.filter(mealPlan => !mealPlan.cooked);
+    // Filter out cooked meals and eating-out meals - only count ingredients from uncooked recipe meals
+    const uncookedMealPlans = mealPlans.filter(
+      mealPlan => !mealPlan.cooked && !mealPlan.eatingOut && mealPlan.recipe
+    );
     // Aggregate needed ingredients (by ingredient+unit) from uncooked meals only
     const ingredients = new Map();
     uncookedMealPlans.forEach(mealPlan => {

@@ -33,11 +33,22 @@ const mealPlanSchema = new mongoose.Schema(
       required: true,
       enum: ["Breakfast", "Lunch", "Dinner", "Snack"]
     },
-    // Reference to the recipe for this meal
+    // Reference to the recipe for this meal (optional when eatingOut is true)
     recipe: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Recipe",
-      required: true
+      ref: "Recipe"
+    },
+    // Whether this meal is eating out (restaurant) vs cooking at home
+    eatingOut: {
+      type: Boolean,
+      default: false
+    },
+    // Restaurant details when eating out
+    restaurant: {
+      name: { type: String },
+      url: { type: String },
+      address: { type: String },
+      notes: { type: String }
     },
     // Optional notes about the meal (e.g., modifications, preferences)
     notes: {
@@ -55,6 +66,20 @@ const mealPlanSchema = new mongoose.Schema(
     timestamps: true 
   }
 );
+
+// Validate: must have either recipe OR (eatingOut + restaurant name)
+mealPlanSchema.pre('save', function (next) {
+  if (this.eatingOut) {
+    if (!this.restaurant?.name) {
+      return next(new Error('Restaurant name is required when eating out'));
+    }
+  } else {
+    if (!this.recipe) {
+      return next(new Error('Recipe is required when not eating out'));
+    }
+  }
+  next();
+});
 
 // Drop any existing indexes to prevent conflicts
 // This ensures clean index management when schema changes

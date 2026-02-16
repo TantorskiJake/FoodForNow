@@ -71,6 +71,8 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
   const handleViewRecipe = () => {
     if (selectedMeal?.recipe?._id) {
       navigate(`/recipes/${selectedMeal.recipe._id}`);
+    } else if (selectedMeal?.eatingOut && selectedMeal?.restaurant?.url) {
+      window.open(selectedMeal.restaurant.url, '_blank');
     }
     handleMenuClose();
   };
@@ -210,6 +212,9 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
 
   const getMealName = (meal) => {
     if (!meal) return 'No Recipe';
+    if (meal.eatingOut && meal.restaurant?.name) {
+      return meal.restaurant.name;
+    }
     if (!meal.recipe) return 'Recipe not found';
     return meal.recipe.name || 'Unnamed Recipe';
   };
@@ -367,6 +372,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               display: 'flex',
                               gap: 0.25
                             }}>
+                              {!meal.eatingOut && (
                               <Tooltip title="Copy to other days">
                                 <span>
                                   <IconButton
@@ -383,6 +389,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                                   </IconButton>
                                 </span>
                               </Tooltip>
+                              )}
                               <Tooltip title="Delete meal">
                                 <span>
                                   <IconButton
@@ -522,6 +529,14 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
               <RestaurantIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText>View Recipe</ListItemText>
+          </MenuItem>
+        )}
+        {selectedMeal?.eatingOut && selectedMeal?.restaurant?.url && (
+          <MenuItem onClick={handleViewRecipe}>
+            <ListItemIcon>
+              <RestaurantIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Open website</ListItemText>
           </MenuItem>
         )}
       </Menu>

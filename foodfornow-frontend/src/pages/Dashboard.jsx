@@ -24,7 +24,13 @@ import {
   Tooltip,
   Collapse,
   Skeleton,
+  Popover,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AddIcon from '@mui/icons-material/Add';
@@ -35,6 +41,7 @@ import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import CasinoIcon from '@mui/icons-material/Casino';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import IconButton from '@mui/material/IconButton';
@@ -63,12 +70,15 @@ const Dashboard = () => {
     day: '',
     meal: '',
     recipeId: '',
+    eatingOut: false,
+    restaurant: { name: '', url: '', address: '', notes: '' },
   });
   const [resetWeekDialog, setResetWeekDialog] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
   const [selectedWeekStart, setSelectedWeekStart] = useState('');
   const [mealActionLoading, setMealActionLoading] = useState(false);
+  const [calendarAnchorEl, setCalendarAnchorEl] = useState(null);
 
   const { authenticated, user } = useAuth();
   const { showAchievements } = useAchievements();
@@ -407,12 +417,22 @@ const Dashboard = () => {
   };
 
   const handleOpenMealDialog = (day, mealType, existingMeal = null) => {
+    const isEatingOut = !!existingMeal?.eatingOut;
     setMealFormData({
       _id: existingMeal?._id || '',
       weekStart: existingMeal?.weekStart || selectedWeekStart,
       day: day || existingMeal?.day || '',
       meal: mealType || existingMeal?.meal || '',
       recipeId: existingMeal?.recipe?._id || '',
+      eatingOut: isEatingOut,
+      restaurant: isEatingOut && existingMeal?.restaurant
+        ? {
+            name: existingMeal.restaurant.name || '',
+            url: existingMeal.restaurant.url || '',
+            address: existingMeal.restaurant.address || '',
+            notes: existingMeal.restaurant.notes || '',
+          }
+        : { name: '', url: '', address: '', notes: '' },
     });
     setOpenMealDialog(true);
   };
@@ -425,20 +445,34 @@ const Dashboard = () => {
       day: '',
       meal: '',
       recipeId: '',
+      eatingOut: false,
+      restaurant: { name: '', url: '', address: '', notes: '' },
     });
   };
 
   const handleAddMeal = async (e) => {
     e.preventDefault();
+    if (mealFormData.eatingOut && !mealFormData.restaurant?.name?.trim()) {
+      toast.error('Please enter a restaurant name');
+      return;
+    }
     try {
       setMealActionLoading(true);
       let response;
       if (mealFormData._id) {
-        response = await api.put(`/mealplan/${mealFormData._id}`, {
-          recipeId: mealFormData.recipeId
-        });
+        response = await api.put(`/mealplan/${mealFormData._id}`, mealFormData.eatingOut
+          ? { eatingOut: true, restaurant: mealFormData.restaurant }
+          : { recipeId: mealFormData.recipeId, eatingOut: false });
       } else {
-        response = await api.post('/mealplan', mealFormData);
+        response = await api.post('/mealplan', mealFormData.eatingOut
+          ? {
+              weekStart: mealFormData.weekStart,
+              day: mealFormData.day,
+              meal: mealFormData.meal,
+              eatingOut: true,
+              restaurant: mealFormData.restaurant,
+            }
+          : mealFormData);
         
         // Check for achievements in response
         if (response.data.achievements && response.data.achievements.length > 0) {
@@ -457,13 +491,12 @@ const Dashboard = () => {
       invalidateCache(MEALPLAN_CACHE_KEYS);
       await fetchIngredients({ forceRefresh: true });
       setError('');
+      toast.success(mealFormData.eatingOut ? 'Eating out meal added' : 'Meal added');
     } catch (err) {
       console.error('Error saving meal:', err);
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Failed to save meal. Please try again.');
-      }
+      const errMsg = err.response?.data?.error || 'Failed to save meal. Please try again.';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setMealActionLoading(false);
     }
@@ -493,7 +526,9 @@ const Dashboard = () => {
     // Instant UI update - close dialog and show meal immediately
     handleCloseMealDialog();
     if (editingId) {
-      setMealPlan(prev => prev.map(m => m._id === editingId ? { ...m, recipe: { _id: recipeId, name: recipe.name } } : m));
+      setMealPlan(prev => prev.map(m => m._id === editingId
+        ? { ...m, recipe: { _id: recipeId, name: recipe.name }, eatingOut: false, restaurant: undefined }
+        : m));
     } else {
       setMealPlan(prev => [...prev, optimisticMeal]);
     }
@@ -501,7 +536,7 @@ const Dashboard = () => {
     try {
       let response;
       if (editingId) {
-        response = await api.put(`/mealplan/${editingId}`, { recipeId });
+        response = await api.put(`/mealplan/${editingId}`, { recipeId, eatingOut: false });
       } else {
         response = await api.post('/mealplan', { ...mealFormData, recipeId });
         if (response.data.achievements?.length > 0) {
@@ -509,7 +544,11 @@ const Dashboard = () => {
         }
       }
 
-      const mealItem = response.data.mealPlanItem || response.data;
+      let mealItem = response.data.mealPlanItem || response.data;
+      // When we have a recipe, ensure eatingOut/restaurant are cleared (backend may return stale data)
+      if (mealItem?.recipe) {
+        mealItem = { ...mealItem, eatingOut: false, restaurant: undefined };
+      }
       if (!editingId && cancelledOptimisticIds.current.has(optimisticId)) {
         cancelledOptimisticIds.current.delete(optimisticId);
         return;
@@ -768,7 +807,16 @@ const Dashboard = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                <Box display="flex" alignItems="center" gap={1}>
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  gap={1}
+                  onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
+                  sx={{
+                    cursor: 'pointer',
+                    '&:hover': { opacity: 0.85 },
+                  }}
+                >
                   <CalendarTodayIcon color="primary" />
                   <Typography variant="h6">
                     Week of Monday, {selectedWeekStart ? (() => {
@@ -810,7 +858,6 @@ const Dashboard = () => {
                     sx={{
                       justifyContent: 'flex-start',
                       textTransform: 'none',
-                      position: 'relative',
                       backgroundColor: theme.palette.primary.main,
                       color: 'white',
                       borderColor: theme.palette.primary.main,
@@ -820,8 +867,9 @@ const Dashboard = () => {
                         color: 'white'
                       }
                     }}
+                    onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
+                    startIcon={<CalendarTodayIcon sx={{ fontSize: 16 }} />}
                   >
-                    <CalendarTodayIcon sx={{ fontSize: 16, mr: 1 }} />
                     {selectedWeekStart ? (() => {
                       const [year, month, day] = selectedWeekStart.split('-').map(Number);
                       const date = new Date(year, month - 1, day);
@@ -831,36 +879,6 @@ const Dashboard = () => {
                         year: 'numeric'
                       });
                     })() : 'Select Date'}
-                    <input
-                      type="date"
-                      value={selectedWeekStart}
-                      onChange={(e) => {
-                        // Parse the date string properly to avoid timezone issues
-                        const [year, month, day] = e.target.value.split('-').map(Number);
-                        const selectedDate = new Date(year, month - 1, day); // month is 0-indexed
-                        
-                        // Adjust to Monday of that week
-                        const dayOfWeek = selectedDate.getDay();
-                        // Calculate days to go back to get to Monday
-                        // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-                        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                        
-                        selectedDate.setDate(selectedDate.getDate() - daysToMonday);
-                        selectedDate.setHours(0, 0, 0, 0);
-                        
-                        setSelectedWeekStart(selectedDate.toISOString().split('T')[0]);
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        opacity: 0,
-                        cursor: 'pointer',
-                        zIndex: 1
-                      }}
-                    />
                   </Button>
                   <Button
                     variant="outlined"
@@ -911,6 +929,38 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </Grid>
+
+        <Popover
+          open={Boolean(calendarAnchorEl)}
+          anchorEl={calendarAnchorEl}
+          onClose={() => setCalendarAnchorEl(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          slotProps={{ paper: { sx: { mt: 1.5 } } }}
+        >
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DatePicker
+              value={selectedWeekStart ? dayjs(selectedWeekStart) : null}
+              onChange={(newValue) => {
+                if (newValue) {
+                  const selectedDate = newValue.toDate();
+                  const dayOfWeek = selectedDate.getDay();
+                  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                  selectedDate.setDate(selectedDate.getDate() - daysToMonday);
+                  selectedDate.setHours(0, 0, 0, 0);
+                  setSelectedWeekStart(selectedDate.toISOString().split('T')[0]);
+                  setCalendarAnchorEl(null);
+                }
+              }}
+              views={['year', 'month', 'day']}
+              openTo="day"
+              slotProps={{
+                actionBar: { actions: ['today'] },
+              }}
+              sx={{ p: 2, minWidth: 320 }}
+            />
+          </LocalizationProvider>
+        </Popover>
 
         {error && (
           <Grid item xs={12}>
@@ -1279,20 +1329,26 @@ const Dashboard = () => {
         onClose={handleCloseMealDialog}
         fullScreen={isMobile}
         disableScrollLock
+        maxWidth="sm"
+        fullWidth
       >
         <DialogTitle>
           {mealFormData._id ? 'Edit Meal' : (mealFormData.day && mealFormData.meal ? `Add Meal - ${mealFormData.day} ${mealFormData.meal}` : 'Add Meal')}
         </DialogTitle>
-        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
+        <DialogContent sx={{ pt: 3, px: 3, pb: 2, ...(isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}) }}>
           {(mealFormData._id || !mealFormData.day || !mealFormData.meal) ? (
             // Editing existing meal, or adding without a pre-selected slot - show day/meal selectors
             <>
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Day</InputLabel>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Day</Typography>
                 <Select
+                  fullWidth
                   value={mealFormData.day}
                   onChange={(e) => setMealFormData({ ...mealFormData, day: e.target.value })}
                   required
+                  displayEmpty
+                  renderValue={(v) => v || 'Select day'}
+                  sx={{ '& .MuiSelect-select': { py: 1.5 } }}
                 >
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
                     <MenuItem key={day} value={day}>
@@ -1300,14 +1356,18 @@ const Dashboard = () => {
                     </MenuItem>
                   ))}
                 </Select>
-              </FormControl>
+              </Box>
 
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Meal</InputLabel>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Meal</Typography>
                 <Select
+                  fullWidth
                   value={mealFormData.meal}
                   onChange={(e) => setMealFormData({ ...mealFormData, meal: e.target.value })}
                   required
+                  displayEmpty
+                  renderValue={(v) => v || 'Select meal'}
+                  sx={{ '& .MuiSelect-select': { py: 1.5 } }}
                 >
                   {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((meal) => (
                     <MenuItem key={meal} value={meal}>
@@ -1315,51 +1375,175 @@ const Dashboard = () => {
                     </MenuItem>
                   ))}
                 </Select>
-              </FormControl>
+              </Box>
             </>
           ) : (
             // Adding new meal from grid slot click - show day and meal as read-only
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Day: <strong>{mealFormData.day}</strong>
+            <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Typography variant="body2" color="text.secondary">
+                <Box component="span" sx={{ display: 'inline-block', minWidth: 56, mr: 0.5 }}>Day:</Box>
+                <strong>{mealFormData.day}</strong>
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Meal: <strong>{mealFormData.meal}</strong>
+              <Typography variant="body2" color="text.secondary">
+                <Box component="span" sx={{ display: 'inline-block', minWidth: 56, mr: 0.5 }}>Meal:</Box>
+                <strong>{mealFormData.meal}</strong>
               </Typography>
             </Box>
           )}
 
-          <Autocomplete
-            fullWidth
-            options={recipes}
-            value={recipes.find((r) => r._id === mealFormData.recipeId) || null}
-            getOptionLabel={(option) => (typeof option === 'string' ? option : option?.name) || ''}
-            isOptionEqualToValue={(option, value) => option?._id === value?._id}
-            filterOptions={(options, { inputValue }) =>
-              options.filter((opt) =>
-                (opt?.name || '').toLowerCase().includes((inputValue || '').toLowerCase())
-              )
-            }
-            onChange={(e, value) => {
-              if (value) {
-                handleRecipeSelect(value);
-              }
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Recipe"
-                placeholder="Type to search recipes..."
-                required={!mealFormData.recipeId}
+          <Box sx={{ mb: 2, mt: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+              Meal type
+            </Typography>
+            <ToggleButtonGroup
+              value={mealFormData.eatingOut ? 'eatingOut' : 'recipe'}
+              exclusive
+              onChange={(e, value) => {
+                if (value !== null) {
+                  setMealFormData({
+                    ...mealFormData,
+                    eatingOut: value === 'eatingOut',
+                    recipeId: value === 'eatingOut' ? '' : mealFormData.recipeId,
+                    restaurant: value === 'eatingOut' ? mealFormData.restaurant : { name: '', url: '', address: '', notes: '' },
+                  });
+                }
+              }}
+              fullWidth
+              size="small"
+            >
+              <ToggleButton value="recipe" aria-label="Recipe" sx={{ whiteSpace: 'nowrap' }}>
+                <MenuBookIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                Recipe
+              </ToggleButton>
+              <ToggleButton value="eatingOut" aria-label="Eating out" sx={{ whiteSpace: 'nowrap' }}>
+                <RestaurantIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                Eating out
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
+          <Box sx={{ minHeight: 340, position: 'relative' }}>
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                opacity: mealFormData.eatingOut ? 0 : 1,
+                visibility: mealFormData.eatingOut ? 'hidden' : 'visible',
+                pointerEvents: mealFormData.eatingOut ? 'none' : 'auto',
+              }}
+            >
+              <Autocomplete
+                fullWidth
+                options={recipes}
+                value={recipes.find((r) => r._id === mealFormData.recipeId) || null}
+                getOptionLabel={(option) => (typeof option === 'string' ? option : option?.name) || ''}
+                isOptionEqualToValue={(option, value) => option?._id === value?._id}
+                filterOptions={(options, { inputValue }) =>
+                  options.filter((opt) =>
+                    (opt?.name || '').toLowerCase().includes((inputValue || '').toLowerCase())
+                  )
+                }
+                onChange={(e, value) => {
+                  if (value) {
+                    handleRecipeSelect(value);
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Recipe"
+                    placeholder="Type to search recipes..."
+                    required={!mealFormData.recipeId}
+                  />
+                )}
               />
-            )}
-          />
+            </Box>
+            <Box
+              component="form"
+              onSubmit={handleAddMeal}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                opacity: mealFormData.eatingOut ? 1 : 0,
+                visibility: mealFormData.eatingOut ? 'visible' : 'hidden',
+                pointerEvents: mealFormData.eatingOut ? 'auto' : 'none',
+              }}
+            >
+              <TextField
+                fullWidth
+                label="Restaurant name"
+                placeholder="e.g. Joe's Pizza"
+                value={mealFormData.restaurant?.name || ''}
+                onChange={(e) =>
+                  setMealFormData({
+                    ...mealFormData,
+                    restaurant: { ...mealFormData.restaurant, name: e.target.value },
+                  })
+                }
+                required
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Website / URL"
+                placeholder="https://..."
+                value={mealFormData.restaurant?.url || ''}
+                onChange={(e) =>
+                  setMealFormData({
+                    ...mealFormData,
+                    restaurant: { ...mealFormData.restaurant, url: e.target.value },
+                  })
+                }
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Address"
+                placeholder="123 Main St, City"
+                value={mealFormData.restaurant?.address || ''}
+                onChange={(e) =>
+                  setMealFormData({
+                    ...mealFormData,
+                    restaurant: { ...mealFormData.restaurant, address: e.target.value },
+                  })
+                }
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Notes"
+                placeholder="Reservation at 7pm, etc."
+                value={mealFormData.restaurant?.notes || ''}
+                onChange={(e) =>
+                  setMealFormData({
+                    ...mealFormData,
+                    restaurant: { ...mealFormData.restaurant, notes: e.target.value },
+                  })
+                }
+                multiline
+                rows={2}
+              />
+            </Box>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseMealDialog}>Cancel</Button>
-          {mealFormData._id && (
-            <Button type="submit" variant="contained" color="primary" disabled={mealActionLoading}>
-              Update
+          {(mealFormData._id || mealFormData.eatingOut) && (
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={mealActionLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                handleAddMeal(e);
+              }}
+            >
+              {mealFormData._id ? 'Update' : 'Add'}
             </Button>
           )}
         </DialogActions>
