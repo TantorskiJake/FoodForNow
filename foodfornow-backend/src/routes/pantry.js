@@ -4,6 +4,7 @@ const Ingredient = require("../models/ingredient");
 const authMiddleware = require("../middleware/auth");
 const mongoose = require("mongoose");
 const ShoppingListItem = require("../models/shopping-list-item");
+const { inferIngredientCategory } = require("../services/recipeParserService");
 
 const router = express.Router();
 
@@ -43,10 +44,38 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
+const VALID_CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
+
+// Helper to resolve ingredient ID from either ID or name
+async function resolveIngredient(req, ingredient, ingredientName, ingredientCategory, ingredientDescription) {
+  if (ingredient) {
+    const found = await Ingredient.findById(ingredient);
+    if (found) return found._id;
+    return null;
+  }
+  if (ingredientName && String(ingredientName).trim()) {
+    const name = String(ingredientName).trim();
+    let found = await Ingredient.findOne({
+      user: req.userId,
+      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    });
+    if (!found) {
+      const category = (ingredientCategory && VALID_CATEGORIES.includes(ingredientCategory))
+        ? ingredientCategory
+        : inferIngredientCategory(name);
+      const description = ingredientDescription ? String(ingredientDescription).trim() : undefined;
+      found = new Ingredient({ name, category, description, user: req.userId });
+      await found.save();
+    }
+    return found._id;
+  }
+  return null;
+}
+
 // Update item
 router.patch('/items/:itemId', authMiddleware, async (req, res) => {
   try {
-    const { ingredient, quantity, unit, expiryDate } = req.body;
+    const { ingredient, ingredientName, ingredientCategory, ingredientDescription, quantity, unit, expiryDate } = req.body;
     const pantry = await Pantry.findOne({ user: req.userId });
     if (!pantry) {
       return res.status(404).json({ error: 'Pantry not found' });
@@ -55,9 +84,32 @@ router.patch('/items/:itemId', authMiddleware, async (req, res) => {
     if (!item) {
       return res.status(404).json({ error: 'Item not found' });
     }
-    
-    // Update all fields
-    if (ingredient) item.ingredient = ingredient;
+
+    let resolvedIngredient;
+    if (ingredient && ingredientName && String(ingredientName).trim()) {
+      // Rename existing ingredient: update the ingredient's name
+      const ing = await Ingredient.findOne({ _id: ingredient, user: req.userId });
+      if (ing) {
+        const newName = String(ingredientName).trim();
+        const existingByName = await Ingredient.findOne({
+          user: req.userId,
+          _id: { $ne: ingredient },
+          name: { $regex: new RegExp(`^${newName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        });
+        if (existingByName) {
+          return res.status(400).json({ error: 'An ingredient with that name already exists' });
+        }
+        ing.name = newName;
+        if (ingredientCategory && VALID_CATEGORIES.includes(ingredientCategory)) ing.category = ingredientCategory;
+        if (ingredientDescription !== undefined) ing.description = String(ingredientDescription || '').trim();
+        await ing.save();
+        resolvedIngredient = ing._id;
+      }
+    }
+    if (!resolvedIngredient) {
+      resolvedIngredient = await resolveIngredient(req, ingredient, ingredientName, ingredientCategory, ingredientDescription);
+    }
+    if (resolvedIngredient) item.ingredient = resolvedIngredient;
     if (quantity !== undefined) item.quantity = Number(quantity);
     if (unit) item.unit = unit;
     if (expiryDate) item.expiryDate = new Date(expiryDate);
@@ -75,24 +127,27 @@ router.patch('/items/:itemId', authMiddleware, async (req, res) => {
 // Add or update a pantry item
 router.post("/", authMiddleware, async (req, res) => {
   try {
-    const { ingredient, quantity, unit, expiryDate } = req.body;
-    // Validate required fields
-    if (!ingredient || !quantity || !unit) {
-      return res.status(400).json({ error: "Ingredient, quantity, and unit are required" });
+    const { ingredient, ingredientName, ingredientCategory, ingredientDescription, quantity, unit, expiryDate } = req.body;
+    // Validate required fields - need either ingredient ID or ingredientName
+    if ((!ingredient && !ingredientName) || !quantity || !unit) {
+      return res.status(400).json({ error: "Ingredient (or ingredient name), quantity, and unit are required" });
     }
 
     // Validate unit
-    const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+    const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
     if (!validUnits.includes(unit)) {
       return res.status(400).json({ error: `Invalid unit. Must be one of: ${validUnits.join(', ')}` });
     }
 
-    // Validate ingredient exists
-    const validIngredient = await Ingredient.findById(ingredient);
-    if (!validIngredient) {
-      console.error("Invalid ingredient ID:", ingredient);
-      return res.status(400).json({ error: "Invalid ingredient ID" });
+    // Resolve ingredient: use ID if provided, otherwise find or create by name
+    const validIngredientId = await resolveIngredient(req, ingredient, ingredientName, ingredientCategory, ingredientDescription);
+    if (!validIngredientId) {
+      if (ingredient) {
+        return res.status(400).json({ error: "Invalid ingredient ID" });
+      }
+      return res.status(400).json({ error: "Ingredient name is required" });
     }
+    const validIngredient = { _id: validIngredientId };
 
     // Find or create pantry
     let pantry = await Pantry.findOne({ user: req.userId });
@@ -102,7 +157,7 @@ router.post("/", authMiddleware, async (req, res) => {
       const newPantry = new Pantry({
         user: req.userId,
         items: [{
-          ingredient: new mongoose.Types.ObjectId(ingredient),
+          ingredient: validIngredient._id,
           quantity: Number(quantity),
           unit: unit,
           expiryDate: expiryDate ? new Date(expiryDate) : undefined
@@ -121,8 +176,9 @@ router.post("/", authMiddleware, async (req, res) => {
     }
 
     // Check if ingredient already exists with same unit
+    const ingredientIdStr = validIngredient._id.toString();
     const existingItemIndex = pantry.items.findIndex(item => 
-      item.ingredient && item.ingredient.toString() === ingredient && item.unit === unit
+      item.ingredient && item.ingredient.toString() === ingredientIdStr && item.unit === unit
     );
 
     if (existingItemIndex > -1) {
@@ -134,7 +190,7 @@ router.post("/", authMiddleware, async (req, res) => {
     } else {
       // Add new item
       pantry.items.push({
-        ingredient: new mongoose.Types.ObjectId(ingredient),
+        ingredient: validIngredient._id,
         quantity: Number(quantity),
         unit: unit,
         expiryDate: expiryDate ? new Date(expiryDate) : undefined

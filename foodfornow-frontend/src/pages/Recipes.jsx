@@ -65,7 +65,7 @@ const Recipes = () => {
     servings: '',
     tags: '',
   });
-  const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+  const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
   const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
   const theme = useTheme();
 
@@ -504,6 +504,7 @@ const Recipes = () => {
     e?.preventDefault();
     if (!newIngredientData.name?.trim() || !newIngredientData.category) return;
 
+    const indexToUpdate = createIngredientForIndex;
     try {
       setCreatingIngredient(true);
       const response = await api.post('/ingredients', {
@@ -512,14 +513,17 @@ const Recipes = () => {
         description: newIngredientData.description?.trim() || undefined,
       });
       const newIng = response.data;
-      await fetchIngredients();
-      if (createIngredientForIndex !== null) {
-        const newIngredients = [...formData.ingredients];
-        newIngredients[createIngredientForIndex] = {
-          ...newIngredients[createIngredientForIndex],
-          ingredient: newIng._id,
-        };
-        setFormData({ ...formData, ingredients: newIngredients });
+      // Force refresh to bypass cache so the new ingredient appears in the list
+      await fetchIngredients({ forceRefresh: true });
+      if (indexToUpdate !== null) {
+        setFormData((prev) => {
+          const newIngredients = [...prev.ingredients];
+          newIngredients[indexToUpdate] = {
+            ...newIngredients[indexToUpdate],
+            ingredient: newIng._id,
+          };
+          return { ...prev, ingredients: newIngredients };
+        });
       }
       handleCloseCreateIngredient();
     } catch (err) {
@@ -696,8 +700,7 @@ const Recipes = () => {
       maxWidth={false}
       sx={{ 
         py: { xs: 2, sm: 4 },
-        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
-        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 }
       }}
     >
       {busyIndicator}
@@ -822,7 +825,7 @@ const Recipes = () => {
 
       {tab === 'mine' ? (
         filteredRecipes.length > 0 ? (
-          <Container maxWidth="xl">
+          <Box>
             <Grid container spacing={3}>
               {filteredRecipes.map((recipe) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
@@ -984,7 +987,7 @@ const Recipes = () => {
                 </Grid>
               ))}
             </Grid>
-          </Container>
+          </Box>
         ) : recipes.length === 0 ? (
           <EmptyState
             icon={<MenuBookIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
@@ -1013,7 +1016,7 @@ const Recipes = () => {
         )
       ) : (
         filteredSharedRecipes.length > 0 ? (
-          <Container maxWidth="xl">
+          <Box>
             <Grid container spacing={3}>
               {filteredSharedRecipes.map((recipe) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
@@ -1160,7 +1163,7 @@ const Recipes = () => {
                 </Grid>
               ))}
             </Grid>
-          </Container>
+          </Box>
         ) : (
           <Box
             sx={{

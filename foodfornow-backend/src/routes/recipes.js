@@ -6,7 +6,7 @@ const { parseRecipeFromUrl, parseRecipeFromText, buildRawRecipeFormat, transform
 
 const router = express.Router();
 
-const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
 
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {

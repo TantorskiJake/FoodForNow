@@ -44,9 +44,11 @@ const UNIT_MAP = {
   pieces: 'piece',
   pinch: 'pinch',
   pinches: 'pinch',
+  box: 'box',
+  boxes: 'box',
 };
 
-const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
 
 const CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
 

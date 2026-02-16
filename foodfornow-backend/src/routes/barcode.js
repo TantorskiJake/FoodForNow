@@ -23,7 +23,7 @@ const CATEGORY_MAP = {
 };
 
 const VALID_CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
-const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
 
 /**
  * Parse quantity string like "400g" or "1.5 kg" into { value, unit }
@@ -31,7 +31,7 @@ const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'pi
 function parseQuantity(quantityStr) {
   if (!quantityStr || typeof quantityStr !== 'string') return { value: 1, unit: 'piece' };
   const trimmed = quantityStr.trim().toLowerCase();
-  const match = trimmed.match(/^([\d.,]+)\s*(g|kg|oz|lb|ml|l|cup|tbsp|tsp|piece|pinch)?$/i);
+  const match = trimmed.match(/^([\d.,]+)\s*(g|kg|oz|lb|ml|l|cup|tbsp|tsp|piece|pinch|box)?$/i);
   if (match) {
     const value = parseFloat(match[1].replace(',', '.')) || 1;
     let unit = (match[2] || 'g').toLowerCase();

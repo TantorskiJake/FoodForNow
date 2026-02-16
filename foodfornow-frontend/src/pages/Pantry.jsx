@@ -23,7 +23,8 @@ import {
   useTheme,
   LinearProgress,
   Grid,
-  useMediaQuery
+  useMediaQuery,
+  Autocomplete
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -55,12 +56,16 @@ const Pantry = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     ingredient: '',
+    ingredientName: '',
+    ingredientCategory: '',
+    ingredientDescription: '',
     quantity: '',
     unit: '',
     expiryDate: '',
   });
   const [ingredients, setIngredients] = useState([]);
-  const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']);
+  const [units] = useState(['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box']);
+  const categories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
@@ -152,6 +157,9 @@ const Pantry = () => {
       setEditingItem(item);
       setFormData({
         ingredient: item.ingredient._id,
+        ingredientName: '', // When editing, user can type new name to rename
+        ingredientCategory: item.ingredient.category || '',
+        ingredientDescription: item.ingredient.description || '',
         quantity: item.quantity,
         unit: item.unit,
         expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
@@ -160,6 +168,9 @@ const Pantry = () => {
       setEditingItem(null);
       setFormData({
         ingredient: '',
+        ingredientName: '',
+        ingredientCategory: '',
+        ingredientDescription: '',
         quantity: '',
         unit: '',
         expiryDate: '',
@@ -173,6 +184,9 @@ const Pantry = () => {
     setEditingItem(null);
     setFormData({
       ingredient: '',
+      ingredientName: '',
+      ingredientCategory: '',
+      ingredientDescription: '',
       quantity: '',
       unit: '',
       expiryDate: '',
@@ -182,16 +196,33 @@ const Pantry = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (!formData.ingredient || !formData.quantity || !formData.unit) {
+      const hasIngredient = formData.ingredient || (formData.ingredientName && formData.ingredientName.trim());
+      const isNewIngredient = formData.ingredientName && formData.ingredientName.trim();
+      if (!hasIngredient || !formData.quantity || !formData.unit) {
         setError('Please fill in all required fields');
+        return;
+      }
+      if (isNewIngredient && !formData.ingredientCategory) {
+        setError('Please select a category for the new ingredient');
         return;
       }
 
       const submitData = {
-        ingredient: formData.ingredient,
         quantity: Number(formData.quantity),
         unit: formData.unit
       };
+      if (formData.ingredient) {
+        submitData.ingredient = formData.ingredient;
+        if (formData.ingredientName && formData.ingredientName.trim()) {
+          submitData.ingredientName = formData.ingredientName.trim();
+          submitData.ingredientCategory = formData.ingredientCategory;
+          submitData.ingredientDescription = formData.ingredientDescription;
+        }
+      } else {
+        submitData.ingredientName = formData.ingredientName.trim();
+        submitData.ingredientCategory = formData.ingredientCategory;
+        submitData.ingredientDescription = formData.ingredientDescription;
+      }
 
       if (formData.expiryDate) {
         submitData.expiryDate = formData.expiryDate;
@@ -212,9 +243,15 @@ const Pantry = () => {
       if (response && response.data) {
         handleCloseDialog();
         invalidatePantryCache();
-        await fetchPantryItems({ forceRefresh: true });
+        await Promise.all([
+          fetchPantryItems({ forceRefresh: true }),
+          fetchIngredients({ forceRefresh: true })
+        ]);
         setFormData({
           ingredient: '',
+          ingredientName: '',
+          ingredientCategory: '',
+          ingredientDescription: '',
           quantity: '',
           unit: '',
           expiryDate: ''
@@ -505,8 +542,7 @@ const Pantry = () => {
       maxWidth={false}
       sx={{ 
         py: { xs: 2, sm: 4 },
-        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
-        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 }
       }}
     >
       {busyIndicator}
@@ -558,8 +594,8 @@ const Pantry = () => {
             Add Item
           </Button>
           <Button
-            variant="outlined"
-            color="secondary"
+            variant="contained"
+            color="primary"
             onClick={() => setScannerOpen(true)}
             size="small"
           >
@@ -755,24 +791,74 @@ const Pantry = () => {
         </Grid>
       )}
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} fullScreen={isMobile}>
+      <Dialog open={openDialog} onClose={handleCloseDialog} fullScreen={isMobile} maxWidth="md" fullWidth>
         <DialogTitle>{editingItem ? 'Edit Pantry Item' : 'Add Pantry Item'}</DialogTitle>
         <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
-            <FormControl fullWidth required sx={{ mb: 2 }}>
-              <InputLabel>Ingredient</InputLabel>
-              <Select
-                value={formData.ingredient}
-                onChange={(e) => setFormData({ ...formData, ingredient: e.target.value })}
-                label="Ingredient"
-              >
-                {ingredients.map((ingredient) => (
-                  <MenuItem key={ingredient._id} value={ingredient._id}>
-                    {ingredient.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Autocomplete
+              freeSolo
+              options={ingredients}
+              value={
+                formData.ingredientName
+                  ? formData.ingredientName
+                  : formData.ingredient
+                    ? ingredients.find((i) => i._id === formData.ingredient) || { _id: formData.ingredient, name: editingItem?.ingredient?.name || '' }
+                    : null
+              }
+              getOptionLabel={(option) => (typeof option === 'string' ? option : option?.name || '')}
+              isOptionEqualToValue={(option, value) =>
+                typeof value === 'string' ? option?.name?.toLowerCase() === value?.toLowerCase() : option?._id === value?._id
+              }
+              filterOptions={(options, state) => {
+                const input = (state.inputValue || '').trim();
+                const inputLower = input.toLowerCase();
+                const filtered = options.filter((opt) =>
+                  opt.name.toLowerCase().includes(inputLower)
+                );
+                if (input && !filtered.some((opt) => opt.name.toLowerCase() === inputLower)) {
+                  return [...filtered, { _id: '__new__', name: input, isNew: true }];
+                }
+                return filtered;
+              }}
+              onChange={(e, value) => {
+                if (value?.isNew) {
+                  setFormData({ ...formData, ingredient: '', ingredientName: value.name });
+                } else if (value && typeof value === 'object' && value._id && value._id !== '__new__') {
+                  const ing = ingredients.find((i) => i._id === value._id);
+                  setFormData({
+                    ...formData,
+                    ingredient: value._id,
+                    ingredientName: '',
+                    ingredientCategory: ing?.category || '',
+                    ingredientDescription: ing?.description || ''
+                  });
+                } else if (typeof value === 'string' && value.trim()) {
+                  setFormData({ ...formData, ingredient: '', ingredientName: value.trim() });
+                } else {
+                  setFormData({ ...formData, ingredient: '', ingredientName: '', ingredientCategory: '', ingredientDescription: '' });
+                }
+              }}
+              onInputChange={(e, inputValue) => {
+                if (editingItem && formData.ingredient) {
+                  // When editing: typing updates the name for rename, keep ingredient ID
+                  setFormData((prev) => ({ ...prev, ingredientName: inputValue || '' }));
+                  return;
+                }
+                const matchesExisting = ingredients.some(
+                  (i) => i.name.toLowerCase() === (inputValue || '').trim().toLowerCase()
+                );
+                if (matchesExisting) return;
+                setFormData((prev) => ({
+                  ...prev,
+                  ingredient: '',
+                  ingredientName: inputValue || ''
+                }));
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Ingredient" required />
+              )}
+              fullWidth
+            />
 
             <TextField
               label="Quantity"
@@ -781,17 +867,20 @@ const Pantry = () => {
               onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
               required
               fullWidth
-              sx={{ mb: 2 }}
               inputProps={{ min: 0, step: 0.1 }}
             />
 
-            <FormControl fullWidth required sx={{ mb: 2 }}>
-              <InputLabel>Unit</InputLabel>
+            <FormControl fullWidth required>
+              <InputLabel id="pantry-unit-label">Unit</InputLabel>
               <Select
+                labelId="pantry-unit-label"
                 value={formData.unit}
                 onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                 label="Unit"
               >
+                <MenuItem value="">
+                  <em>Select unit</em>
+                </MenuItem>
                 {units.map((unit) => (
                   <MenuItem key={unit} value={unit}>
                     {unit}
@@ -801,14 +890,45 @@ const Pantry = () => {
             </FormControl>
 
             <TextField
-              label="Expiry Date"
+              label="Expiry Date (optional)"
               type="date"
               value={formData.expiryDate}
               onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
               fullWidth
-              sx={{ mb: 2 }}
               InputLabelProps={{ shrink: true }}
             />
+
+            {(formData.ingredientName || editingItem) && (
+              <>
+                <FormControl fullWidth required={!!formData.ingredientName && !formData.ingredient}>
+                  <InputLabel id="pantry-category-label">Category</InputLabel>
+                  <Select
+                    labelId="pantry-category-label"
+                    value={formData.ingredientCategory}
+                    onChange={(e) => setFormData({ ...formData, ingredientCategory: e.target.value })}
+                    label="Category"
+                  >
+                    <MenuItem value="">
+                      <em>{formData.ingredientName ? (editingItem ? 'Update category (optional)' : 'Select category for new ingredient') : 'For new ingredients only'}</em>
+                    </MenuItem>
+                    {categories.map((category) => (
+                      <MenuItem key={category} value={category}>
+                        {category}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  label="Description"
+                  value={formData.ingredientDescription}
+                  onChange={(e) => setFormData({ ...formData, ingredientDescription: e.target.value })}
+                  fullWidth
+                  multiline
+                  rows={3}
+                  placeholder={editingItem ? 'Update description (optional)' : 'Optional description (saved to Ingredients when adding a new ingredient)'}
+                />
+              </>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>

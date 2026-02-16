@@ -50,6 +50,11 @@ import { useNavigate } from 'react-router-dom';
 import PageLoader from '../components/PageLoader';
 import useProgressiveLoader from '../hooks/useProgressiveLoader';
 
+const capitalizeWords = (str) => {
+  if (!str || typeof str !== 'string') return str;
+  return str.split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
+
 const ShoppingList = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -71,7 +76,7 @@ const ShoppingList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
 
-  const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+  const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
   const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
 
   const runTask = useCallback(
@@ -457,8 +462,7 @@ const ShoppingList = () => {
       maxWidth={false}
       sx={{ 
         py: { xs: 2, sm: 4 },
-        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
-        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 }
       }}
     >
       {busyIndicator}
@@ -538,7 +542,7 @@ const ShoppingList = () => {
           </Button>
           <Button
             variant="contained"
-            color="success"
+            color="primary"
             onClick={handleAddAllToPantry}
             startIcon={<AddShoppingCartIcon />}
             size="small"
@@ -555,7 +559,7 @@ const ShoppingList = () => {
             Auto Update
           </Button>
           <Button
-            variant="outlined"
+            variant="contained"
             color="primary"
             onClick={() => {
               setFormData({ ingredient: '', quantity: '', unit: '' });
@@ -566,8 +570,8 @@ const ShoppingList = () => {
             Add Item
           </Button>
           <Button
-            variant="outlined"
-            color="secondary"
+            variant="contained"
+            color="primary"
             onClick={() => setScannerOpen(true)}
             size="small"
           >
@@ -644,7 +648,7 @@ const ShoppingList = () => {
                           fontSize: '0.9rem'
                         }}
                       >
-                        {ingredientName}
+                        {capitalizeWords(ingredientName)}
                       </Box>
                     </Box>
                     {items.length > 1 && (
@@ -821,7 +825,7 @@ const ShoppingList = () => {
               >
                 {ingredients.map((ingredient) => (
                   <MenuItem key={ingredient._id} value={ingredient._id}>
-                    {ingredient.name}
+                    {capitalizeWords(ingredient.name)}
                   </MenuItem>
                 ))}
               </Select>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -18,13 +18,40 @@ import { useAuth } from '../context/AuthContext';
 const Login = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { refreshAuth } = useAuth();
+  const { authenticated, loading, refreshAuth } = useAuth();
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect to dashboard if already signed in
+  useEffect(() => {
+    if (!loading && authenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [authenticated, loading, navigate]);
+
+  // Show spinner only when authenticated (redirecting to dashboard)
+  if (authenticated) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
+            : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   const { email, password } = formData;
 

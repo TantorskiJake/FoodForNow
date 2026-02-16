@@ -52,6 +52,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Logout - Clear local auth state without making API calls.
+   * Use this when the user explicitly logs out; the logout API should be
+   * called separately to clear server-side session/cookies.
+   */
+  const logout = () => {
+    setUser(null);
+    setAuthenticated(false);
+    setLoading(false);
+  };
+
   // Check authentication status on component mount
   useEffect(() => {
     refreshAuth();
@@ -60,7 +71,7 @@ export const AuthProvider = ({ children }) => {
 
   // Provide authentication context to child components
   return (
-    <AuthContext.Provider value={{ user, authenticated, loading, refreshAuth }}>
+    <AuthContext.Provider value={{ user, authenticated, loading, refreshAuth, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -97,7 +97,8 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
       }
       
       if (onMealPlanUpdate) {
-        onMealPlanUpdate(response.data.mealPlanItem);
+        const updatedMeal = response.data.mealPlanItem ?? response.data;
+        onMealPlanUpdate(updatedMeal);
       }
     } catch (error) {
       if (error.response?.status === 400 && error.response?.data?.missingIngredients) {
@@ -267,6 +268,13 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                   (m) => m?.day?.toLowerCase() === day.toLowerCase() && m?.meal === mealType
                 );
                 const isCooked = meal?.cooked || false;
+                const isEatingOut = meal?.eatingOut || false;
+                const cardBg = meal
+                  ? (isCooked ? 'success.light' : 'success.dark')
+                  : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100';
+                const cardHoverBg = meal
+                  ? (isCooked ? 'success.main' : 'success.main')
+                  : theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200';
                 
                 return (
                   <Grid item xs={11/7} key={`${day}-${mealType}`} sx={{ p: 0 }}>
@@ -275,13 +283,9 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                       sx={{ 
                         height: '100%',
                         minHeight: 90,
-                        bgcolor: meal 
-                          ? (isCooked ? 'success.light' : 'success.dark')
-                          : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100',
+                        bgcolor: cardBg,
                         '&:hover': {
-                          bgcolor: meal 
-                            ? (isCooked ? 'success.main' : 'success.main')
-                            : theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200',
+                          bgcolor: cardHoverBg,
                           cursor: 'pointer',
                           ...(recipeToCopy && {
                             border: '2px dashed',
@@ -314,7 +318,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               left: 2,
                               zIndex: 1
                             }}>
-                              <Tooltip title={isCooked ? 'Already cooked' : 'Mark as cooked'}>
+                              <Tooltip title={isCooked ? (isEatingOut ? 'Already marked' : 'Already cooked') : (isEatingOut ? 'Mark as eaten' : 'Mark as cooked')}>
                                 <span>
                                   <IconButton
                                     size="small"

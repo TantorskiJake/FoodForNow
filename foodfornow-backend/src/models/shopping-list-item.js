@@ -36,7 +36,7 @@ const shoppingListItemSchema = new mongoose.Schema({
   unit: {
     type: String,
     required: true,
-    enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']
+    enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box']
   },
   // Whether the item has been purchased/completed
   completed: {

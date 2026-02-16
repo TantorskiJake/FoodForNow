@@ -33,7 +33,7 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // Validate unit
-    const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'];
+    const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
     if (!validUnits.includes(unit)) {
       return res.status(400).json({ error: `Invalid unit. Must be one of: ${validUnits.join(', ')}` });
     }

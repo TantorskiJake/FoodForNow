@@ -287,6 +287,7 @@ const Dashboard = () => {
       // Special cases
       'piece': 1, // Keep as pieces
       'pinch': 0.36, // Approximate pinch to grams
+      'box': 1, // Keep as boxes
     };
     
     // For liquids and some ingredients, use volume as standard
@@ -301,9 +302,9 @@ const Dashboard = () => {
     } else if (['g', 'kg', 'oz', 'lb'].includes(unit)) {
       // Convert to grams for solids
       return quantity * (conversions[unit] || 1);
-    } else if (unit === 'piece' || unit === 'pinch') {
-      // Keep pieces as is, convert pinches to grams
-      return unit === 'piece' ? quantity : quantity * conversions[unit];
+    } else if (unit === 'piece' || unit === 'pinch' || unit === 'box') {
+      // Keep pieces/boxes as is, convert pinches to grams
+      return (unit === 'piece' || unit === 'box') ? quantity : quantity * conversions[unit];
     }
     
     return quantity; // Default fallback
@@ -328,6 +329,7 @@ const Dashboard = () => {
       // Special cases
       'piece': 1,
       'pinch': 1/0.36,
+      'box': 1,
     };
     
     return quantity * (conversions[targetUnit] || 1);
@@ -771,8 +773,7 @@ const Dashboard = () => {
         maxWidth={false}
         sx={{ 
           py: { xs: 1, sm: 2 },
-          px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
-          maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+          px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 }
         }}
       >
         {busyIndicator}
@@ -802,8 +803,7 @@ const Dashboard = () => {
       maxWidth={false}
       sx={{ 
         py: { xs: 1, sm: 2 },
-        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
-        maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
+        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 }
       }}
     >
       {busyIndicator}
@@ -1002,7 +1002,7 @@ const Dashboard = () => {
                   <Tooltip title="Fill your week with random recipes from your collection">
                     <span>
                       <Button
-                        variant="outlined"
+                        variant="contained"
                         color="primary"
                         startIcon={<CasinoIcon />}
                         onClick={handlePopulateWeek}

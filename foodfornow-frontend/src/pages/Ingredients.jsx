@@ -191,6 +191,7 @@ const Ingredients = () => {
     'lb',
     'piece',
     'pinch',
+    'box',
   ];
 
   // Sort filtered ingredients based on current sort setting
@@ -214,7 +215,7 @@ const Ingredients = () => {
   });
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth={false} sx={{ py: 4, px: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Ingredients

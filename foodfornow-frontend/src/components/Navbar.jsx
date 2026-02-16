@@ -47,7 +47,7 @@ const Navbar = () => {
   const location = useLocation();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { authenticated, loading, refreshAuth, user } = useAuth();
+  const { authenticated, loading, logout, user } = useAuth();
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -59,7 +59,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     await api.post('/auth/logout');
-    refreshAuth();
+    logout();
     navigate('/login');
   };
 

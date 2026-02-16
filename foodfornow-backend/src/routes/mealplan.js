@@ -267,9 +267,9 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
 
     // Eating out meals: just toggle cooked status (no pantry/ingredients)
     if (mealPlanItem.eatingOut) {
-      mealPlanItem.cooked = !mealPlanItem.cooked;
+      mealPlanItem.cooked = true;
       await mealPlanItem.save();
-      return res.json(mealPlanItem);
+      return res.json({ mealPlanItem });
     }
 
     if (!mealPlanItem.recipe || !mealPlanItem.recipe.ingredients) {

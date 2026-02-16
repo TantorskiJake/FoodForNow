@@ -23,7 +23,7 @@ const pantryItemSchema = new mongoose.Schema({
   unit: {
     type: String,
     required: true,
-    enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch']
+    enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box']
   },
   // Optional expiry date for perishable items
   expiryDate: {
