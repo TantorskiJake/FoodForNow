@@ -665,14 +665,14 @@ const Dashboard = () => {
     <Container 
       maxWidth={false}
       sx={{ 
-        py: { xs: 2, sm: 4 },
+        py: { xs: 1, sm: 2 },
         px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
         maxWidth: { xs: '100%', sm: '100%', md: '100%', lg: '1400px', xl: '1600px' }
       }}
     >
       <Grid container spacing={3}>
         <Grid item xs={12}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={0}>
             <Box display="flex" alignItems="center" gap={1}>
               <Typography variant="h4" component="h1">
                 {user?.name ? `${user.name}'s Dashboard` : 'Dashboard'}
@@ -999,7 +999,7 @@ const Dashboard = () => {
                           <Paper
                             elevation={1}
                             sx={{
-                              p: 2.5,
+                              p: 1.5,
                               height: '100%',
                               display: 'flex',
                               flexDirection: 'column',
@@ -1045,18 +1045,18 @@ const Dashboard = () => {
                                 variant="subtitle1"
                                 sx={{
                                   fontWeight: 600,
-                                  mb: 1.5,
+                                  mb: 0.5,
                                   color: isComplete ? 'success.main' : 'text.primary',
-                                  textDecoration: isComplete ? 'none' : 'none',
-                                  fontSize: '1.1rem'
+                                  fontSize: '1rem',
+                                  textTransform: 'capitalize'
                                 }}
                               >
                                 {ingredient.name}
                               </Typography>
                               
-                              <Box sx={{ mb: 2 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap', mb: 1 }}>
                                 <Typography 
-                                  variant="h6" 
+                                  variant="body1" 
                                   sx={{ 
                                     fontWeight: 700,
                                     color: isComplete 
@@ -1064,44 +1064,49 @@ const Dashboard = () => {
                                       : isPartial 
                                         ? 'warning.main' 
                                         : 'error.main',
-                                    mb: 0.5
+                                    fontSize: '0.95rem',
+                                    textTransform: 'capitalize'
                                   }}
                                 >
                                   {ingredient.quantity} {ingredient.unit}
                                 </Typography>
-                                
                                 {(ingredient.pantryQuantity ?? 0) > 0 && (
-                                  <Typography 
-                                    variant="body2" 
-                                    color="text.secondary"
-                                    sx={{ mb: 1 }}
-                                  >
-                                    You have: {ingredient.pantryQuantity} {ingredient.unit}
+                                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>
+                                    · You have: {ingredient.pantryQuantity} {ingredient.unit}
                                   </Typography>
                                 )}
                               </Box>
                               
-                              {/* Progress Bar */}
+                              {/* Progress Bar + Status inline */}
                               <Box sx={{ mb: 1 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Stock Level
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                                    Stock Level {Math.round(percentage)}%
                                   </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {Math.round(percentage)}%
+                                  <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                      fontWeight: 600,
+                                      color: isComplete ? 'success.main' : isPartial ? 'warning.main' : 'error.main',
+                                      fontSize: '0.7rem',
+                                      textTransform: 'capitalize',
+                                      letterSpacing: 0.3
+                                    }}
+                                  >
+                                    {isComplete ? '✓ In Stock' : isPartial ? '⚠ Partial' : '✗ Missing'}
                                   </Typography>
                                 </Box>
                                 <LinearProgress
                                   variant="determinate"
                                   value={percentage}
                                   sx={{
-                                    height: 8,
-                                    borderRadius: 4,
+                                    height: 6,
+                                    borderRadius: 3,
                                     backgroundColor: theme.palette.mode === 'dark' 
                                       ? 'rgba(255, 255, 255, 0.1)' 
                                       : 'rgba(0, 0, 0, 0.1)',
                                     '& .MuiLinearProgress-bar': {
-                                      borderRadius: 4,
+                                      borderRadius: 3,
                                       backgroundColor: isComplete 
                                         ? 'success.main' 
                                         : isPartial 
@@ -1112,25 +1117,8 @@ const Dashboard = () => {
                                 />
                               </Box>
                               
-                              {/* Status Text */}
-                              <Typography 
-                                variant="caption" 
-                                sx={{ 
-                                  fontWeight: 600,
-                                  color: isComplete 
-                                    ? 'success.main' 
-                                    : isPartial 
-                                      ? 'warning.main' 
-                                      : 'error.main',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: 0.5
-                                }}
-                              >
-                                {isComplete ? '✓ In Stock' : isPartial ? '⚠ Partial' : '✗ Missing'}
-                              </Typography>
-                              
                               {/* Add to Pantry / Add to Shopping List / Remove from Pantry */}
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, gap: 1, flexWrap: 'nowrap', width: '100%' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, gap: 0.5, flexWrap: 'nowrap', width: '100%' }}>
                                 <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
                                   <Tooltip title="You have this at home – add to your pantry">
                                     <span>

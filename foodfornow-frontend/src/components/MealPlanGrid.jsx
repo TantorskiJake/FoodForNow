@@ -271,11 +271,11 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                         height: '100%',
                         minHeight: 90,
                         bgcolor: meal 
-                          ? (isCooked ? 'success.light' : 'primary.light')
+                          ? (isCooked ? 'success.light' : 'success.dark')
                           : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100',
                         '&:hover': {
                           bgcolor: meal 
-                            ? (isCooked ? 'success.main' : 'primary.main')
+                            ? (isCooked ? 'success.main' : 'success.main')
                             : theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200',
                           cursor: 'pointer',
                           ...(recipeToCopy && {
