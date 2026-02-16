@@ -303,8 +303,12 @@ class AchievementService {
   }
 
   static async getUniqueRecipesCooked(userId) {
-    const cookedMeals = await MealPlan.find({ user: userId, cooked: true });
-    const uniqueRecipeIds = new Set(cookedMeals.map(meal => meal.recipe.toString()));
+    const cookedMeals = await MealPlan.find({ user: userId, cooked: true }).lean();
+    const uniqueRecipeIds = new Set(
+      cookedMeals
+        .filter(meal => meal.recipe)
+        .map(meal => (meal.recipe._id || meal.recipe).toString())
+    );
     return uniqueRecipeIds.size;
   }
 
@@ -348,7 +352,26 @@ class AchievementService {
     return await Achievement.countDocuments({ userId, completed: true });
   }
 
-
+  /**
+   * Sync count-based achievements with live data from DB.
+   * Ensures progress is accurate when achievements are viewed.
+   */
+  static async syncAchievementProgress(userId) {
+    const syncs = [
+      { id: 'recipes-created-5', count: () => this.getUserRecipeCount(userId) },
+      { id: 'recipes-created-10', count: () => this.getUserRecipeCount(userId) },
+      { id: 'different-recipes-cooked-5', count: () => this.getUniqueRecipesCooked(userId) },
+      { id: 'different-recipes-cooked-10', count: () => this.getUniqueRecipesCooked(userId) },
+      { id: 'shopping-lists-completed-10', count: () => this.getCompletedShoppingListsCount(userId) }
+    ];
+    for (const { id, count } of syncs) {
+      const liveCount = await count();
+      const config = achievements[id];
+      if (config && liveCount > 0) {
+        await this.checkAchievement(userId, id, liveCount, 'set');
+      }
+    }
+  }
 
   static async checkConsecutiveCookingDays(userId) {
     const results = [];

@@ -566,7 +566,10 @@ const Recipes = () => {
   const handleDuplicateRecipe = async (id) => {
     try {
       setLoading(true);
-      await api.post(`/recipes/${id}/duplicate`);
+      const response = await api.post(`/recipes/${id}/duplicate`);
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
       await fetchRecipes();
       setError('');
     } catch (err) {

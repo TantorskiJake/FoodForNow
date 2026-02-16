@@ -183,6 +183,29 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
     });
     await duplicate.save();
     await duplicate.populate('ingredients.ingredient');
+
+    // Check for recipe-related achievements (e.g. Recipe Master)
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkRecipeAchievements(req.userId, duplicate);
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.status(201).json({
+            recipe: duplicate,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+
     res.status(201).json(duplicate);
   } catch (err) {
     console.error('Error duplicating recipe:', err);

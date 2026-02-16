@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Grid,
@@ -55,9 +55,11 @@ const Dashboard = () => {
   });
   const [resetWeekDialog, setResetWeekDialog] = useState(false);
   const [selectedWeekStart, setSelectedWeekStart] = useState('');
+  const [mealActionLoading, setMealActionLoading] = useState(false);
 
   const { authenticated, user } = useAuth();
   const { showAchievements } = useAchievements();
+  const cancelledOptimisticIds = useRef(new Set());
 
   // Initialize selected week to current week's Monday
   useEffect(() => {
@@ -377,7 +379,7 @@ const Dashboard = () => {
   const handleAddMeal = async (e) => {
     e.preventDefault();
     try {
-      setLoading(true);
+      setMealActionLoading(true);
       let response;
       if (mealFormData._id) {
         response = await api.put(`/mealplan/${mealFormData._id}`, {
@@ -392,12 +394,15 @@ const Dashboard = () => {
         }
       }
 
+      const mealItem = response.data.mealPlanItem || response.data;
       handleCloseMealDialog();
-      await Promise.all([
-        fetchMealPlan(),
-        fetchIngredients()
-      ]);
-      
+      setMealPlan(prev => {
+        if (mealFormData._id) {
+          return prev.map(m => m._id === mealItem._id ? mealItem : m);
+        }
+        return [...prev, mealItem];
+      });
+      fetchIngredients();
       setError('');
     } catch (err) {
       console.error('Error saving meal:', err);
@@ -407,49 +412,66 @@ const Dashboard = () => {
         setError('Failed to save meal. Please try again.');
       }
     } finally {
-      setLoading(false);
+      setMealActionLoading(false);
     }
   };
 
-  const handleRecipeSelect = async (recipeId) => {
-    if (!recipeId) return;
-    
+  const handleRecipeSelect = async (recipe) => {
+    if (!recipe?._id) return;
+
+    const recipeId = recipe._id;
+    const optimisticId = `temp-${Date.now()}`;
+    const optimisticMeal = {
+      _id: optimisticId,
+      day: mealFormData.day,
+      meal: mealFormData.meal,
+      weekStart: mealFormData.weekStart,
+      recipe: { _id: recipeId, name: recipe.name }
+    };
+
+    const editingId = mealFormData._id;
+    const previousMeal = mealPlan.find(m => m._id === editingId);
+
+    // Instant UI update - close dialog and show meal immediately
+    handleCloseMealDialog();
+    if (editingId) {
+      setMealPlan(prev => prev.map(m => m._id === editingId ? { ...m, recipe: { _id: recipeId, name: recipe.name } } : m));
+    } else {
+      setMealPlan(prev => [...prev, optimisticMeal]);
+    }
+
     try {
-      setLoading(true);
-      const updatedFormData = { ...mealFormData, recipeId };
-      
       let response;
-      if (mealFormData._id) {
-        // Editing existing meal
-        response = await api.put(`/mealplan/${mealFormData._id}`, {
-          recipeId: recipeId
-        });
+      if (editingId) {
+        response = await api.put(`/mealplan/${editingId}`, { recipeId });
       } else {
-        // Adding new meal
-        response = await api.post('/mealplan', updatedFormData);
-        
-        // Check for achievements in response
-        if (response.data.achievements && response.data.achievements.length > 0) {
+        response = await api.post('/mealplan', { ...mealFormData, recipeId });
+        if (response.data.achievements?.length > 0) {
           showAchievements(response.data.achievements);
         }
       }
 
-      handleCloseMealDialog();
-      await Promise.all([
-        fetchMealPlan(),
-        fetchIngredients()
-      ]);
-      
+      const mealItem = response.data.mealPlanItem || response.data;
+      if (!editingId && cancelledOptimisticIds.current.has(optimisticId)) {
+        cancelledOptimisticIds.current.delete(optimisticId);
+        return;
+      }
+      setMealPlan(prev => {
+        if (editingId) {
+          return prev.map(m => m._id === mealItem._id ? mealItem : m);
+        }
+        return prev.map(m => m._id === optimisticId ? mealItem : m);
+      });
+      fetchIngredients();
       setError('');
     } catch (err) {
-      console.error('Error saving meal:', err);
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
+      if (editingId && previousMeal) {
+        setMealPlan(prev => prev.map(m => m._id === editingId ? previousMeal : m));
       } else {
-        setError('Failed to save meal. Please try again.');
+        setMealPlan(prev => prev.filter(m => m._id !== optimisticId));
       }
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.error || 'Failed to save meal');
+      toast.error(err.response?.data?.error || 'Failed to save meal');
     }
   };
 
@@ -458,18 +480,20 @@ const Dashboard = () => {
   };
 
   const handleDeleteMeal = async (id) => {
+    const deletedMeal = mealPlan.find(m => m._id === id);
+    setMealPlan(prev => prev.filter(m => m._id !== id));
+    if (String(id).startsWith('temp-')) {
+      cancelledOptimisticIds.current.add(id);
+      return;
+    }
     try {
-      setLoading(true);
       await api.delete(`/mealplan/${id}`);
-      await Promise.all([
-        fetchMealPlan(),
-        fetchIngredients()
-      ]);
+      fetchIngredients();
     } catch (err) {
       console.error('Error deleting meal:', err);
+      if (deletedMeal) setMealPlan(prev => [...prev, deletedMeal]);
       setError('Failed to delete meal. Please try again.');
-    } finally {
-      setLoading(false);
+      toast.error('Failed to delete meal');
     }
   };
 
@@ -735,7 +759,7 @@ const Dashboard = () => {
                     color="primary"
                     startIcon={<CasinoIcon />}
                     onClick={handlePopulateWeek}
-                    disabled={loading || recipes.length === 0}
+                    disabled={loading || mealActionLoading || recipes.length === 0}
                     size="small"
                   >
                     Populate Week
@@ -744,7 +768,7 @@ const Dashboard = () => {
                     variant="outlined"
                     color="error"
                     onClick={handleOpenResetWeekDialog}
-                    disabled={loading || mealPlan.length === 0}
+                    disabled={loading || mealActionLoading || mealPlan.length === 0}
                     size="small"
                   >
                     Reset Week
@@ -782,7 +806,7 @@ const Dashboard = () => {
                   color="primary"
                   startIcon={<ShoppingCartIcon />}
                   onClick={handleAddAllToShoppingList}
-                  disabled={loading || ingredients.length === 0}
+                  disabled={loading || mealActionLoading || ingredients.length === 0}
                   size="small"
                   sx={{ 
                     borderRadius: 2,
@@ -992,7 +1016,7 @@ const Dashboard = () => {
                                   color="primary"
                                   startIcon={<KitchenIcon />}
                                   onClick={() => handleAddToPantry(ingredient)}
-                                  disabled={loading}
+                                  disabled={mealActionLoading}
                                   sx={{ textTransform: 'none' }}
                                 >
                                   Add to Pantry
@@ -1004,7 +1028,7 @@ const Dashboard = () => {
                                     color="error"
                                     startIcon={<RemoveCircleOutlineIcon />}
                                     onClick={() => handleRemoveFromPantry(ingredient)}
-                                    disabled={loading}
+                                    disabled={mealActionLoading}
                                     sx={{ textTransform: 'none' }}
                                   >
                                     Remove from Pantry
@@ -1111,7 +1135,7 @@ const Dashboard = () => {
             }
             onChange={(e, value) => {
               if (value) {
-                handleRecipeSelect(value._id);
+                handleRecipeSelect(value);
               }
             }}
             renderInput={(params) => (
@@ -1127,7 +1151,7 @@ const Dashboard = () => {
         <DialogActions>
           <Button onClick={handleCloseMealDialog}>Cancel</Button>
           {mealFormData._id && (
-            <Button type="submit" variant="contained" color="primary" disabled={loading}>
+            <Button type="submit" variant="contained" color="primary" disabled={mealActionLoading}>
               Update
             </Button>
           )}

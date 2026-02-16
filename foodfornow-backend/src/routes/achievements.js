@@ -12,6 +12,10 @@ const achievements = require('../config/achievements');
  */
 router.get('/', auth, async (req, res) => {
   try {
+    // Sync count-based achievements with live data so progress is accurate
+    const AchievementService = require('../services/achievementService');
+    await AchievementService.syncAchievementProgress(req.userId);
+
     // Get user's achievements
     const userAchievements = await Achievement.find({ userId: req.userId })
       .sort({ category: 1, name: 1 });
