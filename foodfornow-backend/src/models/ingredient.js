@@ -1,5 +1,15 @@
 const mongoose = require('mongoose');
 
+/** Capitalize first letter of each word for consistent display and sorting */
+function capitalizeWords(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 /**
  * Ingredient Schema - Defines the structure for ingredients in the application
  * 
@@ -33,6 +43,25 @@ const ingredientSchema = new mongoose.Schema({
 }, {
   // Automatically add createdAt and updatedAt timestamps
   timestamps: true
+});
+
+// Normalize name to title case (first letter of each word capitalized) on save
+ingredientSchema.pre('save', function (next) {
+  if (this.name) {
+    this.name = capitalizeWords(this.name);
+  }
+  next();
+});
+
+ingredientSchema.pre('findOneAndUpdate', function (next) {
+  const update = this.getUpdate();
+  if (update && update.name) {
+    update.name = capitalizeWords(update.name);
+  }
+  if (update && update.$set && update.$set.name) {
+    update.$set.name = capitalizeWords(update.$set.name);
+  }
+  next();
 });
 
 // Create a compound index for user and name to ensure unique ingredients per user

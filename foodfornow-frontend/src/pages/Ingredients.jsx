@@ -62,6 +62,8 @@ const Ingredients = () => {
     unit: '',
     quantity: '',
   });
+  const [ingredientToDelete, setIngredientToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -162,14 +164,28 @@ const Ingredients = () => {
     }
   };
 
-  const handleDeleteIngredient = async (id) => {
-    if (window.confirm('Are you sure you want to delete this ingredient?')) {
-      try {
-        await api.delete(`/ingredients/${id}`);
-        fetchIngredients();
-      } catch (error) {
-        console.error('Error deleting ingredient:', error);
-      }
+  const handleDeleteIngredientClick = (ingredient) => {
+    setIngredientToDelete(ingredient);
+  };
+
+  const handleDeleteIngredientConfirm = async () => {
+    if (!ingredientToDelete) return;
+    const ingredientId = String(ingredientToDelete._id);
+    const previousIngredients = ingredients;
+    setIngredients((prev) => prev.filter((i) => String(i._id) !== ingredientId));
+    setIngredientToDelete(null);
+    setDeleting(true);
+
+    try {
+      await api.delete(`/ingredients/${ingredientId}`);
+      await fetchIngredients();
+    } catch (error) {
+      console.error('Error deleting ingredient:', error);
+      setIngredients(previousIngredients);
+      const msg = error.response?.data?.message || error.response?.data?.error || 'Failed to delete ingredient. Please try again.';
+      toast.error(msg);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -379,7 +395,6 @@ const Ingredients = () => {
                   flexDirection: 'column',
                   borderRadius: 2,
                   overflow: 'hidden',
-                  cursor: 'pointer',
                   transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                   background: theme.palette.mode === 'dark' 
                     ? 'rgba(255, 255, 255, 0.05)'
@@ -442,18 +457,15 @@ const Ingredients = () => {
                   >
                     {ingredient.description || 'No description'}
                   </Typography>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 'auto' }}>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {tab === 'mine' ? (
-                        <>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenDialog(ingredient);
-                            }}
-                            sx={{ 
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', px: 1.5, pb: 1.5 }}>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {tab === 'mine' ? (
+                      <>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenDialog(ingredient)}
+                          sx={{ 
                               color: 'primary.main',
                               '&:hover': {
                                 background: theme.palette.mode === 'dark'
@@ -467,8 +479,9 @@ const Ingredients = () => {
                           <IconButton
                             size="small"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
-                              handleDeleteIngredient(ingredient._id);
+                              handleDeleteIngredientClick(ingredient);
                             }}
                             sx={{ 
                               color: 'error.main',
@@ -509,11 +522,39 @@ const Ingredients = () => {
                       )}
                     </Box>
                   </Box>
-                </Box>
               </Paper>
             </Grid>
           ))}
         </Grid>
+
+        <Dialog
+          open={Boolean(ingredientToDelete)}
+          onClose={() => !deleting && setIngredientToDelete(null)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Delete ingredient?</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2">
+              {ingredientToDelete
+                ? `Are you sure you want to delete "${ingredientToDelete.name}"? This cannot be undone.`
+                : ''}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setIngredientToDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleDeleteIngredientConfirm}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
           <DialogTitle>

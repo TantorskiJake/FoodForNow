@@ -22,7 +22,6 @@ import {
   Paper,
   useTheme,
   LinearProgress,
-  Grid,
   useMediaQuery,
   Autocomplete
 } from '@mui/material';
@@ -621,7 +620,16 @@ const Pantry = () => {
           secondaryAction={{ label: 'Go to Dashboard', onClick: () => navigate('/dashboard') }}
         />
       ) : (
-        <Grid container spacing={2}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(auto-fill, minmax(280px, 1fr))',
+            },
+            gap: 2,
+          }}
+        >
           {(() => {
             // Group items by ingredient name
             const groupedItems = filteredItems.reduce((groups, item) => {
@@ -634,7 +642,7 @@ const Pantry = () => {
             }, {});
 
             return Object.entries(groupedItems).map(([ingredientName, items]) => (
-              <Grid item xs={12} sm={6} md={4} key={ingredientName}>
+              <Box key={ingredientName}>
                 <Paper
                   elevation={1}
                   sx={{
@@ -696,21 +704,25 @@ const Pantry = () => {
                         sx={{
                           display: 'flex',
                           alignItems: 'center',
+                          gap: 1,
                           mb: index < items.length - 1 ? 1 : 0,
                           p: 1,
                           borderRadius: 1,
+                          width: '100%',
+                          boxSizing: 'border-box',
                           backgroundColor: theme.palette.mode === 'dark' 
                             ? 'rgba(255, 255, 255, 0.03)' 
                             : 'rgba(0, 0, 0, 0.02)',
                         }}
                       >
-                        <Box sx={{ flex: 1 }}>
-                          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                        <Box sx={{ minWidth: 0, flex: '0 1 auto' }}>
+                          <Box display="flex" alignItems="center" gap={1} mb={0.5} flexWrap="nowrap" minWidth={0}>
                             {item.ingredient?.category && (
                               <Chip
                                 label={capitalizeWords(item.ingredient.category)}
                                 size="small"
                                 sx={{
+                                  flexShrink: 0,
                                   backgroundColor: getCategoryColor(item.ingredient.category).main,
                                   color: 'white',
                                   fontSize: '0.7rem',
@@ -721,10 +733,16 @@ const Pantry = () => {
                                 }}
                               />
                             )}
-                            <Typography 
-                              variant="body2" 
+                            <Typography
+                              variant="body2"
                               color="textSecondary"
-                              sx={{ fontWeight: 500 }}
+                              sx={{
+                                fontWeight: 500,
+                                minWidth: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
                             >
                               {item.quantity} {item.unit}
                             </Typography>
@@ -735,7 +753,7 @@ const Pantry = () => {
                             </Typography>
                           )}
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, ml: 'auto' }}>
                           <IconButton
                             size="small"
                             onClick={() => handleOpenDialog(item)}
@@ -787,10 +805,10 @@ const Pantry = () => {
                   </Box>
                   )}
                 </Paper>
-              </Grid>
+              </Box>
             ));
           })()}
-        </Grid>
+        </Box>
       )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog} fullScreen={isMobile} maxWidth="md" fullWidth>

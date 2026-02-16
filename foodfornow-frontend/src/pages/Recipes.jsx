@@ -91,6 +91,10 @@ const Recipes = () => {
   const [pendingRecipeData, setPendingRecipeData] = useState(null);
   const [categoryOverrides, setCategoryOverrides] = useState({});
 
+  // Delete confirmation
+  const [recipeToDelete, setRecipeToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   // Shared recipes and tab state
   const [tab, setTab] = useState('mine');
   const [sharedRecipes, setSharedRecipes] = useState([]);
@@ -309,11 +313,20 @@ const Recipes = () => {
 
   const openRecipeFormWithData = (recipeData) => {
     const mappedIngredients = recipeData.ingredients?.length
-      ? recipeData.ingredients.map((ing) => ({
-          ingredient: ing.ingredient?._id ?? ing.ingredient,
-          quantity: String(ing.quantity ?? ''),
-          unit: ing.unit || 'piece',
-        }))
+      ? recipeData.ingredients.map((ing) => {
+          const id = ing.ingredient?._id ?? ing.ingredient;
+          const name = ing.name || ing.ingredient?.name;
+          if (id) {
+            return { ingredient: id, quantity: String(ing.quantity ?? ''), unit: ing.unit || 'piece' };
+          }
+          return {
+            ingredient: '',
+            ingredientName: name || '',
+            quantity: String(ing.quantity ?? ''),
+            unit: ing.unit || 'piece',
+            category: ing.category || 'Other',
+          };
+        })
       : [{ ingredient: '', quantity: '', unit: '' }];
     setFormData({
       name: recipeData.name,
@@ -514,7 +527,6 @@ const Recipes = () => {
         description: newIngredientData.description?.trim() || undefined,
       });
       const newIng = response.data;
-      // Force refresh to bypass cache so the new ingredient appears in the list
       await fetchIngredients({ forceRefresh: true });
       if (indexToUpdate !== null) {
         setFormData((prev) => {
@@ -522,14 +534,31 @@ const Recipes = () => {
           newIngredients[indexToUpdate] = {
             ...newIngredients[indexToUpdate],
             ingredient: newIng._id,
+            ingredientName: '',
           };
           return { ...prev, ingredients: newIngredients };
         });
       }
       handleCloseCreateIngredient();
     } catch (err) {
-      console.error('Error creating ingredient:', err);
-      setError(err.response?.data?.message || 'Failed to create ingredient.');
+      if (err.response?.status === 409 && err.response?.data?.existingIngredient) {
+        const existing = err.response.data.existingIngredient;
+        await fetchIngredients({ forceRefresh: true });
+        if (indexToUpdate !== null) {
+          setFormData((prev) => {
+            const newIngredients = [...prev.ingredients];
+            newIngredients[indexToUpdate] = {
+              ...newIngredients[indexToUpdate],
+              ingredient: existing._id,
+              ingredientName: '',
+            };
+            return { ...prev, ingredients: newIngredients };
+          });
+        }
+        handleCloseCreateIngredient();
+      } else {
+        setError(err.response?.data?.message || 'Failed to create ingredient.');
+      }
     } finally {
       setCreatingIngredient(false);
     }
@@ -592,19 +621,35 @@ const Recipes = () => {
       setError('At least one instruction is required');
       return;
     }
-    if (!formData.ingredients || formData.ingredients.length === 0 || !formData.ingredients[0]?.ingredient) {
+    const hasAtLeastOneIngredient = formData.ingredients?.some(
+      (ing) => (ing.ingredient || (ing.ingredientName && ing.ingredientName.trim())) && ing.quantity && ing.unit
+    );
+    if (!formData.ingredients || formData.ingredients.length === 0 || !hasAtLeastOneIngredient) {
       setError('At least one ingredient is required');
       return;
     }
-    
+
     try {
       await runTask(async () => {
+        const ingredientsPayload = formData.ingredients
+          .filter((ing) => (ing.ingredient || (ing.ingredientName && ing.ingredientName.trim())) && ing.quantity && ing.unit)
+          .map((ing) => {
+            if (ing.ingredient) {
+              return { ingredient: ing.ingredient, quantity: ing.quantity, unit: ing.unit };
+            }
+            return {
+              name: ing.ingredientName.trim(),
+              quantity: ing.quantity,
+              unit: ing.unit,
+              category: ing.category || 'Other',
+            };
+          });
         const recipeData = {
           ...formData,
           name: formData.name.trim(),
           description: formData.description.trim(),
           instructions: formData.instructions.filter(instruction => instruction.trim()),
-          ingredients: formData.ingredients.filter(ing => ing.ingredient && ing.quantity && ing.unit),
+          ingredients: ingredientsPayload,
           tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
         };
 
@@ -633,19 +678,29 @@ const Recipes = () => {
     }
   };
 
-  const handleDeleteRecipe = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this recipe?')) return;
+  const handleDeleteRecipeClick = (recipe) => {
+    setRecipeToDelete(recipe);
+  };
+
+  const handleDeleteRecipeConfirm = async () => {
+    if (!recipeToDelete) return;
+    const recipeId = String(recipeToDelete._id);
+    const previousRecipes = recipes;
+    setRecipes((prev) => prev.filter((r) => String(r._id) !== recipeId));
+    setError('');
+    setRecipeToDelete(null);
+    setDeleting(true);
 
     try {
-      await runTask(async () => {
-        await api.delete(`/recipes/${id}`);
-        invalidateRecipesCache();
-        await fetchRecipes({ forceRefresh: true });
-      });
-      setError('');
+      await api.delete(`/recipes/${recipeId}`);
+      invalidateRecipesCache();
+      await fetchRecipes({ forceRefresh: true });
     } catch (err) {
       console.error('Error deleting recipe:', err);
-      setError('Failed to delete recipe. Please try again.');
+      setRecipes(previousRecipes);
+      setError(err.response?.data?.error || 'Failed to delete recipe. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -839,7 +894,6 @@ const Recipes = () => {
                       flexDirection: 'column',
                       borderRadius: 2,
                       overflow: 'hidden',
-                      cursor: 'pointer',
                       transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                       background: theme.palette.mode === 'dark' 
                         ? 'rgba(255, 255, 255, 0.05)'
@@ -856,9 +910,11 @@ const Recipes = () => {
                           : '0 8px 24px rgba(0, 0, 0, 0.1)',
                       },
                     }}
-                    onClick={() => navigate(`/recipes/${recipe._id}`)}
                   >
-                    <Box sx={{ p: 2, flex: 1 }}>
+                    <Box
+                      sx={{ p: 2, flex: 1, cursor: 'pointer' }}
+                      onClick={() => navigate(`/recipes/${recipe._id}`)}
+                    >
                       <Typography
                         variant="h6"
                         sx={{
@@ -947,43 +1003,37 @@ const Recipes = () => {
                         >
                           {recipe.ingredients.length} ingredients
                         </Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenDialog(recipe);
-                            }}
-                            sx={{ 
-                              color: 'primary.main',
-                              '&:hover': {
-                                background: theme.palette.mode === 'dark'
-                                  ? 'rgba(34, 139, 34, 0.1)'
-                                  : 'rgba(34, 139, 34, 0.05)',
-                              },
-                            }}
-                          >
-                            <EditIcon sx={{ fontSize: '1.1rem' }} />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteRecipe(recipe._id);
-                            }}
-                            sx={{ 
-                              color: 'error.main',
-                              '&:hover': {
-                                background: theme.palette.mode === 'dark'
-                                  ? 'rgba(211, 47, 47, 0.1)'
-                                  : 'rgba(211, 47, 47, 0.05)',
-                              },
-                            }}
-                          >
-                            <DeleteIcon sx={{ fontSize: '1.1rem' }} />
-                          </IconButton>
-                        </Box>
                       </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 0.5, px: 2, pb: 2 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenDialog(recipe)}
+                        sx={{ 
+                          color: 'primary.main',
+                          '&:hover': {
+                            background: theme.palette.mode === 'dark'
+                              ? 'rgba(34, 139, 34, 0.1)'
+                              : 'rgba(34, 139, 34, 0.05)',
+                          },
+                        }}
+                      >
+                        <EditIcon sx={{ fontSize: '1.1rem' }} />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteRecipeClick(recipe)}
+                        sx={{ 
+                          color: 'error.main',
+                          '&:hover': {
+                            background: theme.palette.mode === 'dark'
+                              ? 'rgba(211, 47, 47, 0.1)'
+                              : 'rgba(211, 47, 47, 0.05)',
+                          },
+                        }}
+                      >
+                        <DeleteIcon sx={{ fontSize: '1.1rem' }} />
+                      </IconButton>
                     </Box>
                   </Paper>
                 </Grid>
@@ -1215,17 +1265,25 @@ const Recipes = () => {
                 <Typography variant="subtitle1" gutterBottom>
                   Ingredients
                 </Typography>
-                {formData.ingredients.map((ingredient, index) => (
+                {formData.ingredients.map((ingredient, index) => {
+                  const valueOption = ingredient.ingredient
+                    ? ingredients.find((i) => i._id === ingredient.ingredient) || null
+                    : (ingredient.ingredientName && ingredient.ingredientName.trim()) ? ingredient.ingredientName.trim() : null;
+                  return (
                   <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
                     <Autocomplete
                       sx={{ flex: 2 }}
                       options={ingredients}
-                      value={ingredients.find((i) => i._id === ingredient.ingredient) || null}
-                      getOptionLabel={(option) => option.name}
-                      isOptionEqualToValue={(option, value) => option._id === value?._id}
+                      value={valueOption}
+                      freeSolo={!ingredient.ingredient}
+                      getOptionLabel={(option) => (option && (typeof option === 'string' ? option : option.name)) || ''}
+                      isOptionEqualToValue={(option, value) => {
+                        if (typeof option === 'string' || typeof value === 'string') return (option || '').trim() === (value || '').trim();
+                        return option._id === value?._id;
+                      }}
                       filterOptions={(options, state) => {
                         const filtered = options.filter((opt) =>
-                          opt.name.toLowerCase().includes((state.inputValue || '').toLowerCase())
+                          opt.name && opt.name.toLowerCase().includes((state.inputValue || '').toLowerCase())
                         );
                         const createOption = {
                           _id: '__create__',
@@ -1238,18 +1296,26 @@ const Recipes = () => {
                       onChange={(e, value) => {
                         if (value?.isCreate) {
                           handleOpenCreateIngredient(index, value.prefillName || '');
+                        } else if (typeof value === 'string') {
+                          const newIngredients = [...formData.ingredients];
+                          newIngredients[index] = { ...newIngredients[index], ingredient: '', ingredientName: value.trim() || '', category: ingredient.category || 'Other' };
+                          setFormData({ ...formData, ingredients: newIngredients });
                         } else if (value) {
                           const newIngredients = [...formData.ingredients];
-                          newIngredients[index].ingredient = value._id;
+                          newIngredients[index] = { ...newIngredients[index], ingredient: value._id, ingredientName: '', category: '' };
                           setFormData({ ...formData, ingredients: newIngredients });
                         } else {
                           const newIngredients = [...formData.ingredients];
-                          newIngredients[index].ingredient = '';
+                          newIngredients[index] = { ...newIngredients[index], ingredient: '', ingredientName: '' };
                           setFormData({ ...formData, ingredients: newIngredients });
                         }
                       }}
                       renderInput={(params) => (
-                        <TextField {...params} label="Ingredient" required={!ingredient.ingredient} />
+                        <TextField
+                          {...params}
+                          label="Ingredient"
+                          required={!ingredient.ingredient && !(ingredient.ingredientName && ingredient.ingredientName.trim())}
+                        />
                       )}
                     />
                     <TextField
@@ -1289,7 +1355,8 @@ const Recipes = () => {
                       <DeleteIcon />
                     </IconButton>
                   </Box>
-                ))}
+                  );
+                })}
                 <Button
                   startIcon={<AddIcon />}
                   onClick={handleAddIngredient}
@@ -1393,6 +1460,35 @@ const Recipes = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(recipeToDelete)}
+        onClose={() => !deleting && setRecipeToDelete(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete recipe?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            {recipeToDelete
+              ? `Are you sure you want to delete "${recipeToDelete.name}"? This cannot be undone.`
+              : ''}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRecipeToDelete(null)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteRecipeConfirm}
+            disabled={deleting}
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog

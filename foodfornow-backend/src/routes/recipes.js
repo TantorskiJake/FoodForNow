@@ -2,7 +2,8 @@ const express = require('express');
 const authMiddleware = require('../middleware/auth');
 const Recipe = require('../models/recipe');
 const Ingredient = require('../models/ingredient');
-const { parseRecipeFromUrl, parseRecipeFromText, buildRawRecipeFormat, transformToRecipeFormat } = require('../services/recipeParserService');
+const { parseRecipeFromUrl, parseRecipeFromText, buildRawRecipeFormat } = require('../services/recipeParserService');
+const { resolveRecipeIngredient } = require('../services/ingredientResolutionService');
 
 const router = express.Router();
 
@@ -71,22 +72,30 @@ router.post('/parse-text', authMiddleware, async (req, res) => {
   }
 });
 
-// Create ingredients from parsed recipe data with user-selected categories
-// Call after parse-url; use categoryOverrides for ingredients where uncertain was true
+// Prepare import: return recipe payload with ingredient names (no DB creation).
+// Ingredients are resolved and created only when the user saves the recipe.
 router.post('/prepare-import', authMiddleware, async (req, res) => {
   try {
     const { recipeData, categoryOverrides = {} } = req.body;
     if (!recipeData || !recipeData.name || !Array.isArray(recipeData.ingredients)) {
       return res.status(400).json({ error: 'Invalid recipe data' });
     }
-
-    const result = await transformToRecipeFormat(
-      recipeData,
-      req.userId,
-      Ingredient,
-      VALID_UNITS,
-      categoryOverrides
-    );
+    const ingredients = recipeData.ingredients.map((ing) => ({
+      name: ing.name || ing.ingredient?.name,
+      quantity: ing.quantity ?? 1,
+      unit: VALID_UNITS.includes(ing.unit) ? ing.unit : 'piece',
+      category: categoryOverrides[ing.name] ?? ing.suggestedCategory ?? 'Other',
+    })).filter((ing) => ing.name);
+    const result = {
+      name: recipeData.name,
+      description: recipeData.description || recipeData.name,
+      ingredients,
+      instructions: Array.isArray(recipeData.instructions) ? recipeData.instructions.filter(Boolean) : ['See original recipe for instructions.'],
+      prepTime: recipeData.prepTime || 15,
+      cookTime: recipeData.cookTime || 30,
+      servings: recipeData.servings || 4,
+      tags: Array.isArray(recipeData.tags) ? recipeData.tags.filter(Boolean) : [],
+    };
     res.json(result);
   } catch (err) {
     console.error('Error preparing recipe import:', err);
@@ -229,7 +238,7 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
   }
 });
 
-// Create new recipe
+// Create new recipe (ingredients resolved at save time: by id or by name, finding similar to avoid duplicates)
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const {
@@ -248,18 +257,13 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // Verify all ingredients exist and convert quantities to numbers
     const validatedIngredients = [];
     for (const ing of ingredients) {
-      const ingredient = await Ingredient.findById(ing.ingredient);
-      if (!ingredient) {
-        return res.status(404).json({ error: `Ingredient ${ing.ingredient} not found` });
+      const resolved = await resolveRecipeIngredient(Ingredient, req.userId, ing, VALID_UNITS);
+      if (!resolved) {
+        return res.status(400).json({ error: 'Each ingredient must have an ingredient id or a name' });
       }
-      validatedIngredients.push({
-        ingredient: ing.ingredient,
-        quantity: Number(ing.quantity),
-        unit: ing.unit
-      });
+      validatedIngredients.push(resolved);
     }
 
     const recipe = new Recipe({
@@ -332,20 +336,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Recipe not found' });
     }
 
-    // Verify all ingredients exist and convert quantities to numbers if being updated
+    // Resolve ingredients (by id or by name, finding similar to avoid duplicates)
     let validatedIngredients;
     if (ingredients) {
       validatedIngredients = [];
       for (const ing of ingredients) {
-        const ingredient = await Ingredient.findById(ing.ingredient);
-        if (!ingredient) {
-          return res.status(404).json({ error: `Ingredient ${ing.ingredient} not found` });
+        const resolved = await resolveRecipeIngredient(Ingredient, req.userId, ing, VALID_UNITS);
+        if (!resolved) {
+          return res.status(400).json({ error: 'Each ingredient must have an ingredient id or a name' });
         }
-        validatedIngredients.push({
-          ingredient: ing.ingredient,
-          quantity: Number(ing.quantity),
-          unit: ing.unit
-        });
+        validatedIngredients.push(resolved);
       }
     }
 
@@ -375,7 +375,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Delete recipe
+// Delete recipe (ingredients are not deleted; they remain for pantry/other recipes)
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const recipe = await Recipe.findOneAndDelete({ _id: req.params.id, createdBy: req.userId });

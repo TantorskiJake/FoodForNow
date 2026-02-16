@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const Ingredient = require('../models/ingredient');
 const Recipe = require('../models/recipe');
+const { findSimilarIngredient } = require('../services/ingredientResolutionService');
 
 // Get all ingredients with search
 router.get('/', authMiddleware, async (req, res) => {
@@ -90,9 +91,20 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
   }
 });
 
-// Add new ingredient
+// Add new ingredient (avoid near-duplicates: if a similar-named ingredient exists, return it)
 router.post('/', authMiddleware, async (req, res) => {
   try {
+    const name = (req.body.name || '').trim();
+    if (!name) {
+      return res.status(400).json({ message: 'Ingredient name is required' });
+    }
+    const similar = await findSimilarIngredient(Ingredient, req.userId, name);
+    if (similar) {
+      return res.status(409).json({
+        message: 'An ingredient with a similar name already exists',
+        existingIngredient: { _id: similar._id, name: similar.name, category: similar.category },
+      });
+    }
     const ingredient = new Ingredient({
       ...req.body,
       user: req.userId
@@ -101,6 +113,9 @@ router.post('/', authMiddleware, async (req, res) => {
     res.status(201).json(ingredient);
   } catch (err) {
     console.error('Error adding ingredient:', err);
+    if (err.code === 11000) {
+      return res.status(409).json({ message: 'An ingredient with that name already exists' });
+    }
     res.status(500).json({ message: 'Error adding ingredient' });
   }
 });

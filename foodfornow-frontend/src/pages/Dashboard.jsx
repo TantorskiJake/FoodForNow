@@ -241,20 +241,19 @@ const Dashboard = () => {
           existing.quantity += ingredient.quantity;
           existing.pantryQuantity = (existing.pantryQuantity || 0) + (ingredient.pantryQuantity || 0);
         } else {
-          // Different units - convert to standard unit and combine
+          // Different units - convert to standard unit and combine needed; pantry is same stock so use max (no double-count)
           const convertedQuantity = convertToStandardUnit(ingredient.quantity, ingredient.unit, name);
           const convertedPantryQuantity = convertToStandardUnit(ingredient.pantryQuantity || 0, ingredient.unit, name);
-          
+
           const existingConvertedQuantity = convertToStandardUnit(existing.quantity, existing.unit, name);
           const existingConvertedPantryQuantity = convertToStandardUnit(existing.pantryQuantity || 0, existing.unit, name);
-          
-          // Use the most common unit as standard, or convert to grams for most ingredients
+
           const standardUnit = getStandardUnit(name);
-          
-          // Convert back to standard unit
+
           const totalConvertedQuantity = existingConvertedQuantity + convertedQuantity;
-          const totalConvertedPantryQuantity = existingConvertedPantryQuantity + convertedPantryQuantity;
-          
+          // Pantry is the same for both rows (e.g. 1000 ml = 4.23 cups) - take max to avoid double-counting
+          const totalConvertedPantryQuantity = Math.max(existingConvertedPantryQuantity, convertedPantryQuantity);
+
           existing.quantity = convertFromStandardUnit(totalConvertedQuantity, standardUnit, name);
           existing.pantryQuantity = convertFromStandardUnit(totalConvertedPantryQuantity, standardUnit, name);
           existing.unit = standardUnit;

@@ -29,6 +29,7 @@ import {
   InputLabel,
   Select,
   Menu,
+  Autocomplete,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -68,6 +69,9 @@ const ShoppingList = () => {
   const [ingredients, setIngredients] = useState([]);
   const [formData, setFormData] = useState({
     ingredient: '',
+    ingredientName: '',
+    category: 'Other',
+    description: '',
     quantity: '',
     unit: ''
   });
@@ -76,8 +80,17 @@ const ShoppingList = () => {
   const [sortBy, setSortBy] = useState('name');
   const [searchTerm, setSearchTerm] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanNotFoundOpen, setScanNotFoundOpen] = useState(false);
+  const [scanNotFoundData, setScanNotFoundData] = useState({
+    barcode: '',
+    productName: '',
+    quantity: '1',
+    unit: 'piece',
+  });
+  const [newIngredientToComplete, setNewIngredientToComplete] = useState(null);
 
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
+  const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
   const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
 
   const runTask = useCallback(
@@ -344,61 +357,111 @@ const ShoppingList = () => {
       toast.success(`Found: ${productName}`);
     } catch (err) {
       console.error('Barcode lookup failed:', err?.response?.status, err?.response?.data, err?.message);
-      // Fallback: product not in Open Food Facts - create placeholder so user can still add
       const msg = err.response?.status === 404
-        ? 'Product not in database - add manually'
-        : err.response?.data?.error || err?.message || 'Lookup failed - add manually';
+        ? 'Product not in database'
+        : err.response?.data?.error || err?.message || 'Lookup failed';
       toast.error(msg);
-      try {
+      setScanNotFoundData({
+        barcode: code,
+        productName: '',
+        quantity: '1',
+        unit: 'piece',
+      });
+      setScanNotFoundOpen(true);
+    }
+  };
+
+  const handleScanNotFoundSubmit = async (e) => {
+    e.preventDefault();
+    const name = (scanNotFoundData.productName || '').trim();
+    if (!name) {
+      toast.error('Please enter the product name');
+      return;
+    }
+    try {
+      let ingredientId = ingredients.find((ing) => ing.name.toLowerCase() === name.toLowerCase())?._id;
+      let wasNewIngredient = false;
+      if (!ingredientId) {
         const response = await api.post('/ingredients', {
-          name: `Product (barcode: ${code})`,
+          name: capitalizeWords(name),
           category: 'Other',
-          description: `Scanned barcode - edit name as needed`,
+          description: scanNotFoundData.barcode ? 'Scanned barcode (not in database)' : 'Added from scan',
         });
-        const ingredientId = response.data._id;
+        ingredientId = response.data._id;
+        wasNewIngredient = true;
         await fetchIngredients();
-        setFormData({
-          ingredient: ingredientId,
-          quantity: '1',
-          unit: 'piece',
-        });
-        setOpenDialog(true);
-      } catch (createErr) {
-        // If duplicate (409), find existing and use it
-        if (createErr.response?.status === 409) {
-          const existing = ingredients.find(
-            (ing) => ing.name.toLowerCase().includes(`barcode: ${code}`)
-          );
-          if (existing) {
-            setFormData({
-              ingredient: existing._id,
-              quantity: '1',
-              unit: 'piece',
-            });
-            setOpenDialog(true);
-            return;
-          }
-        }
-        toast.error('Could not add item. Please add manually.');
-        setFormData({
-          ingredient: '',
-          quantity: '',
-          unit: '',
-        });
-        setOpenDialog(true);
       }
+      const quantity = Number(scanNotFoundData.quantity) || 1;
+      const unit = scanNotFoundData.unit || 'piece';
+      const response = await api.post('/shopping-list', {
+        ingredient: ingredientId,
+        quantity,
+        unit,
+      });
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      setScanNotFoundOpen(false);
+      setScanNotFoundData({ barcode: '', productName: '', quantity: '1', unit: 'piece' });
+      invalidateShoppingCache();
+      await fetchShoppingList({ forceRefresh: true });
+      toast.success('Added to shopping list');
+      if (wasNewIngredient) {
+        setNewIngredientToComplete({ id: ingredientId, name: capitalizeWords(name), category: 'Other', description: '' });
+      }
+    } catch (createErr) {
+      if (createErr.response?.status === 409) {
+        const existing = ingredients.find((ing) => ing.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+          try {
+            await api.post('/shopping-list', {
+              ingredient: existing._id,
+              quantity: Number(scanNotFoundData.quantity) || 1,
+              unit: scanNotFoundData.unit || 'piece',
+            });
+            setScanNotFoundOpen(false);
+            setScanNotFoundData({ barcode: '', productName: '', quantity: '1', unit: 'piece' });
+            invalidateShoppingCache();
+            await fetchShoppingList({ forceRefresh: true });
+            toast.success('Added to shopping list');
+          } catch (addErr) {
+            toast.error(addErr.response?.data?.error || 'Failed to add to shopping list');
+          }
+          return;
+        }
+      }
+      toast.error(createErr.response?.data?.error || 'Could not add item');
     }
   };
 
   const handleAddItemSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.ingredient || !formData.quantity || !formData.unit) {
+    const hasIngredient = formData.ingredient && !formData.ingredientName;
+    const hasNewName = (formData.ingredientName || '').trim().length > 0;
+    if ((!hasIngredient && !hasNewName) || !formData.quantity || !formData.unit) {
       toast.error('Please fill in all required fields');
       return;
     }
     try {
+      let ingredientId = formData.ingredient;
+      if (hasNewName) {
+        const name = formData.ingredientName.trim();
+        const existing = ingredients.find((ing) => ing.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+          ingredientId = existing._id;
+        } else {
+          const createRes = await api.post('/ingredients', {
+            name: capitalizeWords(name),
+            category: 'Other',
+            description: 'Added from shopping list',
+          });
+          ingredientId = createRes.data._id;
+          await fetchIngredients();
+        }
+      }
+      const wasNewIngredient = hasNewName && !ingredients.find((ing) => ing.name.toLowerCase() === formData.ingredientName.trim().toLowerCase());
       const response = await api.post('/shopping-list', {
-        ingredient: formData.ingredient,
+        ingredient: ingredientId,
         quantity: Number(formData.quantity),
         unit: formData.unit,
       });
@@ -406,10 +469,18 @@ const ShoppingList = () => {
         showAchievements(response.data.achievements);
       }
       setOpenDialog(false);
-      setFormData({ ingredient: '', quantity: '', unit: '' });
+      setFormData({ ingredient: '', ingredientName: '', category: 'Other', description: '', quantity: '', unit: '' });
       invalidateShoppingCache();
       await fetchShoppingList({ forceRefresh: true });
       toast.success('Added to shopping list');
+      if (wasNewIngredient) {
+        setNewIngredientToComplete({
+          id: ingredientId,
+          name: capitalizeWords(formData.ingredientName.trim()),
+          category: 'Other',
+          description: '',
+        });
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to add item');
     }
@@ -417,7 +488,27 @@ const ShoppingList = () => {
 
   const handleCloseAddDialog = () => {
     setOpenDialog(false);
-    setFormData({ ingredient: '', quantity: '', unit: '' });
+    setFormData({ ingredient: '', ingredientName: '', category: 'Other', description: '', quantity: '', unit: '' });
+  };
+
+  const handleSaveNewIngredientDetails = async (e) => {
+    e?.preventDefault?.();
+    if (!newIngredientToComplete) return;
+    try {
+      await api.put(`/ingredients/${newIngredientToComplete.id}`, {
+        category: ingredientCategories.includes(newIngredientToComplete.category) ? newIngredientToComplete.category : 'Other',
+        description: (newIngredientToComplete.description || '').trim() || undefined,
+      });
+      await fetchIngredients();
+      setNewIngredientToComplete(null);
+      toast.success('Ingredient details updated');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update ingredient');
+    }
+  };
+
+  const handleSkipNewIngredientDetails = () => {
+    setNewIngredientToComplete(null);
   };
 
   // Sort shopping items based on current sort setting
@@ -563,7 +654,7 @@ const ShoppingList = () => {
             variant="contained"
             color="primary"
             onClick={() => {
-              setFormData({ ingredient: '', quantity: '', unit: '' });
+              setFormData({ ingredient: '', ingredientName: '', category: 'Other', description: '', quantity: '', unit: '' });
               setOpenDialog(true);
             }}
             size="small"
@@ -593,7 +684,7 @@ const ShoppingList = () => {
           icon={<AddIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
           title="Your shopping list is empty"
           description="Add items manually, scan a barcode, or use Auto Update to add ingredients from your meal plan."
-          primaryAction={{ label: 'Add Item', onClick: () => { setFormData({ ingredient: '', quantity: '', unit: '' }); setOpenDialog(true); } }}
+          primaryAction={{ label: 'Add Item', onClick: () => { setFormData({ ingredient: '', ingredientName: '', category: 'Other', description: '', quantity: '', unit: '' }); setOpenDialog(true); } }}
           secondaryAction={{ label: 'Auto Update', onClick: handleUpdateFromMealPlan }}
           tertiaryAction={{ label: 'Scan Barcode', onClick: () => setScannerOpen(true), startIcon: <QrCodeScannerIcon /> }}
         />
@@ -829,20 +920,52 @@ const ShoppingList = () => {
             </Button>
           </Box>
           <Box component="form" onSubmit={handleAddItemSubmit}>
-            <FormControl fullWidth required sx={{ mb: 2 }}>
-              <InputLabel>Ingredient</InputLabel>
-              <Select
-                value={formData.ingredient}
-                onChange={(e) => setFormData({ ...formData, ingredient: e.target.value })}
-                label="Ingredient"
-              >
-                {ingredients.map((ingredient) => (
-                  <MenuItem key={ingredient._id} value={ingredient._id}>
-                    {capitalizeWords(ingredient.name)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              freeSolo
+              options={ingredients}
+              value={
+                formData.ingredientName
+                  ? formData.ingredientName
+                  : formData.ingredient
+                    ? ingredients.find((i) => i._id === formData.ingredient) || null
+                    : null
+              }
+              getOptionLabel={(option) => (typeof option === 'string' ? option : option?.name ?? '')}
+              isOptionEqualToValue={(option, value) =>
+                typeof value === 'string' ? option?.name?.toLowerCase() === value?.toLowerCase() : option?._id === value?._id
+              }
+              filterOptions={(options, state) => {
+                const input = (state.inputValue || '').trim();
+                const inputLower = input.toLowerCase();
+                const filtered = options.filter((opt) => opt.name.toLowerCase().includes(inputLower));
+                if (input && !filtered.some((opt) => opt.name.toLowerCase() === inputLower)) {
+                  return [...filtered, { _id: '__new__', name: input, isNew: true }];
+                }
+                return filtered;
+              }}
+              onChange={(e, value) => {
+                if (value?.isNew || (typeof value === 'string' && value.trim())) {
+                  setFormData({ ...formData, ingredient: '', ingredientName: typeof value === 'string' ? value.trim() : value.name });
+                } else if (value && typeof value === 'object' && value._id && value._id !== '__new__') {
+                  setFormData({ ...formData, ingredient: value._id, ingredientName: '' });
+                } else {
+                  setFormData({ ...formData, ingredient: '', ingredientName: '' });
+                }
+              }}
+              onInputChange={(e, inputValue) => {
+                const trimmed = (inputValue || '').trim();
+                const matches = ingredients.find((i) => i.name.toLowerCase() === trimmed.toLowerCase());
+                if (matches) {
+                  setFormData((prev) => ({ ...prev, ingredient: matches._id, ingredientName: '' }));
+                } else {
+                  setFormData((prev) => ({ ...prev, ingredient: '', ingredientName: trimmed }));
+                }
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Ingredient" required sx={{ mb: 2 }} />
+              )}
+              fullWidth
+            />
             <TextField
               label="Quantity"
               type="number"
@@ -900,6 +1023,105 @@ const ShoppingList = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Scan: Product not found – enter name manually */}
+      <Dialog open={scanNotFoundOpen} onClose={() => setScanNotFoundOpen(false)} fullScreen={isMobile}>
+        <Box component="form" onSubmit={handleScanNotFoundSubmit}>
+          <DialogTitle>Product not found</DialogTitle>
+          <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
+            <Typography color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+              The barcode wasn&apos;t in our database. Enter the product name to add it to your shopping list.
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Product name"
+                value={scanNotFoundData.productName}
+                onChange={(e) => setScanNotFoundData({ ...scanNotFoundData, productName: e.target.value })}
+                required
+                fullWidth
+                autoFocus
+                placeholder="e.g. Organic milk"
+              />
+              <TextField
+                label="Quantity"
+                type="number"
+                value={scanNotFoundData.quantity}
+                onChange={(e) => setScanNotFoundData({ ...scanNotFoundData, quantity: e.target.value })}
+                fullWidth
+                inputProps={{ min: 0.1, step: 0.1 }}
+              />
+              <FormControl fullWidth>
+                <InputLabel>Unit</InputLabel>
+                <Select
+                  value={scanNotFoundData.unit}
+                  onChange={(e) => setScanNotFoundData({ ...scanNotFoundData, unit: e.target.value })}
+                  label="Unit"
+                >
+                  {validUnits.map((unit) => (
+                    <MenuItem key={unit} value={unit}>{unit}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button type="button" onClick={() => setScanNotFoundOpen(false)} color="primary">
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" color="primary">
+              Add to list
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* After adding a new ingredient: optional details (category, description) */}
+      <Dialog
+        open={Boolean(newIngredientToComplete)}
+        onClose={handleSkipNewIngredientDetails}
+        fullScreen={isMobile}
+      >
+        <DialogTitle>Add details for &quot;{newIngredientToComplete?.name}&quot;</DialogTitle>
+        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
+          <Typography color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+            You can set a category and description now, or skip and edit later in Ingredients.
+          </Typography>
+          {newIngredientToComplete && (
+            <Box component="form" onSubmit={handleSaveNewIngredientDetails} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <FormControl fullWidth>
+                <InputLabel>Category (tag)</InputLabel>
+                <Select
+                  value={newIngredientToComplete.category}
+                  onChange={(e) => setNewIngredientToComplete((prev) => prev && { ...prev, category: e.target.value })}
+                  label="Category (tag)"
+                >
+                  {ingredientCategories.map((cat) => (
+                    <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Description (optional)"
+                value={newIngredientToComplete.description}
+                onChange={(e) => setNewIngredientToComplete((prev) => prev && { ...prev, description: e.target.value })}
+                fullWidth
+                multiline
+                minRows={2}
+                placeholder="e.g. Added from shopping list"
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleSkipNewIngredientDetails} color="primary">
+            Skip
+          </Button>
+          <Button onClick={handleSaveNewIngredientDetails} variant="contained" color="primary">
+            Save details
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <BarcodeScanner
         open={scannerOpen}
         onDetected={handleBarcodeDetected}
