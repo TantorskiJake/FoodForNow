@@ -22,7 +22,11 @@ import {
   Paper,
   TextField,
   Autocomplete,
+  Tooltip,
+  Collapse,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -30,16 +34,23 @@ import KitchenIcon from '@mui/icons-material/Kitchen';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import CasinoIcon from '@mui/icons-material/Casino';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import IconButton from '@mui/material/IconButton';
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
 import MealPlanGrid from '../components/MealPlanGrid';
+import EmptyState from '../components/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
   const [ingredients, setIngredients] = useState([]);
@@ -54,6 +65,8 @@ const Dashboard = () => {
     recipeId: '',
   });
   const [resetWeekDialog, setResetWeekDialog] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
   const [selectedWeekStart, setSelectedWeekStart] = useState('');
   const [mealActionLoading, setMealActionLoading] = useState(false);
 
@@ -69,6 +82,17 @@ const Dashboard = () => {
     monday.setHours(0, 0, 0, 0);
     setSelectedWeekStart(monday.toISOString().split('T')[0]);
   }, []);
+
+  // Start ingredients section collapsed when empty or when many items (only on first load)
+  const ingredientsInitialized = useRef(false);
+  useEffect(() => {
+    if (!ingredientsInitialized.current && !loading) {
+      ingredientsInitialized.current = true;
+      if (ingredients.length === 0 || ingredients.length > 8) {
+        setIngredientsExpanded(false);
+      }
+    }
+  }, [loading, ingredients.length]);
 
   useEffect(() => {
     if (!authenticated || !selectedWeekStart) return;
@@ -418,6 +442,11 @@ const Dashboard = () => {
 
   const handleRecipeSelect = async (recipe) => {
     if (!recipe?._id) return;
+    // When adding (not editing), require day and meal to be selected first
+    if (!mealFormData._id && (!mealFormData.day || !mealFormData.meal)) {
+      toast.error('Please select a day and meal first');
+      return;
+    }
 
     const recipeId = recipe._id;
     const optimisticId = `temp-${Date.now()}`;
@@ -573,6 +602,29 @@ const Dashboard = () => {
     }
   };
 
+  const handleAddToShoppingList = async (ingredient) => {
+    if (!ingredient?._id) {
+      toast.error('Cannot add to shopping list: ingredient ID missing');
+      return;
+    }
+    const remainingNeeded = Math.max(0, ingredient.quantity - (ingredient.pantryQuantity || 0));
+    if (remainingNeeded <= 0) {
+      toast.error(`${ingredient.name} is already in stock`);
+      return;
+    }
+    try {
+      await api.post('/shopping-list', {
+        ingredient: ingredient._id,
+        quantity: remainingNeeded,
+        unit: ingredient.unit,
+      });
+      toast.success(`Added ${ingredient.name} to shopping list`);
+    } catch (err) {
+      console.error('Error adding to shopping list:', err);
+      toast.error(err.response?.data?.error || 'Failed to add to shopping list');
+    }
+  };
+
   const handleRemoveFromPantry = async (ingredient) => {
     if (!ingredient?._id) {
       toast.error('Cannot remove from pantry: ingredient ID missing');
@@ -621,9 +673,16 @@ const Dashboard = () => {
       <Grid container spacing={3}>
         <Grid item xs={12}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-            <Typography variant="h4" component="h1">
-              {user?.name ? `${user.name}'s Dashboard` : 'Dashboard'}
-            </Typography>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography variant="h4" component="h1">
+                {user?.name ? `${user.name}'s Dashboard` : 'Dashboard'}
+              </Typography>
+              <Tooltip title="How it works">
+                <IconButton size="small" onClick={() => setHelpDialogOpen(true)} color="inherit">
+                  <HelpOutlineIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
         </Grid>
 
@@ -792,16 +851,20 @@ const Dashboard = () => {
                   Meal Plan
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    startIcon={<CasinoIcon />}
-                    onClick={handlePopulateWeek}
-                    disabled={loading || mealActionLoading || recipes.length === 0}
-                    size="small"
-                  >
-                    Populate Week
-                  </Button>
+                  <Tooltip title="Fill your week with random recipes from your collection">
+                    <span>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        startIcon={<CasinoIcon />}
+                        onClick={handlePopulateWeek}
+                        disabled={loading || mealActionLoading || recipes.length === 0}
+                        size="small"
+                      >
+                        Populate Week
+                      </Button>
+                    </span>
+                  </Tooltip>
                   <Button
                     variant="outlined"
                     color="error"
@@ -828,36 +891,55 @@ const Dashboard = () => {
         <Grid item xs={12}>
           <Card>
             <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Box>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={ingredientsExpanded ? 3 : 0}
+                sx={{ cursor: 'pointer' }}
+                onClick={() => setIngredientsExpanded((e) => !e)}
+              >
+                <Box display="flex" alignItems="center" gap={1}>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
                     Needed Ingredients
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {ingredients.length > 0 
-                      ? `${ingredients.length} ingredient${ingredients.length !== 1 ? 's' : ''} needed for your meal plan`
-                      : 'No ingredients needed from your meal plan'
+                      ? `${ingredients.length} ingredient${ingredients.length !== 1 ? 's' : ''} needed`
+                      : 'No ingredients needed'
                     }
                   </Typography>
+                  {ingredientsExpanded ? (
+                    <ExpandLessIcon fontSize="small" />
+                  ) : (
+                    <ExpandMoreIcon fontSize="small" />
+                  )}
                 </Box>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<ShoppingCartIcon />}
-                  onClick={handleAddAllToShoppingList}
-                  disabled={loading || mealActionLoading || ingredients.length === 0}
-                  size="small"
-                  sx={{ 
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    px: 3
-                  }}
-                >
-                  Add All to Shopping List
-                </Button>
+                <Box onClick={(e) => e.stopPropagation()}>
+                  <Tooltip title="Add ingredients you need that aren't in your pantry">
+                    <span>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<ShoppingCartIcon />}
+                        onClick={handleAddAllToShoppingList}
+                        disabled={loading || mealActionLoading || ingredients.length === 0}
+                        size="small"
+                        sx={{ 
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          px: 3
+                        }}
+                      >
+                        Add All to Shopping List
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </Box>
               </Box>
               
+              <Collapse in={ingredientsExpanded}>
               {ingredients.length > 0 ? (
                 <Box>
                   {/* Summary Stats */}
@@ -1047,32 +1129,53 @@ const Dashboard = () => {
                                 {isComplete ? '✓ In Stock' : isPartial ? '⚠ Partial' : '✗ Missing'}
                               </Typography>
                               
-                              {/* Add to Pantry / Remove from Pantry */}
-                              <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="primary"
-                                  startIcon={<KitchenIcon />}
-                                  onClick={() => handleAddToPantry(ingredient)}
-                                  disabled={mealActionLoading}
-                                  sx={{ textTransform: 'none' }}
-                                >
-                                  Add to Pantry
-                                </Button>
-                                {(ingredient.pantryQuantity || 0) > 0 && (
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    color="error"
-                                    startIcon={<RemoveCircleOutlineIcon />}
-                                    onClick={() => handleRemoveFromPantry(ingredient)}
-                                    disabled={mealActionLoading}
-                                    sx={{ textTransform: 'none' }}
-                                  >
-                                    Remove from Pantry
-                                  </Button>
-                                )}
+                              {/* Add to Pantry / Add to Shopping List / Remove from Pantry */}
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, gap: 1, flexWrap: 'nowrap', width: '100%' }}>
+                                <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                                  <Tooltip title="You have this at home – add to your pantry">
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        color="primary"
+                                        onClick={() => handleAddToPantry(ingredient)}
+                                        disabled={mealActionLoading}
+                                        sx={{ border: '1px solid', borderColor: 'divider' }}
+                                      >
+                                        <KitchenIcon fontSize="small" />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                  {(ingredient.pantryQuantity || 0) > 0 && (
+                                    <Tooltip title="Remove from pantry – you used it or no longer have it">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          onClick={() => handleRemoveFromPantry(ingredient)}
+                                          disabled={mealActionLoading}
+                                          sx={{ border: '1px solid', borderColor: 'divider' }}
+                                        >
+                                          <RemoveCircleOutlineIcon fontSize="small" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                </Box>
+                                <Box sx={{ flexShrink: 0 }}>
+                                  <Tooltip title={isComplete ? 'Already in stock – no need to buy' : 'Add this item to your shopping list'}>
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        color="secondary"
+                                        onClick={() => handleAddToShoppingList(ingredient)}
+                                        disabled={mealActionLoading || isComplete}
+                                        sx={{ border: '1px solid', borderColor: 'divider' }}
+                                      >
+                                        <ShoppingCartIcon fontSize="small" />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                </Box>
                               </Box>
                             </Box>
                           </Paper>
@@ -1082,25 +1185,22 @@ const Dashboard = () => {
                   </Grid>
                 </Box>
               ) : (
-                <Paper sx={{ 
-                  p: 4, 
-                  textAlign: 'center',
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(255, 255, 255, 0.03)' 
-                    : 'rgba(0, 0, 0, 0.02)',
-                  borderRadius: 2
-                }}>
-                  <Box sx={{ mb: 2 }}>
-                    <ShoppingCartIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                  </Box>
-                  <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                    No ingredients needed
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Add meals to your meal plan to see required ingredients here
-                  </Typography>
-                </Paper>
+                <EmptyState
+                  icon={<ShoppingCartIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
+                  title="No ingredients needed"
+                  description="Add meals to your meal plan to see required ingredients here. Then add them to your shopping list or pantry."
+                  primaryAction={{
+                    label: 'Add Meal',
+                    onClick: () => handleOpenMealDialog(),
+                  }}
+                  secondaryAction={
+                    mealPlan.length === 0
+                      ? { label: 'Go to Recipes', onClick: () => navigate('/recipes') }
+                      : undefined
+                  }
+                />
               )}
+              </Collapse>
             </CardContent>
           </Card>
         </Grid>
@@ -1113,11 +1213,11 @@ const Dashboard = () => {
         disableScrollLock
       >
         <DialogTitle>
-          {mealFormData._id ? 'Edit Meal' : `Add Meal - ${mealFormData.day} ${mealFormData.meal}`}
+          {mealFormData._id ? 'Edit Meal' : (mealFormData.day && mealFormData.meal ? `Add Meal - ${mealFormData.day} ${mealFormData.meal}` : 'Add Meal')}
         </DialogTitle>
         <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
-          {mealFormData._id ? (
-            // Editing existing meal - show all fields
+          {(mealFormData._id || !mealFormData.day || !mealFormData.meal) ? (
+            // Editing existing meal, or adding without a pre-selected slot - show day/meal selectors
             <>
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>Day</InputLabel>
@@ -1150,7 +1250,7 @@ const Dashboard = () => {
               </FormControl>
             </>
           ) : (
-            // Adding new meal - show day and meal as read-only
+            // Adding new meal from grid slot click - show day and meal as read-only
             <Box sx={{ mb: 2 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 Day: <strong>{mealFormData.day}</strong>
@@ -1194,6 +1294,50 @@ const Dashboard = () => {
               Update
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Help Dialog */}
+      <Dialog open={helpDialogOpen} onClose={() => setHelpDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>How FoodForNow Works</DialogTitle>
+        <DialogContent>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: 'wrap',
+              mb: 3,
+              p: 2,
+              borderRadius: 2,
+              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Recipes</Typography>
+            <Typography variant="body2" color="text.disabled">→</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Meal Plan</Typography>
+            <Typography variant="body2" color="text.disabled">→</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Ingredients</Typography>
+            <Typography variant="body2" color="text.disabled">→</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Shopping List</Typography>
+            <Typography variant="body2" color="text.disabled">/</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Pantry</Typography>
+          </Box>
+          <Typography variant="body2" paragraph>
+            <strong>1. Recipes</strong> – Add or import recipes. They are the foundation of your meal plan.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            <strong>2. Meal Plan</strong> – Add meals to each day. Use Populate Week to fill randomly from your recipes.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            <strong>3. Ingredients</strong> – Needed ingredients are shown automatically. Add to Pantry if you have them at home, or Add All to Shopping List for items to buy.
+          </Typography>
+          <Typography variant="body2">
+            <strong>4. Shopping List</strong> – Your list of items to buy. Use Auto Update on the Shopping List page to sync from your meal plan.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHelpDialogOpen(false)}>Got it</Button>
         </DialogActions>
       </Dialog>
 

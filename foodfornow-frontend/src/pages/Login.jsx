@@ -138,7 +138,17 @@ const Login = () => {
               </Alert>
             )}
 
-            <Box component="form" onSubmit={onSubmit} sx={{ width: '100%' }}>
+            <Box
+              component="form"
+              onSubmit={onSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                  e.preventDefault();
+                  e.target.closest('form')?.requestSubmit();
+                }
+              }}
+              sx={{ width: '100%' }}
+            >
               <TextField
                 margin="normal"
                 required

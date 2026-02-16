@@ -166,8 +166,10 @@ function parseIngredientString(str) {
   }
 }
 
-// Browser-like headers to reduce 403 blocks from sites that reject bot requests (e.g. TheKitchn)
-const BROWSER_HEADERS = {
+// Browser-like headers to reduce 403 blocks from sites that reject bot requests.
+// @dimfu/recipe-scraper sends no User-Agent, so many sites block it. We try our
+// fallback first (with these headers) for better success on sites like ChewOutLoud.
+const BROWSER_HEADERS_CHROME = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
@@ -180,18 +182,54 @@ const BROWSER_HEADERS = {
   'Sec-Fetch-User': '?1',
 };
 
+// Alternate User-Agent for sites that block Chrome (e.g. Food Network, ChewOutLoud)
+const BROWSER_HEADERS_FIREFOX = {
+  ...BROWSER_HEADERS_CHROME,
+  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
+};
+
+/**
+ * Fetch HTML with browser-like headers. Retries with alternate User-Agent on 403.
+ */
+async function fetchRecipeHtml(url) {
+  const baseHeaders = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+  };
+  const opts = { responseType: 'text', timeout: 15000 };
+  const headerSets = [
+    { ...baseHeaders, 'User-Agent': BROWSER_HEADERS_CHROME['User-Agent'] },
+    { ...baseHeaders, 'User-Agent': BROWSER_HEADERS_FIREFOX['User-Agent'], 'Referer': new URL(url).origin + '/' },
+  ];
+  let lastErr;
+  for (const headers of headerSets) {
+    try {
+      const { data } = await axios.get(url, { ...opts, headers });
+      return data;
+    } catch (err) {
+      lastErr = err;
+      const is403 = err.response?.status === 403 || (err.message && err.message.includes('403'));
+      if (!is403) throw err;
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * Lenient fallback: fetch HTML and extract Recipe from JSON-LD manually.
  * Handles sites (e.g. WP Recipe Maker, Salt & Lavender) that use valid schema
  * but fail @dimfu's strict validation (e.g. different property names).
- * Uses browser-like headers to work around 403 blocks (e.g. TheKitchn).
+ * Uses browser-like headers and retries with alternate User-Agent on 403.
  */
 async function parseRecipeFromUrlFallback(url) {
-  const { data: html } = await axios.get(url, {
-    responseType: 'text',
-    timeout: 15000,
-    headers: BROWSER_HEADERS,
-  });
+  const html = await fetchRecipeHtml(url);
 
   const $ = cheerio.load(html);
   const scripts = $('script[type="application/ld+json"]');
@@ -264,18 +302,27 @@ async function parseRecipeFromUrlFallback(url) {
 async function parseRecipeFromUrl(url) {
   let data = null;
 
+  // Try fallback first: it uses browser-like headers and retries with alternate User-Agent on 403.
+  // @dimfu/recipe-scraper sends no User-Agent, so many sites (ChewOutLoud, Food Network, etc.) block it.
   try {
-    data = await getRecipeData(url);
-  } catch (err) {
-    // Try fallback on validation failure OR HTTP errors (403, etc.) from sites that block scrapers
-    const shouldFallback =
-      err.message === 'Recipe is not valid' ||
-      err.response?.status === 403 ||
-      (err.message && err.message.includes('status code 403'));
-    if (shouldFallback) {
-      data = await parseRecipeFromUrlFallback(url);
+    data = await parseRecipeFromUrlFallback(url);
+  } catch {
+    data = null;
+  }
+
+  if (!data) {
+    try {
+      data = await getRecipeData(url);
+    } catch (err) {
+      const shouldFallback =
+        err.message === 'Recipe is not valid' ||
+        err.response?.status === 403 ||
+        (err.message && err.message.includes('status code 403'));
+      if (shouldFallback) {
+        data = await parseRecipeFromUrlFallback(url);
+      }
+      if (!data) throw err;
     }
-    if (!data) throw err;
   }
 
   if (!data || !data.name) {
@@ -417,8 +464,108 @@ async function transformToRecipeFormat(parsed, userId, Ingredient, validUnits, c
   };
 }
 
+/**
+ * Parse raw text (e.g. from OCR of handwritten recipe) into structured recipe format.
+ * Expects text with optional sections: title, Ingredients, Instructions.
+ */
+function parseRecipeFromText(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    throw new Error('No text provided');
+  }
+
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) throw new Error('No content to parse');
+
+  const name = lines[0].length <= 80 ? lines[0] : 'Imported Recipe';
+
+  // Find section boundaries (case-insensitive)
+  const ingIdx = lines.findIndex((l) => /^ingredients?(\s*[:.]|$)/i.test(l) || /^ing\.?\s*$/i.test(l));
+  const instrIdx = lines.findIndex((l) =>
+    /^instructions?(\s*[:.]|$)/i.test(l) || /^directions?(\s*[:.]|$)/i.test(l) ||
+    /^steps?(\s*[:.]|$)/i.test(l) || /^method(\s*[:.]|$)/i.test(l)
+  );
+
+  let ingredientLines = [];
+  let instructionLines = [];
+
+  if (ingIdx >= 0 && instrIdx >= 0 && ingIdx < instrIdx) {
+    ingredientLines = lines.slice(ingIdx + 1, instrIdx).filter((l) => l.length > 1);
+    instructionLines = lines.slice(instrIdx + 1).filter((l) => l.length > 1);
+  } else if (ingIdx >= 0) {
+    ingredientLines = lines.slice(ingIdx + 1).filter((l) => l.length > 1);
+    const nextSection = lines.findIndex((l, i) => i > ingIdx && /^(instructions?|directions?|steps?|method)/i.test(l));
+    if (nextSection > ingIdx) {
+      ingredientLines = lines.slice(ingIdx + 1, nextSection).filter((l) => l.length > 1);
+      instructionLines = lines.slice(nextSection + 1).filter((l) => l.length > 1);
+    }
+  } else if (instrIdx >= 0) {
+    instructionLines = lines.slice(instrIdx + 1).filter((l) => l.length > 1);
+  }
+
+  // If no clear sections, heuristic: lines starting with numbers or bullets are often ingredients
+  if (ingredientLines.length === 0 && instructionLines.length === 0) {
+    const bulletOrNum = /^[\d\-•*]\s*\.?\s*/;
+    const possibleIng = lines.filter((l) => bulletOrNum.test(l) || /^\d+\s*[\.\)]\s*/.test(l));
+    const rest = lines.filter((l) => !bulletOrNum.test(l) && !/^\d+\s*[\.\)]\s*/.test(l));
+    if (possibleIng.length >= 2) {
+      ingredientLines = possibleIng.map((l) => l.replace(bulletOrNum, '').replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean);
+      instructionLines = rest.slice(1).filter((l) => l.length > 2);
+    } else {
+      instructionLines = lines.slice(1).filter((l) => l.length > 2);
+    }
+  }
+
+  // Parse ingredients
+  const ingredients = [];
+  for (const line of ingredientLines) {
+    const parsed = parseIngredientString(line);
+    if (parsed && parsed.name) {
+      const suggestedCategory = inferIngredientCategory(parsed.name);
+      const unit = VALID_UNITS.includes(parsed.unit) ? parsed.unit : 'piece';
+      ingredients.push({
+        name: parsed.name,
+        quantity: parsed.quantity,
+        unit,
+        suggestedCategory: CATEGORIES.includes(suggestedCategory) ? suggestedCategory : 'Other',
+        uncertain: suggestedCategory === 'Other',
+      });
+    }
+  }
+
+  if (ingredients.length === 0 && ingredientLines.length > 0) {
+    for (const line of ingredientLines) {
+      if (line.length > 2) {
+        ingredients.push({
+          name: line.replace(/^[\d\-•*]\s*\.?\s*/, '').trim(),
+          quantity: 1,
+          unit: 'piece',
+          suggestedCategory: 'Other',
+          uncertain: true,
+        });
+      }
+    }
+  }
+
+  const instructions =
+    instructionLines.length > 0
+      ? instructionLines.map((l) => l.replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean)
+      : ['See original recipe for instructions.'];
+
+  return {
+    name,
+    description: name,
+    ingredients,
+    instructions,
+    prepTime: 15,
+    cookTime: 30,
+    servings: 4,
+    tags: [],
+  };
+}
+
 module.exports = {
   parseRecipeFromUrl,
+  parseRecipeFromText,
   parseIngredientString,
   buildRawRecipeFormat,
   transformToRecipeFormat,

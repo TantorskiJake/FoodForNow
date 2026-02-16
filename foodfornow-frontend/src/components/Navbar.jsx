@@ -33,9 +33,9 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 
 const pages = [
   { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
-  { name: 'Shopping List', path: '/shopping-list', icon: <ShoppingCartIcon /> },
-  { name: 'Pantry', path: '/pantry', icon: <KitchenIcon /> },
   { name: 'Recipes', path: '/recipes', icon: <MenuBookIcon /> },
+  { name: 'Pantry', path: '/pantry', icon: <KitchenIcon /> },
+  { name: 'Shopping List', path: '/shopping-list', icon: <ShoppingCartIcon /> },
   { name: 'Ingredients', path: '/ingredients', icon: <LocalDiningIcon /> },
   { name: 'Achievements', path: '/achievements', icon: <EmojiEventsIcon /> }
 ];

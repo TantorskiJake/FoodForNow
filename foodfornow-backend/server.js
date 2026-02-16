@@ -23,6 +23,8 @@ const recipesRoutes = require("./src/routes/recipes");
 const pantryRoutes = require("./src/routes/pantry");
 const ingredientRoutes = require("./src/routes/ingredients");
 const shoppingListRoutes = require("./src/routes/shopping-list");
+const barcodeRoutes = require("./src/routes/barcode");
+const scanSessionRoutes = require("./src/routes/scan-session");
 const achievementsRoutes = require("./src/routes/achievements");
 
 // Create Express application instance
@@ -75,6 +77,8 @@ app.use("/api/recipes", recipesRoutes);     // Recipe management
 app.use("/api/pantry", pantryRoutes);       // Pantry management
 app.use("/api/ingredients", ingredientRoutes); // Ingredient management
 app.use("/api/shopping-list", shoppingListRoutes); // Shopping list functionality
+app.use("/api/barcode", barcodeRoutes); // Barcode lookup (Open Food Facts)
+app.use("/api/scan-session", scanSessionRoutes); // Phone scan session (QR code flow)
 app.use("/api/achievements", achievementsRoutes); // Achievements system
 
 /**

@@ -6,6 +6,7 @@ const Recipe = require('../models/recipe');
 const PantryItem = require('../models/pantry');
 const Ingredient = require('../models/ingredient');
 const MealPlan = require('../models/mealPlan');
+const { isAlwaysAvailableIngredient } = require('../constants/ingredients');
 
 // Get shopping list
 router.get('/', authMiddleware, async (req, res) => {
@@ -127,6 +128,7 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       if (!mealPlan.recipe || !mealPlan.recipe.ingredients) return;
       mealPlan.recipe.ingredients.forEach(ing => {
         if (!ing.ingredient) return;
+        if (isAlwaysAvailableIngredient(ing.ingredient.name)) return;
         const ingredientId = ing.ingredient._id || ing.ingredient;
         if (!ingredientId) return;
         const key = `${ingredientId}-${ing.unit}`;
@@ -275,26 +277,8 @@ router.put('/:id/toggle', authMiddleware, async (req, res) => {
   }
 });
 
-// Remove item from shopping list
-router.delete('/:id', authMiddleware, async (req, res) => {
-  try {
-    const item = await ShoppingListItem.findOneAndDelete({
-      _id: req.params.id,
-      user: req.userId
-    });
-
-    if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
-    }
-
-    res.json({ message: 'Item removed from shopping list' });
-  } catch (err) {
-    console.error('Error removing item:', err);
-    res.status(500).json({ message: 'Error removing item' });
-  }
-});
-
 // Clear completed items (counts as 1 completed shopping list for achievements)
+// NOTE: Must be defined BEFORE /:id route - otherwise "clear-completed" is matched as an id
 router.delete('/clear-completed', authMiddleware, async (req, res) => {
   try {
     const deletedCount = await ShoppingListItem.countDocuments({
@@ -338,6 +322,25 @@ router.delete('/clear-completed', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Error clearing completed items:', err);
     res.status(500).json({ message: 'Error clearing completed items' });
+  }
+});
+
+// Remove item from shopping list
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const item = await ShoppingListItem.findOneAndDelete({
+      _id: req.params.id,
+      user: req.userId
+    });
+
+    if (!item) {
+      return res.status(404).json({ message: 'Item not found' });
+    }
+
+    res.json({ message: 'Item removed from shopping list' });
+  } catch (err) {
+    console.error('Error removing item:', err);
+    res.status(500).json({ message: 'Error removing item' });
   }
 });
 

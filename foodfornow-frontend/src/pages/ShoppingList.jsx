@@ -29,10 +29,12 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Menu,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Add as AddIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
   AddShoppingCart as AddShoppingCartIcon,
   CheckCircle as CheckCircleIcon,
   Sort as SortIcon,
@@ -43,10 +45,14 @@ import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import BarcodeScanner from '../components/BarcodeScanner';
+import EmptyState from '../components/EmptyState';
+import { lookupBarcode, extractBarcode } from '../services/barcodeLookup';
+import { useNavigate } from 'react-router-dom';
 
 const ShoppingList = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const navigate = useNavigate();
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
   const [shoppingItems, setShoppingItems] = useState([]);
@@ -60,6 +66,7 @@ const ShoppingList = () => {
     unit: ''
   });
   const [openClearConfirmDialog, setOpenClearConfirmDialog] = useState(false);
+  const [clearMenuAnchor, setClearMenuAnchor] = useState(null);
   const [sortBy, setSortBy] = useState('name');
   const [searchTerm, setSearchTerm] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -273,26 +280,115 @@ const ShoppingList = () => {
     }
   };
 
-  const handleBarcodeDetected = (barcode) => {
+  const handleBarcodeDetected = async (barcode) => {
     setScannerOpen(false);
-    const match = ingredients.find(ing => ing.barcode === barcode);
-    if (match) {
-      setFormData({
-        ingredient: match._id,
-        quantity: '',
-        unit: match.unit || '',
-      });
-      setOpenDialog(true);
-      toast.success(`Found ingredient: ${match.name}`);
-    } else {
-      toast.error(`No matching ingredient found for barcode: ${barcode}`);
-      setFormData({
-        ingredient: '',
-        quantity: '',
-        unit: '',
-      });
-      setOpenDialog(true);
+    const code = extractBarcode(barcode);
+    if (!code) {
+      toast.error('Could not read barcode. Try scanning a product barcode (not a QR code).');
+      return;
     }
+    try {
+      const product = await lookupBarcode(barcode);
+      const { productName, category, quantity, unit } = product;
+
+      // Find existing ingredient by name (case-insensitive)
+      let ingredientId = ingredients.find(
+        (ing) => ing.name.toLowerCase() === productName.toLowerCase()
+      )?._id;
+
+      // If no match, create new ingredient
+      if (!ingredientId) {
+        const response = await api.post('/ingredients', {
+          name: productName,
+          category,
+          description: `Added from barcode scan`,
+        });
+        ingredientId = response.data._id;
+        await fetchIngredients();
+      }
+
+      setFormData({
+        ingredient: ingredientId,
+        quantity: quantity.toString(),
+        unit: unit || 'piece',
+      });
+      setOpenDialog(true);
+      toast.success(`Found: ${productName}`);
+    } catch (err) {
+      console.error('Barcode lookup failed:', err?.response?.status, err?.response?.data, err?.message);
+      // Fallback: product not in Open Food Facts - create placeholder so user can still add
+      const msg = err.response?.status === 404
+        ? 'Product not in database - add manually'
+        : err.response?.data?.error || err?.message || 'Lookup failed - add manually';
+      toast.error(msg);
+      try {
+        const response = await api.post('/ingredients', {
+          name: `Product (barcode: ${code})`,
+          category: 'Other',
+          description: `Scanned barcode - edit name as needed`,
+        });
+        const ingredientId = response.data._id;
+        await fetchIngredients();
+        setFormData({
+          ingredient: ingredientId,
+          quantity: '1',
+          unit: 'piece',
+        });
+        setOpenDialog(true);
+      } catch (createErr) {
+        // If duplicate (409), find existing and use it
+        if (createErr.response?.status === 409) {
+          const existing = ingredients.find(
+            (ing) => ing.name.toLowerCase().includes(`barcode: ${code}`)
+          );
+          if (existing) {
+            setFormData({
+              ingredient: existing._id,
+              quantity: '1',
+              unit: 'piece',
+            });
+            setOpenDialog(true);
+            return;
+          }
+        }
+        toast.error('Could not add item. Please add manually.');
+        setFormData({
+          ingredient: '',
+          quantity: '',
+          unit: '',
+        });
+        setOpenDialog(true);
+      }
+    }
+  };
+
+  const handleAddItemSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.ingredient || !formData.quantity || !formData.unit) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    try {
+      const response = await api.post('/shopping-list', {
+        ingredient: formData.ingredient,
+        quantity: Number(formData.quantity),
+        unit: formData.unit,
+      });
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
+      setOpenDialog(false);
+      setFormData({ ingredient: '', quantity: '', unit: '' });
+      await fetchShoppingList();
+      toast.success('Added to shopping list');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add item');
+    }
+  };
+
+  const handleCloseAddDialog = () => {
+    setOpenDialog(false);
+    setFormData({ ingredient: '', quantity: '', unit: '' });
   };
 
   // Sort shopping items based on current sort setting
@@ -365,25 +461,41 @@ const ShoppingList = () => {
             </Select>
           </FormControl>
           <Button
-            variant="outlined"
-            color="error"
-            onClick={handleClearCompleted}
-            startIcon={<DeleteIcon />}
-            size="small"
-            disabled={loading || !shoppingItems.some(item => item.completed)}
-          >
-            Clear Completed
-          </Button>
-          <Button
             variant="contained"
             color="error"
-            onClick={() => setOpenClearConfirmDialog(true)}
+            onClick={(e) => setClearMenuAnchor(e.currentTarget)}
             startIcon={<DeleteIcon />}
+            endIcon={<KeyboardArrowDownIcon />}
             size="small"
             disabled={loading || shoppingItems.length === 0}
           >
-            Clear All
+            Clear
           </Button>
+          <Menu
+            anchorEl={clearMenuAnchor}
+            open={Boolean(clearMenuAnchor)}
+            onClose={() => setClearMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            <MenuItem
+              onClick={() => {
+                setClearMenuAnchor(null);
+                handleClearCompleted();
+              }}
+              disabled={!shoppingItems.some(item => item.completed)}
+            >
+              Clear Completed
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setClearMenuAnchor(null);
+                setOpenClearConfirmDialog(true);
+              }}
+            >
+              Clear All
+            </MenuItem>
+          </Menu>
           <Button
             variant="contained"
             color="primary"
@@ -414,10 +526,20 @@ const ShoppingList = () => {
           </Button>
           <Button
             variant="outlined"
+            color="primary"
+            onClick={() => {
+              setFormData({ ingredient: '', quantity: '', unit: '' });
+              setOpenDialog(true);
+            }}
+            size="small"
+          >
+            Add Item
+          </Button>
+          <Button
+            variant="outlined"
             color="secondary"
             onClick={() => setScannerOpen(true)}
             size="small"
-            sx={{ minWidth: 0, ml: 1 }}
           >
             Scan Barcode
           </Button>
@@ -435,14 +557,13 @@ const ShoppingList = () => {
           <CircularProgress />
         </Box>
       ) : shoppingItems.length === 0 ? (
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Your shopping list is empty
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Click "Auto Update" to add ingredients from your meal plan
-          </Typography>
-        </Paper>
+        <EmptyState
+          icon={<AddIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
+          title="Your shopping list is empty"
+          description="Add items manually, scan a barcode, or use Auto Update to add ingredients from your meal plan."
+          primaryAction={{ label: 'Add Item', onClick: () => { setFormData({ ingredient: '', quantity: '', unit: '' }); setOpenDialog(true); } }}
+          secondaryAction={{ label: 'Auto Update', onClick: handleUpdateFromMealPlan }}
+        />
       ) : (
         <Grid container spacing={2}>
           {(() => {
@@ -651,6 +772,61 @@ const ShoppingList = () => {
           })()}
         </Grid>
       )}
+
+      {/* Add Item Dialog */}
+      <Dialog open={openDialog} onClose={handleCloseAddDialog} fullScreen={isMobile}>
+        <DialogTitle>Add to Shopping List</DialogTitle>
+        <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
+          <Box component="form" onSubmit={handleAddItemSubmit} sx={{ mt: 2 }}>
+            <FormControl fullWidth required sx={{ mb: 2 }}>
+              <InputLabel>Ingredient</InputLabel>
+              <Select
+                value={formData.ingredient}
+                onChange={(e) => setFormData({ ...formData, ingredient: e.target.value })}
+                label="Ingredient"
+              >
+                {ingredients.map((ingredient) => (
+                  <MenuItem key={ingredient._id} value={ingredient._id}>
+                    {ingredient.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Quantity"
+              type="number"
+              value={formData.quantity}
+              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+              required
+              fullWidth
+              sx={{ mb: 2 }}
+              inputProps={{ min: 0, step: 0.1 }}
+            />
+            <FormControl fullWidth required sx={{ mb: 2 }}>
+              <InputLabel>Unit</InputLabel>
+              <Select
+                value={formData.unit}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                label="Unit"
+              >
+                {validUnits.map((unit) => (
+                  <MenuItem key={unit} value={unit}>
+                    {unit}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddDialog} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleAddItemSubmit} variant="contained" color="primary">
+            Add Item
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Clear All Confirmation Dialog */}
       <Dialog

@@ -13,7 +13,9 @@ import {
   DialogContent,
   DialogActions,
   Chip,
+  Menu,
   MenuItem,
+  MenuList,
   Select,
   FormControl,
   InputLabel,
@@ -28,16 +30,21 @@ import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import TimerIcon from '@mui/icons-material/Timer';
 import LinkIcon from '@mui/icons-material/Link';
+import ImageIcon from '@mui/icons-material/Image';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import SortIcon from '@mui/icons-material/Sort';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import { useNavigate } from 'react-router-dom';
+import EmptyState from '../components/EmptyState';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import { createWorker } from 'tesseract.js';
 
 const Recipes = () => {
   const [recipes, setRecipes] = useState([]);
@@ -67,11 +74,16 @@ const Recipes = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
 
-  // Import from URL state
+  // Import state
+  const [anchorImportMenu, setAnchorImportMenu] = useState(null);
   const [openImportUrl, setOpenImportUrl] = useState(false);
   const [importUrl, setImportUrl] = useState('');
   const [parsingUrl, setParsingUrl] = useState(false);
   const [importUrlError, setImportUrlError] = useState('');
+  const [openImportImage, setOpenImportImage] = useState(false);
+  const [importImageFile, setImportImageFile] = useState(null);
+  const [parsingImage, setParsingImage] = useState(false);
+  const [importImageError, setImportImageError] = useState('');
   const [openCategoryReview, setOpenCategoryReview] = useState(false);
   const [pendingRecipeData, setPendingRecipeData] = useState(null);
   const [categoryOverrides, setCategoryOverrides] = useState({});
@@ -305,29 +317,68 @@ const Recipes = () => {
       setOpenImportUrl(false);
       setImportUrl('');
 
-      const uncertainIngredients = recipeData.ingredients?.filter((ing) => ing.uncertain) || [];
-      if (uncertainIngredients.length > 0) {
-        const initialOverrides = {};
-        uncertainIngredients.forEach((ing) => {
-          initialOverrides[ing.name] = ing.suggestedCategory || 'Other';
-        });
-        setCategoryOverrides(initialOverrides);
-        setPendingRecipeData(recipeData);
-        setOpenCategoryReview(true);
-      } else {
-        const prepResponse = await api.post('/recipes/prepare-import', {
-          recipeData,
-          categoryOverrides: {},
-        });
-        await fetchIngredients();
-        openRecipeFormWithData(prepResponse.data);
-      }
+      await processImportedRecipeData(recipeData);
     } catch (err) {
       setImportUrlError(
         err.response?.data?.error || 'Failed to parse recipe. The site may not be supported.'
       );
     } finally {
       setParsingUrl(false);
+    }
+  };
+
+  const processImportedRecipeData = async (recipeData) => {
+    const uncertainIngredients = recipeData.ingredients?.filter((ing) => ing.uncertain) || [];
+    if (uncertainIngredients.length > 0) {
+      const initialOverrides = {};
+      uncertainIngredients.forEach((ing) => {
+        initialOverrides[ing.name] = ing.suggestedCategory || 'Other';
+      });
+      setCategoryOverrides(initialOverrides);
+      setPendingRecipeData(recipeData);
+      setOpenCategoryReview(true);
+    } else {
+      const prepResponse = await api.post('/recipes/prepare-import', {
+        recipeData,
+        categoryOverrides: {},
+      });
+      await fetchIngredients();
+      openRecipeFormWithData(prepResponse.data);
+    }
+  };
+
+  const handleImportFromImage = async () => {
+    if (!importImageFile) {
+      setImportImageError('Please select an image');
+      return;
+    }
+
+    try {
+      setParsingImage(true);
+      setImportImageError('');
+      const worker = await createWorker('eng');
+      try {
+        const { data: { text } } = await worker.recognize(importImageFile);
+        if (!text?.trim()) {
+          setImportImageError('Could not read any text from the image. Try a clearer photo.');
+          return;
+        }
+        const response = await api.post('/recipes/parse-text', { text });
+        const recipeData = response.data;
+
+        setOpenImportImage(false);
+        setImportImageFile(null);
+
+        await processImportedRecipeData(recipeData);
+      } finally {
+        await worker.terminate();
+      }
+    } catch (err) {
+      setImportImageError(
+        err.response?.data?.error || 'Failed to parse recipe from image. Try a clearer photo.'
+      );
+    } finally {
+      setParsingImage(false);
     }
   };
 
@@ -645,16 +696,44 @@ const Recipes = () => {
           <Button
             variant="outlined"
             color="primary"
-            startIcon={<LinkIcon />}
-            onClick={() => {
-              setImportUrl('');
-              setImportUrlError('');
-              setOpenImportUrl(true);
-            }}
+            endIcon={<KeyboardArrowDownIcon />}
+            onClick={(e) => setAnchorImportMenu(e.currentTarget)}
             size="small"
           >
-            Import from URL
+            Import
           </Button>
+          <Menu
+            anchorEl={anchorImportMenu}
+            open={!!anchorImportMenu}
+            onClose={() => setAnchorImportMenu(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          >
+            <MenuList>
+              <MenuItem
+                onClick={() => {
+                  setAnchorImportMenu(null);
+                  setImportUrl('');
+                  setImportUrlError('');
+                  setOpenImportUrl(true);
+                }}
+              >
+                <LinkIcon sx={{ mr: 1.5, fontSize: 20 }} />
+                From URL
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setAnchorImportMenu(null);
+                  setImportImageFile(null);
+                  setImportImageError('');
+                  setOpenImportImage(true);
+                }}
+              >
+                <ImageIcon sx={{ mr: 1.5, fontSize: 20 }} />
+                From handwritten recipe card
+              </MenuItem>
+            </MenuList>
+          </Menu>
           <Button
             variant="contained"
             color="primary"
@@ -857,58 +936,30 @@ const Recipes = () => {
               ))}
             </Grid>
           </Container>
-        ) : (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              py: 8,
+        ) : recipes.length === 0 ? (
+          <EmptyState
+            icon={<MenuBookIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
+            title="Add your first recipe"
+            description="Create a recipe manually or import from a URL or handwritten recipe card."
+            primaryAction={{
+              label: 'Add Recipe',
+              onClick: () => handleOpenDialog(),
+              startIcon: <AddIcon />,
             }}
-          >
+            secondaryAction={{
+              label: 'Import',
+              onClick: (e) => setAnchorImportMenu(e.currentTarget),
+              startIcon: <ImageIcon />,
+            }}
+          />
+        ) : (
+          <Box sx={{ py: 8, textAlign: 'center' }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              No recipes found
+              No recipes match your search
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <Button
-                variant="outlined"
-                startIcon={<LinkIcon />}
-                onClick={() => {
-                  setImportUrl('');
-                  setImportUrlError('');
-                  setOpenImportUrl(true);
-                }}
-                sx={{
-                  textTransform: 'none',
-                  borderColor: theme.palette.mode === 'dark' ? 'rgba(34, 139, 34, 0.5)' : '#228B22',
-                  color: '#228B22',
-                  '&:hover': {
-                    borderColor: '#228B22',
-                    background: theme.palette.mode === 'dark' ? 'rgba(34, 139, 34, 0.1)' : 'rgba(34, 139, 34, 0.05)',
-                  },
-                }}
-              >
-                Import from URL
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleOpenDialog}
-                sx={{
-                  textTransform: 'none',
-                  background: theme.palette.mode === 'dark'
-                    ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
-                    : '#228B22',
-                  '&:hover': {
-                    background: theme.palette.mode === 'dark'
-                      ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
-                      : '#1B6B1B',
-                  },
-                }}
-              >
-                Add Recipe
-              </Button>
-            </Box>
+            <Typography variant="body2" color="text.secondary">
+              Try changing your search or filters.
+            </Typography>
           </Box>
         )
       ) : (
@@ -1299,7 +1350,7 @@ const Recipes = () => {
         <DialogTitle>Import Recipe from URL</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Paste a recipe URL from supported sites (e.g. AllRecipes, Food Network, BBC Good Food, Serious Eats, TheKitchn).
+            Paste a recipe URL from supported sites (e.g. AllRecipes, Food Network, BBC Good Food, Serious Eats, TheKitchn, ChewOutLoud).
             The recipe will be parsed and you can review before saving.
           </Typography>
           <TextField
@@ -1333,8 +1384,68 @@ const Recipes = () => {
       </Dialog>
 
       <Dialog
+        open={openImportImage}
+        onClose={() => !parsingImage && (setOpenImportImage(false), setImportImageFile(null), setImportImageError(''))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Import from handwritten recipe card</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Take or upload a photo of a handwritten recipe card. We&apos;ll extract the text and turn it into a recipe.
+            Clear, legible handwriting works best.
+          </Typography>
+          <Button
+            variant="outlined"
+            component="label"
+            fullWidth
+            sx={{ py: 3, borderStyle: 'dashed' }}
+            disabled={parsingImage}
+          >
+            {importImageFile ? importImageFile.name : 'Choose image or take photo'}
+            <input
+              type="file"
+              hidden
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                setImportImageFile(file || null);
+                setImportImageError('');
+              }}
+            />
+          </Button>
+          {importImageError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {importImageError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setOpenImportImage(false);
+              setImportImageFile(null);
+              setImportImageError('');
+            }}
+            disabled={parsingImage}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleImportFromImage}
+            disabled={parsingImage || !importImageFile}
+            startIcon={parsingImage ? <CircularProgress size={20} /> : <ImageIcon />}
+          >
+            {parsingImage ? 'Reading...' : 'Import recipe'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
         open={openCategoryReview}
-        onClose={() => !parsingUrl && (setOpenCategoryReview(false), setPendingRecipeData(null))}
+        onClose={() => !parsingUrl && !parsingImage && (setOpenCategoryReview(false), setPendingRecipeData(null))}
         maxWidth="sm"
         fullWidth
       >

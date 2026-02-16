@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:host": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -17,12 +18,14 @@
     "@zxing/browser": "^0.1.5",
     "axios": "^1.6.7",
     "match-sorter": "^8.0.3",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hot-toast": "^2.5.2",
     "react-qr-barcode-scanner": "^2.1.8",
     "react-router-dom": "^6.22.3",
-    "react-zxing": "^2.1.0"
+    "react-zxing": "^2.1.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",

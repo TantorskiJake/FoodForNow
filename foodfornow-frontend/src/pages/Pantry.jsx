@@ -39,8 +39,14 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import BarcodeScanner from '../components/BarcodeScanner';
+import EmptyState from '../components/EmptyState';
+import { lookupBarcode, extractBarcode } from '../services/barcodeLookup';
+import { useNavigate } from 'react-router-dom';
+
+const capitalizeWords = (str) => str ? str.replace(/\b\w/g, (c) => c.toUpperCase()) : str;
 
 const Pantry = () => {
+  const navigate = useNavigate();
   const [pantryItems, setPantryItems] = useState([]);
   const [error, setError] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
@@ -250,29 +256,93 @@ const Pantry = () => {
     }
   };
 
-  const handleBarcodeDetected = (barcode) => {
+  const handleBarcodeDetected = async (barcode) => {
     setScannerOpen(false);
-    const match = ingredients.find(ing => ing.barcode === barcode);
-    if (match) {
+    const code = extractBarcode(barcode);
+    if (!code) {
+      toast.error('Could not read barcode. Try scanning a product barcode (not a QR code).');
+      return;
+    }
+    try {
+      const product = await lookupBarcode(barcode);
+      const { productName, category, quantity, unit } = product;
+
+      // Find existing ingredient by name (case-insensitive)
+      let ingredientId = ingredients.find(
+        (ing) => ing.name.toLowerCase() === productName.toLowerCase()
+      )?._id;
+
+      // If no match, create new ingredient
+      if (!ingredientId) {
+        const response = await api.post('/ingredients', {
+          name: productName,
+          category,
+          description: `Added from barcode scan`,
+        });
+        ingredientId = response.data._id;
+        await fetchIngredients();
+      }
+
       setFormData({
-        ingredient: match._id,
-        quantity: '',
-        unit: match.unit || '',
+        ingredient: ingredientId,
+        quantity: quantity.toString(),
+        unit: unit || 'piece',
         expiryDate: '',
       });
       setEditingItem(null);
       setOpenDialog(true);
-      toast.success(`Found ingredient: ${match.name}`);
-    } else {
-      toast.error(`No matching ingredient found for barcode: ${barcode}`);
-      setFormData({
-        ingredient: '',
-        quantity: '',
-        unit: '',
-        expiryDate: '',
-      });
-      setEditingItem(null);
-      setOpenDialog(true);
+      toast.success(`Found: ${productName}`);
+    } catch (err) {
+      console.error('Barcode lookup failed:', err?.response?.status, err?.response?.data, err?.message);
+      // Fallback: product not in Open Food Facts - create placeholder so user can still add
+      const msg = err.response?.status === 404
+        ? 'Product not in database - add manually'
+        : err.response?.data?.error || err?.message || 'Lookup failed - add manually';
+      toast.error(msg);
+      try {
+        const response = await api.post('/ingredients', {
+          name: `Product (barcode: ${code})`,
+          category: 'Other',
+          description: `Scanned barcode - edit name as needed`,
+        });
+        const ingredientId = response.data._id;
+        await fetchIngredients();
+        setFormData({
+          ingredient: ingredientId,
+          quantity: '1',
+          unit: 'piece',
+          expiryDate: '',
+        });
+        setEditingItem(null);
+        setOpenDialog(true);
+      } catch (createErr) {
+        // If duplicate (409), find existing and use it
+        if (createErr.response?.status === 409) {
+          const existing = ingredients.find(
+            (ing) => ing.name.toLowerCase().includes(`barcode: ${code}`)
+          );
+          if (existing) {
+            setFormData({
+              ingredient: existing._id,
+              quantity: '1',
+              unit: 'piece',
+              expiryDate: '',
+            });
+            setEditingItem(null);
+            setOpenDialog(true);
+            return;
+          }
+        }
+        toast.error('Could not add item. Please add manually.');
+        setFormData({
+          ingredient: '',
+          quantity: '',
+          unit: '',
+          expiryDate: '',
+        });
+        setEditingItem(null);
+        setOpenDialog(true);
+      }
     }
   };
 
@@ -318,14 +388,14 @@ const Pantry = () => {
         <ListItemText
           primary={
             <Typography variant="h6" component="div" sx={{ fontWeight: 'medium' }}>
-              {item.ingredient.name}
+              {capitalizeWords(item.ingredient.name)}
             </Typography>
           }
           secondary={
             <Box sx={{ mt: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Chip
-                  label={item.ingredient.category}
+                  label={capitalizeWords(item.ingredient.category)}
                   size="small"
                   sx={{
                     backgroundColor: getCategoryColor(item.ingredient.category).main,
@@ -440,7 +510,6 @@ const Pantry = () => {
             color="secondary"
             onClick={() => setScannerOpen(true)}
             size="small"
-            sx={{ minWidth: 0, ml: 1 }}
           >
             Scan Barcode
           </Button>
@@ -458,11 +527,13 @@ const Pantry = () => {
           <CircularProgress />
         </Box>
       ) : pantryItems.length === 0 ? (
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
-            No items in your pantry. Add your first item!
-          </Typography>
-        </Paper>
+        <EmptyState
+          icon={<AddIcon sx={{ fontSize: 48, color: 'text.secondary' }} />}
+          title="No items in your pantry"
+          description="Add your first item manually, or add ingredients from your meal plan on the Dashboard."
+          primaryAction={{ label: 'Add Item', onClick: () => handleOpenDialog() }}
+          secondaryAction={{ label: 'Go to Dashboard', onClick: () => navigate('/dashboard') }}
+        />
       ) : (
         <Grid container spacing={2}>
           {(() => {
@@ -506,7 +577,7 @@ const Pantry = () => {
                       gap: 1
                     }}
                   >
-                    {ingredientName}
+                    {capitalizeWords(ingredientName)}
                     {items.length > 1 && (
                       <Chip
                         label={`${items.length} units`}
@@ -538,7 +609,7 @@ const Pantry = () => {
                           <Box display="flex" alignItems="center" gap={1} mb={0.5}>
                             {item.ingredient?.category && (
                               <Chip
-                                label={item.ingredient.category}
+                                label={capitalizeWords(item.ingredient.category)}
                                 size="small"
                                 sx={{
                                   backgroundColor: getCategoryColor(item.ingredient.category).main,

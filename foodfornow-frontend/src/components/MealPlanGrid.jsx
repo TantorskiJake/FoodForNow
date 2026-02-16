@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -22,7 +22,8 @@ import {
   ListItem,
   ListItemText as MuiListItemText,
   Snackbar,
-  Alert
+  Alert,
+  Tooltip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -167,14 +168,39 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
     setRecipeToCopy(null);
   };
 
+  // Escape key exits copy mode
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && recipeToCopy) {
+        handleCancelCopyMode();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [recipeToCopy]);
+
+  // Click outside meal cards exits copy mode (capture phase to catch all clicks)
+  useEffect(() => {
+    if (!recipeToCopy) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('[data-meal-card]') && !e.target.closest('[role="alert"]')) {
+        handleCancelCopyMode();
+      }
+    };
+    document.addEventListener('click', handleClickOutside, true);
+    return () => document.removeEventListener('click', handleClickOutside, true);
+  }, [recipeToCopy]);
+
   const handleCardClick = (meal, day, mealType, event) => {
-    if (recipeToCopy && onAddRecipeToSlot) {
+    if (recipeToCopy) {
       event.stopPropagation();
+      if (!onAddRecipeToSlot) return;
       // Skip if this slot already has the same recipe
       if (meal?.recipe?._id === recipeToCopy._id) return;
       onAddRecipeToSlot(day, mealType, recipeToCopy, meal?._id);
       return;
     }
+    // Not in copy mode - normal click behavior
     if (meal) {
       handleMealClick(meal, event);
     } else {
@@ -204,13 +230,13 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
 
   return (
     <Box sx={{ mt: 2 }}>
-      <Grid container spacing={1}>
+      <Grid container spacing={1.5}>
         {/* Header row with days */}
         <Grid item xs={12}>
-          <Grid container spacing={0.5}>
-            <Grid item xs={1.5} /> {/* Spacer for meal type labels */}
+          <Grid container spacing={1}>
+            <Grid item xs={1} /> {/* Spacer for meal type labels */}
             {days.map((day) => (
-              <Grid item xs={1.5} key={day}>
+              <Grid item xs={11/7} key={day}>
                 <Typography variant="subtitle1" align="center" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1 }}>
                   {day}
                 </Typography>
@@ -222,10 +248,10 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
         {/* Meal rows */}
         {mealTypes.map((mealType) => (
           <Grid item xs={12} key={mealType}>
-            <Grid container spacing={0.5}>
+            <Grid container spacing={1}>
               {/* Meal type label */}
-              <Grid item xs={1.5} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 0 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1, px: 1 }}>
+              <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', p: 0, minWidth: 0 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1 }}>
                   {mealType}
                 </Typography>
               </Grid>
@@ -238,8 +264,9 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                 const isCooked = meal?.cooked || false;
                 
                 return (
-                  <Grid item xs={1.5} key={`${day}-${mealType}`} sx={{ p: 0 }}>
+                  <Grid item xs={11/7} key={`${day}-${mealType}`} sx={{ p: 0 }}>
                     <Card 
+                      data-meal-card
                       sx={{ 
                         height: '100%',
                         minHeight: 90,
@@ -282,26 +309,30 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               left: 2,
                               zIndex: 1
                             }}>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleToggleCooked(meal, e)}
-                                sx={{
-                                  bgcolor: isCooked ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                                  color: 'white',
-                                  width: 20,
-                                  height: 20,
-                                  '&:hover': {
-                                    bgcolor: isCooked ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)',
-                                  },
-                                  p: 0
-                                }}
-                              >
-                                {isCooked ? (
-                                  <CheckCircleIcon sx={{ fontSize: 14 }} />
-                                ) : (
-                                  <RestaurantMenuIcon sx={{ fontSize: 14 }} />
-                                )}
-                              </IconButton>
+                              <Tooltip title={isCooked ? 'Already cooked' : 'Mark as cooked'}>
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleToggleCooked(meal, e)}
+                                    sx={{
+                                      bgcolor: isCooked ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                      color: 'white',
+                                      width: 20,
+                                      height: 20,
+                                      '&:hover': {
+                                        bgcolor: isCooked ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)',
+                                      },
+                                      p: 0
+                                    }}
+                                  >
+                                    {isCooked ? (
+                                      <CheckCircleIcon sx={{ fontSize: 14 }} />
+                                    ) : (
+                                      <RestaurantMenuIcon sx={{ fontSize: 14 }} />
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
                             </Box>
 
                             <Typography 
@@ -336,35 +367,43 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               display: 'flex',
                               gap: 0.25
                             }}>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleCopyRecipe(meal, e)}
-                                sx={{ 
-                                  p: 0.25,
-                                  color: 'white',
-                                  m: 0,
-                                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' }
-                                }}
-                                title="Copy to other days"
-                              >
-                                <ContentCopyIcon sx={{ fontSize: 14 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (meal._id) {
-                                    onDeleteMeal(meal._id);
-                                  }
-                                }}
-                                sx={{ 
-                                  p: 0.25,
-                                  color: 'white',
-                                  m: 0
-                                }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
+                              <Tooltip title="Copy to other days">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleCopyRecipe(meal, e)}
+                                    sx={{ 
+                                      p: 0.25,
+                                      color: 'white',
+                                      m: 0,
+                                      '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' }
+                                    }}
+                                  >
+                                    <ContentCopyIcon sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title="Delete meal">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (meal._id) {
+                                        onDeleteMeal(meal._id);
+                                      }
+                                    }}
+                                    sx={{ 
+                                      p: 0.25,
+                                      color: 'white',
+                                      m: 0,
+                                      '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' }
+                                    }}
+                                  >
+                                    <DeleteIcon sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
                             </Box>
                           </>
                         ) : (
@@ -455,13 +494,14 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
         <Alert 
           severity="info" 
           sx={{ width: '100%' }}
+          onClose={handleCancelCopyMode}
           action={
             <Button color="inherit" size="small" onClick={handleCancelCopyMode}>
               Cancel
             </Button>
           }
         >
-          Click a card to add &quot;{recipeToCopy?.name || 'recipe'}&quot; to that day
+          Click a card to add &quot;{recipeToCopy?.name || 'recipe'}&quot; to that day. Press Esc to cancel.
         </Alert>
       </Snackbar>
 

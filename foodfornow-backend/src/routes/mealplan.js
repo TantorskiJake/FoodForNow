@@ -2,6 +2,7 @@ const express = require('express');
 const authMiddleware = require('../middleware/auth');
 const MealPlan = require('../models/mealPlan');
 const Recipe = require('../models/recipe');
+const { isAlwaysAvailableIngredient } = require('../constants/ingredients');
 
 const router = express.Router();
 
@@ -224,6 +225,9 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
     for (const recipeIngredient of mealPlanItem.recipe.ingredients) {
       if (!recipeIngredient.ingredient) continue;
 
+      // Skip water, salt, pepper - assumed always available
+      if (isAlwaysAvailableIngredient(recipeIngredient.ingredient.name)) continue;
+
       const ingredientId = recipeIngredient.ingredient._id;
       const neededQuantity = recipeIngredient.quantity;
       const neededUnit = recipeIngredient.unit;
@@ -423,6 +427,7 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
       if (mealPlan.recipe && mealPlan.recipe.ingredients) {
         mealPlan.recipe.ingredients.forEach(ing => {
           if (!ing.ingredient) return;
+          if (isAlwaysAvailableIngredient(ing.ingredient.name)) return;
           const key = `${ing.ingredient._id.toString()}-${ing.unit}`;
           if (!ingredients.has(key)) {
             ingredients.set(key, {

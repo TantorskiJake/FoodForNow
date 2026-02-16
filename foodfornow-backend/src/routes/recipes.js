@@ -2,7 +2,7 @@ const express = require('express');
 const authMiddleware = require('../middleware/auth');
 const Recipe = require('../models/recipe');
 const Ingredient = require('../models/ingredient');
-const { parseRecipeFromUrl, buildRawRecipeFormat, transformToRecipeFormat } = require('../services/recipeParserService');
+const { parseRecipeFromUrl, parseRecipeFromText, buildRawRecipeFormat, transformToRecipeFormat } = require('../services/recipeParserService');
 
 const router = express.Router();
 
@@ -52,6 +52,22 @@ router.post('/parse-url', authMiddleware, async (req, res) => {
     console.error('Error parsing recipe URL:', err);
     const message = err.message || 'Failed to parse recipe from URL. The site may not be supported.';
     res.status(400).json({ error: message });
+  }
+});
+
+// Parse recipe from raw text (e.g. OCR output from handwritten recipe card)
+router.post('/parse-text', authMiddleware, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    const recipeData = parseRecipeFromText(text.trim());
+    res.json(recipeData);
+  } catch (err) {
+    console.error('Error parsing recipe text:', err);
+    res.status(400).json({ error: err.message || 'Failed to parse recipe from text' });
   }
 });
 
