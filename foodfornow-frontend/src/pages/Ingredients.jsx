@@ -28,9 +28,13 @@ import SearchIcon from '@mui/icons-material/Search';
 import SortIcon from '@mui/icons-material/Sort';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import TimerIcon from '@mui/icons-material/Timer';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryColor } from '../utils/categoryColors';
+import BarcodeScanner from '../components/BarcodeScanner';
+import { lookupBarcode, extractBarcode } from '../services/barcodeLookup';
+import { toast } from 'react-hot-toast';
 
 const toTitleCase = (str) => {
   if (!str) return '';
@@ -47,6 +51,7 @@ const Ingredients = () => {
   const [filteredIngredients, setFilteredIngredients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState(null);
   const [tab, setTab] = useState('mine');
   const [sortBy, setSortBy] = useState('name');
@@ -168,6 +173,70 @@ const Ingredients = () => {
     }
   };
 
+  const handleBarcodeDetected = async (barcode) => {
+    setScannerOpen(false);
+    const code = extractBarcode(barcode);
+    if (!code) {
+      toast.error('Could not read barcode. Try scanning a product barcode (not a QR code).');
+      return;
+    }
+    try {
+      const product = await lookupBarcode(barcode);
+      const { productName, category } = product;
+
+      // Find existing ingredient by name (case-insensitive)
+      const existingIngredient = ingredients.find(
+        (ing) => ing.name.toLowerCase() === productName.toLowerCase()
+      );
+
+      if (existingIngredient) {
+        // Open dialog to edit existing ingredient
+        handleOpenDialog(existingIngredient);
+        toast.success(`Found existing ingredient: ${productName}`);
+      } else {
+        // Create new ingredient and open dialog to edit
+        const response = await api.post('/ingredients', {
+          name: productName,
+          category: category || 'Other',
+          description: `Added from barcode scan`,
+        });
+        await fetchIngredients();
+        handleOpenDialog({ _id: response.data._id, name: productName, category: category || 'Other', description: 'Added from barcode scan' });
+        toast.success(`Created new ingredient: ${productName}`);
+      }
+    } catch (err) {
+      console.error('Barcode lookup failed:', err?.response?.status, err?.response?.data, err?.message);
+      // Fallback: product not in Open Food Facts - create placeholder
+      const msg = err.response?.status === 404
+        ? 'Product not in database - creating placeholder'
+        : err.response?.data?.error || err?.message || 'Lookup failed - creating placeholder';
+      toast.error(msg);
+      try {
+        const response = await api.post('/ingredients', {
+          name: `Product (barcode: ${code})`,
+          category: 'Other',
+          description: `Scanned barcode - edit name as needed`,
+        });
+        await fetchIngredients();
+        handleOpenDialog({ _id: response.data._id, name: `Product (barcode: ${code})`, category: 'Other', description: 'Scanned barcode - edit name as needed' });
+      } catch (createErr) {
+        // If duplicate (409), find existing and open it
+        if (createErr.response?.status === 409) {
+          await fetchIngredients();
+          const existing = ingredients.find(
+            (ing) => ing.name.toLowerCase().includes(`barcode: ${code}`)
+          );
+          if (existing) {
+            handleOpenDialog(existing);
+            return;
+          }
+        }
+        toast.error('Could not add ingredient. Please add manually.');
+        handleOpenDialog();
+      }
+    }
+  };
+
   const categories = [
     'Produce',
     'Dairy',
@@ -267,6 +336,15 @@ const Ingredients = () => {
             size="small"
           >
             Add Ingredient
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => setScannerOpen(true)}
+            startIcon={<QrCodeScannerIcon />}
+            size="small"
+          >
+            Scan Barcode
           </Button>
         </Box>
       </Box>
@@ -497,6 +575,12 @@ const Ingredients = () => {
             </DialogActions>
           </form>
         </Dialog>
+
+        <BarcodeScanner
+          open={scannerOpen}
+          onDetected={handleBarcodeDetected}
+          onClose={() => setScannerOpen(false)}
+        />
       </Container>
     );
 };

@@ -7,7 +7,6 @@ import {
   Button,
   Box,
   Typography,
-  Alert,
   ToggleButtonGroup,
   ToggleButton,
   TextField,
@@ -16,7 +15,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import api from '../services/api';
 
-// Base URL for QR code - use env var for dev (phone can't reach localhost)
+// Base URL for QR code - use env var for dev
 const getBaseUrl = (manualOverride) => {
   if (manualOverride) return manualOverride.replace(/\/$/, '');
   return import.meta.env.VITE_APP_PUBLIC_URL || window.location.origin;
@@ -186,28 +185,6 @@ const BarcodeScanner = ({ open, onDetected, onClose }) => {
           </Box>
         ) : mode === 'phone' ? (
           <>
-            {window.location.hostname === 'localhost' && !import.meta.env.VITE_APP_PUBLIC_URL && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <strong>Phone can&apos;t reach &quot;localhost&quot;</strong>
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  1. Run dev server: <code>npm run dev:host</code>
-                </Typography>
-                <Typography variant="body2">
-                  2. Find your computer&apos;s IP (e.g. 192.168.1.5) in network settings
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  3. Enter the app URL below (e.g. http://192.168.1.5:5173)
-                </Typography>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder="http://192.168.1.5:5173"
-                  value={baseUrlOverride}
-                  onChange={(e) => setBaseUrlOverride(e.target.value)}
-                  label="App URL (for phone)"
-                />
-              </Alert>
-            )}
             {scanUrl ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <Typography variant="body2" color="text.secondary" textAlign="center">

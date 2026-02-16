@@ -32,7 +32,8 @@ import {
   Add as AddIcon,
   Remove as RemoveIcon,
   AddShoppingCart as AddShoppingCartIcon,
-  Sort as SortIcon
+  Sort as SortIcon,
+  QrCodeScanner as QrCodeScannerIcon
 } from '@mui/icons-material';
 import api from '../services/api';
 import { getCategoryColor } from '../utils/categoryColors';
@@ -597,6 +598,7 @@ const Pantry = () => {
             variant="contained"
             color="primary"
             onClick={() => setScannerOpen(true)}
+            startIcon={<QrCodeScannerIcon />}
             size="small"
           >
             Scan Barcode

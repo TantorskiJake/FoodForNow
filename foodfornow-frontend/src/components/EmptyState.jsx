@@ -9,8 +9,9 @@ import { Box, Typography, Button, Paper, useTheme } from '@mui/material';
  * @param {string} props.description - Supporting text
  * @param {Object} props.primaryAction - { label, onClick }
  * @param {Object} props.secondaryAction - { label, onClick } (optional)
+ * @param {Object} props.tertiaryAction - { label, onClick } (optional)
  */
-const EmptyState = ({ icon, title, description, primaryAction, secondaryAction }) => {
+const EmptyState = ({ icon, title, description, primaryAction, secondaryAction, tertiaryAction }) => {
   const theme = useTheme();
 
   return (
@@ -58,24 +59,48 @@ const EmptyState = ({ icon, title, description, primaryAction, secondaryAction }
         )}
         {secondaryAction && (
           <Button
-            variant="outlined"
+            variant="contained"
             onClick={secondaryAction.onClick}
             startIcon={secondaryAction.startIcon}
             sx={{
               textTransform: 'none',
-              borderColor:
-                theme.palette.mode === 'dark' ? 'rgba(34, 139, 34, 0.5)' : '#228B22',
-              color: '#228B22',
+              background:
+                theme.palette.mode === 'dark'
+                  ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                  : '#228B22',
+              color: 'white',
               '&:hover': {
-                borderColor: '#228B22',
                 background:
                   theme.palette.mode === 'dark'
-                    ? 'rgba(34, 139, 34, 0.1)'
-                    : 'rgba(34, 139, 34, 0.05)',
+                    ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                    : '#1B6B1B',
               },
             }}
           >
             {secondaryAction.label}
+          </Button>
+        )}
+        {tertiaryAction && (
+          <Button
+            variant="contained"
+            onClick={tertiaryAction.onClick}
+            startIcon={tertiaryAction.startIcon}
+            sx={{
+              textTransform: 'none',
+              background:
+                theme.palette.mode === 'dark'
+                  ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                  : '#228B22',
+              color: 'white',
+              '&:hover': {
+                background:
+                  theme.palette.mode === 'dark'
+                    ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                    : '#1B6B1B',
+              },
+            }}
+          >
+            {tertiaryAction.label}
           </Button>
         )}
       </Box>

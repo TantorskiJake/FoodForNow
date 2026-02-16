@@ -37,6 +37,7 @@ import {
   AddShoppingCart as AddShoppingCartIcon,
   CheckCircle as CheckCircleIcon,
   Sort as SortIcon,
+  QrCodeScanner as QrCodeScannerIcon,
 } from '@mui/icons-material';
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
@@ -573,6 +574,7 @@ const ShoppingList = () => {
             variant="contained"
             color="primary"
             onClick={() => setScannerOpen(true)}
+            startIcon={<QrCodeScannerIcon />}
             size="small"
           >
             Scan Barcode
@@ -593,6 +595,7 @@ const ShoppingList = () => {
           description="Add items manually, scan a barcode, or use Auto Update to add ingredients from your meal plan."
           primaryAction={{ label: 'Add Item', onClick: () => { setFormData({ ingredient: '', quantity: '', unit: '' }); setOpenDialog(true); } }}
           secondaryAction={{ label: 'Auto Update', onClick: handleUpdateFromMealPlan }}
+          tertiaryAction={{ label: 'Scan Barcode', onClick: () => setScannerOpen(true), startIcon: <QrCodeScannerIcon /> }}
         />
       ) : (
         <Grid container spacing={2}>
@@ -815,7 +818,17 @@ const ShoppingList = () => {
       <Dialog open={openDialog} onClose={handleCloseAddDialog} fullScreen={isMobile}>
         <DialogTitle>Add to Shopping List</DialogTitle>
         <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
-          <Box component="form" onSubmit={handleAddItemSubmit} sx={{ mt: 2 }}>
+          <Box sx={{ mt: 2, mb: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<QrCodeScannerIcon />}
+              onClick={() => setScannerOpen(true)}
+            >
+              Scan Barcode
+            </Button>
+          </Box>
+          <Box component="form" onSubmit={handleAddItemSubmit}>
             <FormControl fullWidth required sx={{ mb: 2 }}>
               <InputLabel>Ingredient</InputLabel>
               <Select

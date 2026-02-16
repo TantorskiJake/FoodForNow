@@ -33,6 +33,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import ImageIcon from '@mui/icons-material/Image';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import SortIcon from '@mui/icons-material/Sort';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
@@ -746,8 +747,9 @@ const Recipes = () => {
             </Select>
           </FormControl>
           <Button
-            variant="outlined"
+            variant="contained"
             color="primary"
+            startIcon={<FileDownloadIcon />}
             endIcon={<KeyboardArrowDownIcon />}
             onClick={(e) => setAnchorImportMenu(e.currentTarget)}
             size="small"
