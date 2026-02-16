@@ -441,6 +441,13 @@ Remove an item from the shopping list.
 #### POST `/api/shopping-list/update-from-meal-plan`
 Automatically update shopping list based on meal plan.
 
+### Barcode & Scan Session Infrastructure
+
+- **`GET /api/barcode/:code`**: Express route defined in `src/routes/barcode.js`. Uses Axios with browser-like headers to fetch product info from Open Food Facts and maps categories/units to the app's enums.
+- **`POST /api/scan-session`**/**`GET /api/scan-session/:id`**/**`POST /api/scan-session/:id`**: Implemented in `src/routes/scan-session.js`. Sessions live in an in-memory `Map` (TTL 5 minutes). Desktop clients poll via authenticated GET; phones submit barcodes via POST without auth (session ID acts as the shared secret).
+- **Always-Available Ingredients**: `src/constants/ingredients.js` exports `ALWAYS_AVAILABLE_INGREDIENTS` plus `isAlwaysAvailableIngredient(name)`. Meal plan cooking (`mealplan.js`) and shopping list aggregation skip staples such as water, salt, and pepper when checking pantry levels or adding missing items.
+- **Recipe Parser Enhancements**: `src/services/recipeParserService.js` now includes `fetchRecipeHtml` with UA retries, `parseRecipeFromText` for OCR output, and improved JSON-LD fallback parsing. These functions power the `/recipes/parse-url`, `/recipes/parse-text`, and `/recipes/prepare-import` flows.
+
 ### Achievement Endpoints
 
 #### GET `/api/achievements`
@@ -460,11 +467,10 @@ Get users ranked by achievement completion.
 ### Application Structure
 
 #### Main App Component (`src/App.jsx`)
-The main application component sets up:
-- Context providers (Auth, Theme, Achievement)
-- Routing configuration
-- Error boundary
-- Global components (Navbar, Toaster)
+The main application component now wraps routing inside `AppRoutes`, which:
+- Mounts context providers (Auth, Theme, Achievement) + the global `ErrorBoundary`
+- Renders `Navbar`, `Toaster`, and all route definitions (including the public `/scan` helper)
+- Checks local storage via `hasCompletedOnboarding(userId)` and shows `OnboardingOverlay` for new users
 
 #### Context Providers
 
@@ -474,9 +480,9 @@ The main application component sets up:
 - Provides user information to components
 
 **ThemeContext (`src/context/ThemeContext.jsx`)**
-- Manages light/dark theme state
-- Persists theme preference
-- Provides theme toggle functionality
+- Defaults to dark mode unless the user explicitly opts into light
+- Persists the preference in `localStorage` and syncs with profile settings
+- Exposes `toggleDarkMode` plus `setThemeFromPreference('light' | 'dark')`
 
 **AchievementContext (`src/context/AchievementContext.jsx`)**
 - Manages achievement notifications
@@ -496,37 +502,40 @@ The main application component sets up:
 - Redirects unauthenticated users to login
 - Handles authentication state
 
+#### OnboardingOverlay (`src/components/OnboardingOverlay.jsx`)
+- Stepper modal shown until `foodfornow_onboarding_<userId>` is set in localStorage
+- Highlights the Recipes → Meal Plan → Shopping List → Pantry workflow with icons
+- Triggered from `AppRoutes` once auth is ready
+
 #### MealPlanGrid (`src/components/MealPlanGrid.jsx`)
 - Weekly meal planning interface
 - Drag-and-drop functionality
 - Meal status tracking
 
 #### BarcodeScanner (`src/components/BarcodeScanner.jsx`)
-- Barcode scanning functionality
-- Product lookup integration
-- Ingredient addition to pantry
+- Multi-mode scanner (manual entry, desktop camera, or QR handoff to phone `/scan`)
+- Creates/polls `/scan-session` IDs and posts results via `onDetected`
+- Integrates with the backend barcode proxy + ingredient auto-creation fallback
 
 ### Pages
 
 #### Dashboard (`src/pages/Dashboard.jsx`)
-- Overview of pantry, recipes, and meal plans
-- Quick actions and statistics
-- Recent activity feed
+- Personalized stats plus collapsible "Needed Ingredients" list with Add-All-to-shopping-list
+- Auto-populate/reset week controls, recipe copy mode, cooked toggles, and contextual help dialog
 
 #### Recipes (`src/pages/Recipes.jsx`)
-- Recipe listing with search and filters
-- Recipe creation and editing
-- Category and tag management
+- Recipe listing with search/sort + dual import dialog (URL scraper + OCR image ingestion)
+- Category review modal for uncertain ingredients before import finalization
 
 #### Pantry (`src/pages/Pantry.jsx`)
-- Pantry item management
-- Quantity tracking
-- Expiration date monitoring
+- Grouped ingredient cards with expiration badges and EmptyState CTA
+- Barcode scanner integration with Open Food Facts lookup + graceful fallback
 
 #### ShoppingList (`src/pages/ShoppingList.jsx`)
-- Shopping list management
-- Item completion tracking
-- Bulk operations
+- Inline CRUD with Auto Update from meal plan, Add Item dialog, barcode scanner, and quick clear menu
+
+#### Scan (`src/pages/Scan.jsx`)
+- Mobile-friendly QR destination that uses `@zxing/browser` to send decoded barcodes back through `scan-session`
 
 ### Services
 

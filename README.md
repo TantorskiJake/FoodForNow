@@ -21,6 +21,9 @@ FoodForNow is a comprehensive full-stack web application designed to help users 
 - **Missing Ingredient Detection**: Identifies missing ingredients when cooking meals
 - **Shopping List Integration**: Automatically add missing ingredients to shopping lists
 - **Pantry Integration**: Bulk add shopping list items to pantry
+- **Barcode Scanning & QR Handoff**: Scan groceries with your laptop camera or hand off the scan to your phone via QR code
+- **Handwritten Recipe OCR Import**: Snap a recipe card photo and convert it into structured ingredients and instructions
+- **Guided Onboarding**: New users get a quick in-app walkthrough of the core workflow
 - **Theme Support**: Dark mode by default with an optional manual light mode toggle
 
 ## 🛠 Tech Stack
@@ -110,12 +113,19 @@ FoodForNow/
    ```env
    VITE_API_URL=http://localhost:3001/api
    VITE_GEONAMES_USERNAME=your_geonames_username
+   # Optional: make the dev server reachable from your phone for barcode scans
+   VITE_APP_PUBLIC_URL=http://192.168.1.23:5173
    ```
 
 4. **Start development servers** (both frontend and backend concurrently)
    ```bash
    npm run dev
    ```
+   Need to scan barcodes from a phone during development? Start the hosted variant:
+   ```bash
+   npm run dev:host
+   ```
+   Then confirm `VITE_APP_PUBLIC_URL` is set to the LAN URL (for example `http://192.168.1.23:5173`) so the desktop app can generate QR codes that your phone can open.
 
 5. **Access the application**
    - **Frontend**: http://localhost:5173
@@ -151,8 +161,8 @@ GitHub Actions automatically builds and pushes Docker images to GitHub Container
 ### Available Scripts
 
 #### Root Level (Monorepo)
-```bash
 npm run dev          # Start both frontend and backend in development mode
+npm run dev:host     # Same as dev, but exposes the frontend to your LAN for phone barcode scans
 npm run build        # Build frontend for production
 npm run start        # Start backend in production mode
 ```
@@ -161,6 +171,7 @@ npm run start        # Start backend in production mode
 ```bash
 cd foodfornow-frontend
 npm run dev          # Start Vite development server
+npm run dev:host     # Start Vite with --host for testing on phones/tablets
 npm run build        # Build for production
 npm run preview      # Preview production build
 npm run lint         # Run ESLint
@@ -198,6 +209,15 @@ npm run start        # Start production server
 - `GET /recipes/shared` - Get shared recipes from other users
 - `POST /recipes` - Create new recipe
 - `GET /recipes/:id` - Get recipe by ID
+- `POST /recipes/parse-url` - Scrape a recipe from a supported website URL
+- `POST /recipes/parse-text` - Parse OCR/plain text (e.g., handwritten recipe cards)
+- `POST /recipes/prepare-import` - Create ingredient records from parsed recipe data
+
+### Barcode & Scan Session
+- `GET /barcode/:code` - Look up a UPC/EAN barcode via Open Food Facts
+- `POST /scan-session` - Create a temporary session for phone handoffs (auth required)
+- `GET /scan-session/:id` - Poll for scanned barcodes (auth required)
+- `POST /scan-session/:id` - Submit a barcode from the phone (no auth, session-scoped)
 - `PUT /recipes/:id` - Update recipe
 - `DELETE /recipes/:id` - Delete recipe
 

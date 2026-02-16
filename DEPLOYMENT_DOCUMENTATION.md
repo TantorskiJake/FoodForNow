@@ -48,6 +48,7 @@ This document provides comprehensive guidance for deploying the FoodForNow appli
    CORS_ORIGIN=http://localhost:5173
    NODE_ENV=development
    ```
+   For the frontend, optional variables live in `foodfornow-frontend/.env`. Set `VITE_APP_PUBLIC_URL=http://<your_LAN_IP>:5173` whenever you need phones/tablets to hit the Vite dev server for barcode scanning tests.
 
 4. **Start development servers**
    ```bash
@@ -64,6 +65,9 @@ This document provides comprehensive guidance for deploying the FoodForNow appli
 # Start both frontend and backend
 npm run dev
 
+# Same as above, but exposes Vite with --host (useful when testing phone barcode scans)
+npm run dev:host
+
 # Start only frontend
 cd foodfornow-frontend && npm run dev
 
@@ -76,6 +80,14 @@ npm run build
 # Start backend in production mode
 npm run start
 ```
+
+### Testing Barcode Scanning on Mobile Devices
+
+1. Run `npm run dev:host` from the repo root so the Vite dev server binds to `0.0.0.0`.
+2. Set `VITE_APP_PUBLIC_URL` to the LAN URL your phone can open (e.g., `http://192.168.1.23:5173`), restart the frontend if you change it.
+3. Open the barcode scanner dialog on desktop, switch to **Use phone**, and scan the QR code. The app generates URLs like `http://192.168.1.23:5173/scan?session=...`.
+4. The `/scan` page runs `@zxing/browser` to stream the camera feed and hits `POST /api/scan-session/:id` whenever a barcode is decoded.
+5. Back on desktop, the dialog polls `GET /api/scan-session/:id` until a barcode arrives, then performs the normal lookup flow.
 
 ## Docker Configuration
 

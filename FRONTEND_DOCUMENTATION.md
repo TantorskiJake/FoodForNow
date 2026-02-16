@@ -34,7 +34,7 @@ src/
 
 ### Main App Component (`src/App.jsx`)
 
-The main application component orchestrates the entire application:
+The main application component orchestrates global providers, routing, and the onboarding overlay. `AppRoutes` encapsulates all routes plus conditional UI that depends on auth state.
 
 ```jsx
 function App() {
@@ -44,11 +44,7 @@ function App() {
         <AuthProvider>
           <AchievementProvider>
             <Router>
-              <Navbar />
-              <Routes>
-                {/* Route definitions */}
-              </Routes>
-              <Toaster position="bottom-right" />
+              <AppRoutes />
             </Router>
           </AchievementProvider>
         </AuthProvider>
@@ -59,10 +55,11 @@ function App() {
 ```
 
 **Key Features:**
-- **Error Boundary**: Catches and handles JavaScript errors gracefully
-- **Context Providers**: Manages global state (auth, theme, achievements)
-- **Routing**: Client-side navigation with protected routes; public routes: `/login`, `/register`, `/forgot-password`, `/reset-password`
-- **Global Components**: Navbar and toast notifications
+- **Error Boundary**: Catches runtime issues and shows a friendly fallback
+- **Context Providers**: Theme (dark-by-default), authentication, and achievements
+- **Routing**: `PrivateRoute` protects all app pages; public routes cover `/login`, `/register`, `/forgot-password`, `/reset-password`, plus `/scan` (phone barcode helper)
+- **Guided Onboarding**: `AppRoutes` checks `hasCompletedOnboarding(userId)` and mounts `OnboardingOverlay` until dismissed
+- **Global Components**: Navbar, `Toaster` (bottom-right), and route-specific overlays
 
 ### Error Boundary
 
@@ -247,25 +244,26 @@ Weekly meal planning interface with drag-and-drop functionality.
 
 ### BarcodeScanner (`src/components/BarcodeScanner.jsx`)
 
-Barcode scanning component for adding items to pantry.
+Modal component that lets users add barcodes three different ways: manual entry, laptop camera, or a QR handoff to their phone.
 
 **Features:**
-- Camera access for barcode scanning
-- Product lookup integration
-- Automatic ingredient addition
-- Error handling for unsupported devices
+- Toggle between `type`, `camera`, and `phone` modes in a single dialog
+- Generates `/api/scan-session` IDs and polls until a phone submission arrives
+- Shows a QR code that opens `/scan?session=...` on the phone (needs `VITE_APP_PUBLIC_URL` or LAN URL)
+- Performs Open Food Facts lookups (via backend proxy) and falls back to manual ingredient creation
+- Allows manual barcode entry for grocery items that won't scan well
 
 **Props:**
-- `onScan`: Callback when barcode is scanned
-- `onError`: Callback for scanning errors
-- `onClose`: Callback to close scanner
+- `open`: Boolean to show/hide the dialog
+- `onDetected(barcode: string)`: Fired when a valid code is captured (from any mode)
+- `onClose()`: Close handler (also clears timers/session polling)
 
 **Usage:**
 ```jsx
 <BarcodeScanner
-  onScan={handleBarcodeScan}
-  onError={handleScanError}
-  onClose={handleCloseScanner}
+  open={scannerOpen}
+  onDetected={handleBarcodeScan}
+  onClose={() => setScannerOpen(false)}
 />
 ```
 
@@ -340,6 +338,56 @@ Theme toggle button component.
 <ThemeToggle size="medium" color="primary" />
 ```
 
+### EmptyState (`src/components/EmptyState.jsx`)
+
+Reusable call-to-action card for empty screens (dashboard widgets, pantry, shopping list, etc.).
+
+**Features:**
+- Accepts any icon and copy; adapts styling to light/dark mode
+- Primary/secondary button slots with consistent gradients/borders
+- Keeps layouts consistent when sections have no data
+
+**Props:**
+- `icon`: React node rendered at the top
+- `title`: Headline text
+- `description`: Supporting copy
+- `primaryAction`: `{ label, onClick, startIcon? }`
+- `secondaryAction`: Optional `{ label, onClick, startIcon? }`
+
+**Usage:**
+```jsx
+<EmptyState
+  icon={<ShoppingCartIcon sx={{ fontSize: 48 }} />}
+  title="Your shopping list is empty"
+  description="Scan a barcode or auto-import ingredients from your meal plan."
+  primaryAction={{ label: 'Add Item', onClick: handleAdd }}
+  secondaryAction={{ label: 'Auto Update', onClick: handleAutoUpdate }}
+/>
+```
+
+### OnboardingOverlay (`src/components/OnboardingOverlay.jsx`)
+
+Stepper-style modal that guides first-time users through the workflow.
+
+**Features:**
+- Four steps (Recipes → Meal Plan → Shopping List → Pantry) with icons and descriptions
+- Persists completion via `localStorage` per user ID (`foodfornow_onboarding_<id>`)
+- Offers Skip/Got it controls; automatically opens until dismissed
+
+**Props:**
+- `open`: Controls visibility
+- `onClose()`: Called after Skip/Got it
+- `userId`: Used to key onboarding preference
+
+**Usage:**
+```jsx
+<OnboardingOverlay
+  open={showOnboarding}
+  onClose={() => setShowOnboarding(false)}
+  userId={user?._id}
+/>
+```
+
 ## Pages
 
 ### Dashboard (`src/pages/Dashboard.jsx`)
@@ -347,16 +395,16 @@ Theme toggle button component.
 Main dashboard page providing overview of all application features.
 
 **Features:**
-- Quick statistics (recipes, pantry items, meal plans)
-- Recent activity feed
-- Quick action buttons
-- Responsive grid layout
-- Achievement highlights
+- Personalized greeting + stats (recipes, pantry items, meal plans, shopping items)
+- Weekly meal plan grid with copy-to-slot mode, cooked toggles, and optimistic edits
+- Collapsible “Needed Ingredients” panel with Add-All-to-shopping-list, pantry adjustments, and per-item state chips
+- EmptyState fallbacks for meal plan/ingredient widgets
+- Contextual help dialog ("How FoodForNow Works") accessible from the header
 
 **State Management:**
-- Fetches data from multiple API endpoints
-- Real-time updates for meal plan status
-- Achievement notifications
+- Fetches recipes, pantry, shopping list, and meal plans in parallel
+- Optimistic updates for add/edit/cook operations with toast feedback
+- Achievement notifications fire when API responses include `achievements`
 
 **Usage:**
 ```jsx
@@ -438,20 +486,18 @@ User registration page.
 
 ### Recipes (`src/pages/Recipes.jsx`)
 
-Recipe management page.
+Recipe management page that now supports both URL scraping and handwritten card imports.
 
 **Features:**
-- Recipe listing with search and filters
-- Recipe creation and editing
-- Category and tag management
-- Pagination
-- Sort options
+- Recipe listing with search, filters, sorting, and empty-state guidance
+- Dual import menu (URL scraper + OCR image upload powered by `tesseract.js`)
+- Category review dialog for uncertain ingredients before import completes
+- Inline editing/creation with image upload, tags, timings, and instructions
+- Toast notifications + loading states for parse/prep flows
 
 **State Management:**
-- Recipe list with pagination
-- Search and filter state
-- Loading states
-- Error handling
+- Tracks list filters, import dialog states, OCR progress, category overrides, and pending recipe payloads
+- Uses `api.post('/recipes/parse-text')` + `/prepare-import` to hydrate forms
 
 ### RecipeDetail (`src/pages/RecipeDetail.jsx`)
 
@@ -473,36 +519,45 @@ Individual recipe view page.
 Pantry management page.
 
 **Features:**
-- Pantry item listing
-- Add/edit/delete items
-- Quantity tracking
-- Expiration date monitoring
-- Category filtering
-- Barcode scanning integration
+- Grouped ingredient cards with per-unit chips and expiration badges
+- Add/edit dialog with drag/drop photos (if desired) and quantity controls
+- Barcode scanner integration (manual/camera/phone) plus Open Food Facts lookup + fallback placeholder creation
+- Empty state CTA that links to Dashboard when no pantry items exist
+- Quick actions to add scanning results directly into pantry forms
 
 **State Management:**
-- Pantry items with real-time updates
-- Search and filter functionality
-- Bulk operations
-- Expiration alerts
+- Aggregates pantry items by ingredient name for clean UI
+- Tracks form data, dialog state, scanner modal, and existing ingredients
+- Gracefully degrades when barcode lookup fails (keeps dialog populated)
 
 ### ShoppingList (`src/pages/ShoppingList.jsx`)
 
 Shopping list management page.
 
 **Features:**
-- Shopping list items
-- Add/edit/delete items
-- Completion tracking
-- Priority levels
-- Category organization
-- Bulk operations
+- Full CRUD with inline checkboxes and quantity/unit display
+- Auto Update action pulls missing meal-plan ingredients; Add Item dialog supports manual additions
+- Clear menu differentiates “Clear Completed” vs “Clear All”
+- Barcode scanner integration mirrors pantry behavior, auto-creating ingredients when needed
+- Empty state CTA cards for first-time use
 
 **State Management:**
-- Shopping list with real-time updates
-- Completion status tracking
-- Priority management
-- Bulk add to pantry
+- Maintains filters, sort order, search term, barcode scanner visibility, and add dialog state
+- Calls `/shopping-list` APIs and surfaces achievements returned from server
+
+### Scan (`src/pages/Scan.jsx`)
+
+Simple mobile-friendly page used when a user scans the QR code from the desktop barcode dialog.
+
+**Features:**
+- Uses `@zxing/browser` to access the device camera and continuously decode barcodes
+- Submits scanned text to `POST /scan-session/:id` (session ID comes from QR query string)
+- Shows success/error states and instructs the user to return to their computer after scanning
+
+**Usage:**
+```jsx
+<Route path="/scan" element={<Scan />} />
+```
 
 ### Ingredients (`src/pages/Ingredients.jsx`)
 
@@ -532,10 +587,10 @@ User profile management page.
 
 **Features:**
 - Profile information editing
-- Preference settings
-- Notification settings
-- Account management
-- Theme preferences
+- Notification settings (email, push, reminders)
+- Display preferences (theme, units, language) with dark-mode default + manual light override only
+- Security tab for password updates with live validation
+- Account stats and downloadable data section
 
 ## Services
 
@@ -606,6 +661,18 @@ try {
   // Show "Location services not configured" or similar
 }
 ```
+
+### Barcode Lookup (`src/services/barcodeLookup.js`)
+
+Helper functions shared by Pantry and Shopping List flows.
+
+**Exports:**
+- `extractBarcode(value: string)`: Strips non-digits and returns a normalized UPC/EAN or `null`
+- `lookupBarcode(barcode: string)`: Calls the backend (`/barcode/:code`) and returns `{ productName, category, quantity, unit, barcode }`
+
+**Usage Considerations:**
+- Throwing errors are surfaced to the UI; callers fall back to manual ingredient selection when lookup fails
+- Depends on the backend proxy so no API keys are needed client-side
 
 ## Utilities
 

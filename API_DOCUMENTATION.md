@@ -520,6 +520,102 @@ Update an existing recipe.
 
 ---
 
+### POST `/api/recipes/parse-url`
+
+Scrape recipe data from a supported website (Serious Eats, TheKitchn, Food Network, ChewOutLoud, etc.). Requires authentication.
+
+**Request Body:**
+```json
+{
+  "url": "https://www.seriouseats.com/real-deal-carbonara"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "name": "Real Deal Carbonara",
+  "description": "Roman-style pasta",
+  "ingredients": [
+    {
+      "name": "guanciale",
+      "quantity": 150,
+      "unit": "g",
+      "suggestedCategory": "Meat",
+      "uncertain": false
+    }
+  ],
+  "instructions": ["..."],
+  "prepTime": 15,
+  "cookTime": 15,
+  "servings": 4,
+  "tags": ["italian"]
+}
+```
+
+**Error Responses:**
+- `400`: Missing/invalid URL or unsupported schema
+- `403`: Upstream site blocked scraping after retries
+
+---
+
+### POST `/api/recipes/parse-text`
+
+Convert OCR/plain text (e.g., handwritten recipe cards) into structured recipe data.
+
+**Request Body:**
+```json
+{
+  "text": "Grandma's Lasagna\nIngredients:\n2 cups sauce\n...\nInstructions:\n1. Preheat oven..."
+}
+```
+
+**Success Response (200):**
+Same payload shape as `parse-url`. Unparsable lines become `uncertain` ingredients so the UI can ask for confirmation.
+
+**Error Responses:**
+- `400`: Missing or empty `text` body
+
+---
+
+### POST `/api/recipes/prepare-import`
+
+Create ingredient records (or map to existing ones) after parsing. Returns a recipe payload where all ingredient IDs are resolvable.
+
+**Request Body:**
+```json
+{
+  "recipeData": { "...": "Output from parse-url/parse-text" },
+  "categoryOverrides": {
+    "guanciale": "Meat",
+    "pecorino romano": "Dairy"
+  }
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "recipe": {
+    "name": "Real Deal Carbonara",
+    "ingredients": [
+      {
+        "ingredient": "65f5f41fc...",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ],
+    "instructions": ["..."]
+  }
+}
+```
+
+**Error Responses:**
+- `400`: Validation error (e.g., missing ingredient IDs)
+- `500`: Failed to create ingredient records
+
+---
+
 ### DELETE `/api/recipes/:id`
 
 Delete a recipe.
@@ -1297,6 +1393,79 @@ Endpoints that return lists support pagination:
 **Dates:**
 - Must be valid ISO date strings
 - Cannot be in the past for future events
+
+## Barcode & Scan Session Endpoints
+
+### GET `/api/barcode/:code`
+
+Look up product metadata by UPC/EAN barcode via the Open Food Facts proxy. Requires authentication.
+
+**Success Response (200):**
+```json
+{
+  "productName": "Nutella",
+  "category": "Pantry",
+  "quantity": 750,
+  "unit": "g",
+  "barcode": "3017620422003"
+}
+```
+
+**Error Responses:**
+- `404`: Product not found
+- `503`: Open Food Facts unreachable
+- `500`: Unexpected lookup error
+
+---
+
+### POST `/api/scan-session`
+
+Create a 5-minute session to pair a logged-in desktop browser with a phone scanner.
+
+**Success Response (200):**
+```json
+{ "sessionId": "4c7ab1f9fa1e44c3a4cd1f89a6d26335" }
+```
+
+Use the session ID to generate `https://app.example.com/scan?session=<id>` or rely on the frontend QR code.
+
+---
+
+### GET `/api/scan-session/:id`
+
+Poll for barcode submissions tied to a session. Requires authentication.
+
+**Success Response (200):**
+```json
+{ "barcode": null }
+```
+
+When the phone posts, `barcode` becomes a numeric string (e.g., `"3017620422003"`).
+
+**Error Responses:**
+- `404`: Session expired or invalid
+
+---
+
+### POST `/api/scan-session/:id`
+
+Called from the mobile `/scan` page (no auth) to send a decoded barcode back to the desktop.
+
+**Request Body:**
+```json
+{ "barcode": "3017620422003" }
+```
+
+**Success Response (200):**
+```json
+{ "success": true }
+```
+
+**Error Responses:**
+- `400`: Missing/invalid barcode
+- `404`: Session expired or invalid
+
+---
 
 ## Webhooks (Future Feature)
 
