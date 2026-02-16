@@ -326,9 +326,13 @@ const Dashboard = () => {
   const handlePopulateWeek = async () => {
     try {
       setLoading(true);
-      await api.post('/mealplan/populate-week', {
+      const response = await api.post('/mealplan/populate-week', {
         weekStart: selectedWeekStart
       });
+      // Check for achievements in response
+      if (response.data.achievements && response.data.achievements.length > 0) {
+        showAchievements(response.data.achievements);
+      }
       // Refresh meal plan and ingredients
       await Promise.all([
         fetchMealPlan(),

@@ -86,7 +86,7 @@ const achievements = {
     description: 'Plan a full week of meals',
     category: 'meal-planning',
     icon: '🗓️',
-    requiredProgress: 7
+    requiredProgress: 21
   },
   'three-meals-one-day': {
     name: 'Meal Prep Pro',

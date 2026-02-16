@@ -166,16 +166,31 @@ function parseIngredientString(str) {
   }
 }
 
+// Browser-like headers to reduce 403 blocks from sites that reject bot requests (e.g. TheKitchn)
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Connection': 'keep-alive',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+};
+
 /**
  * Lenient fallback: fetch HTML and extract Recipe from JSON-LD manually.
  * Handles sites (e.g. WP Recipe Maker, Salt & Lavender) that use valid schema
  * but fail @dimfu's strict validation (e.g. different property names).
+ * Uses browser-like headers to work around 403 blocks (e.g. TheKitchn).
  */
 async function parseRecipeFromUrlFallback(url) {
   const { data: html } = await axios.get(url, {
     responseType: 'text',
     timeout: 15000,
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FoodForNow/1.0; +https://github.com)' },
+    headers: BROWSER_HEADERS,
   });
 
   const $ = cheerio.load(html);
@@ -252,7 +267,12 @@ async function parseRecipeFromUrl(url) {
   try {
     data = await getRecipeData(url);
   } catch (err) {
-    if (err.message === 'Recipe is not valid') {
+    // Try fallback on validation failure OR HTTP errors (403, etc.) from sites that block scrapers
+    const shouldFallback =
+      err.message === 'Recipe is not valid' ||
+      err.response?.status === 403 ||
+      (err.message && err.message.includes('status code 403'));
+    if (shouldFallback) {
       data = await parseRecipeFromUrlFallback(url);
     }
     if (!data) throw err;

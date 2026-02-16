@@ -247,10 +247,10 @@ class AchievementService {
     const firstPlan = await this.checkAchievement(userId, 'first-meal-plan');
     if (firstPlan) results.push(firstPlan);
 
-    // Check full week planning (all 21 slots)
+    // Check full week planning (all 21 slots: 7 days × 3 meals)
     const weekMeals = await this.getWeekMealsCount(userId);
     if (weekMeals >= 21) {
-      const weeklyWarrior = await this.checkAchievement(userId, 'full-week-planned');
+      const weeklyWarrior = await this.checkAchievement(userId, 'full-week-planned', weekMeals, 'set');
       if (weeklyWarrior) results.push(weeklyWarrior);
     }
 
@@ -330,23 +330,18 @@ class AchievementService {
   }
 
   static async getWeekMealsCount(userId) {
-    const now = new Date();
-    // Use Monday as week start to match MealPlan schema (weekStart is Monday)
-    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-
-    // Find all meal plans for the user in the current week
-    const meals = await MealPlan.find({
-      user: userId,
-      weekStart: { $gte: weekStart, $lt: weekEnd }
+    // Check ALL weeks - user may plan future/past weeks, not just current
+    const meals = await MealPlan.find({ user: userId });
+    // Group by week (normalize weekStart to date string for grouping)
+    const slotsByWeek = {};
+    meals.forEach(m => {
+      const weekKey = new Date(m.weekStart).toISOString().split('T')[0];
+      if (!slotsByWeek[weekKey]) slotsByWeek[weekKey] = new Set();
+      slotsByWeek[weekKey].add(`${m.day}|${m.meal}`);
     });
-    // Count unique (day, meal) pairs (21 = 7 days × 3 meals for full week)
-    const uniqueSlots = new Set(meals.map(m => `${m.day}|${m.meal}`));
-    return uniqueSlots.size;
+    // Return max slots in any single week (21 = 7 days × 3 meals for full week)
+    const counts = Object.values(slotsByWeek).map(s => s.size);
+    return counts.length > 0 ? Math.max(...counts) : 0;
   }
 
   static async getCompletedAchievementsCount(userId) {

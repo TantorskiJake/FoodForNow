@@ -32,6 +32,13 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryColor } from '../utils/categoryColors';
 
+const toTitleCase = (str) => {
+  if (!str) return '';
+  return str.split(' ').map(word =>
+    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  ).join(' ');
+};
+
 const Ingredients = () => {
   const theme = useTheme();
   const { authenticated } = useAuth();
@@ -322,7 +329,7 @@ const Ingredients = () => {
                       lineHeight: 1.3,
                     }}
                   >
-                    {ingredient.name}
+                    {toTitleCase(ingredient.name)}
                   </Typography>
 
                   <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>

@@ -524,6 +524,30 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
         newMealPlans.push(mealPlanItem);
       }
     }
+
+    // Check for meal planning achievements (e.g. Weekly Warrior)
+    try {
+      const AchievementService = require('../services/achievementService');
+      const achievements = await AchievementService.checkMealPlanningAchievements(req.userId);
+      if (achievements && achievements.length > 0) {
+        const newlyCompleted = achievements.filter(a => a.newlyCompleted);
+        if (newlyCompleted.length > 0) {
+          res.json({
+            message: `Week populated with ${newMealPlans.length} random recipes`,
+            mealPlans: newMealPlans,
+            achievements: newlyCompleted.map(a => ({
+              name: a.config.name,
+              description: a.config.description,
+              icon: a.config.icon
+            }))
+          });
+          return;
+        }
+      }
+    } catch (achievementError) {
+      console.error('Error checking achievements:', achievementError);
+    }
+
     res.json({
       message: `Week populated with ${newMealPlans.length} random recipes`,
       mealPlans: newMealPlans

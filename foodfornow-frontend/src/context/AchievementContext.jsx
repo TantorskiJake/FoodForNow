@@ -17,8 +17,13 @@ export const AchievementProvider = ({ children }) => {
    * @param {Object} achievement - Achievement object with name, description, and icon
    */
   const showAchievement = useCallback((achievement) => {
+    if (!achievement?.name) return;
     const id = Date.now() + Math.random();
-    setNotifications(prev => [...prev, { id, achievement }]);
+    setNotifications(prev => {
+      // Don't show duplicate - same achievement already in queue
+      if (prev.some(n => n.achievement?.name === achievement.name)) return prev;
+      return [...prev, { id, achievement }];
+    });
   }, []);
 
   /**
@@ -35,8 +40,15 @@ export const AchievementProvider = ({ children }) => {
    */
   const showAchievements = useCallback((achievements) => {
     if (!Array.isArray(achievements)) return;
-    
-    achievements.forEach((achievement, index) => {
+    // Deduplicate by name - only show each achievement once
+    const seen = new Set();
+    const unique = achievements.filter(a => {
+      const key = a?.name || '';
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    unique.forEach((achievement, index) => {
       setTimeout(() => {
         showAchievement(achievement);
       }, index * 500); // Stagger notifications by 500ms
