@@ -497,6 +497,44 @@ const Dashboard = () => {
     }
   };
 
+  const handleAddRecipeToSlot = async (day, mealType, recipe, existingMealId = null) => {
+    if (!recipe?._id) return;
+    try {
+      setMealActionLoading(true);
+      let response;
+      if (existingMealId) {
+        response = await api.put(`/mealplan/${existingMealId}`, { recipeId: recipe._id });
+      } else {
+        response = await api.post('/mealplan', {
+          weekStart: selectedWeekStart,
+          day,
+          meal: mealType,
+          recipeId: recipe._id
+        });
+        if (response.data.achievements?.length > 0) {
+          showAchievements(response.data.achievements);
+        }
+      }
+      const mealItem = response.data.mealPlanItem || response.data;
+      setMealPlan(prev => {
+        if (existingMealId) {
+          return prev.map(m => m._id === mealItem._id ? mealItem : m);
+        }
+        return [...prev, mealItem];
+      });
+      await fetchIngredients();
+      setError('');
+      toast.success(`Added ${recipe.name} to ${day} ${mealType}`);
+    } catch (err) {
+      console.error('Error adding recipe to slot:', err);
+      const errMsg = err.response?.data?.error || 'Failed to add recipe. Please try again.';
+      setError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setMealActionLoading(false);
+    }
+  };
+
   const handleMealPlanUpdate = async (updatedMeal) => {
     try {
       // Update the local meal plan state with the updated meal
@@ -781,6 +819,7 @@ const Dashboard = () => {
                 onEditMeal={handleEditMeal}
                 onDeleteMeal={handleDeleteMeal}
                 onMealPlanUpdate={handleMealPlanUpdate}
+                onAddRecipeToSlot={handleAddRecipeToSlot}
               />
             </CardContent>
           </Card>
