@@ -33,11 +33,12 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
+// Order matches user flow: plan (Dashboard) → recipes → shopping list → pantry → ingredients (reference)
 const pages = [
   { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   { name: 'Recipes', path: '/recipes', icon: <MenuBookIcon /> },
-  { name: 'Pantry', path: '/pantry', icon: <KitchenIcon /> },
   { name: 'Shopping List', path: '/shopping-list', icon: <ShoppingCartIcon /> },
+  { name: 'Pantry', path: '/pantry', icon: <KitchenIcon /> },
   { name: 'Ingredients', path: '/ingredients', icon: <LocalDiningIcon /> },
 ];
 
