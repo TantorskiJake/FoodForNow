@@ -20,6 +20,8 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import EditIcon from '@mui/icons-material/Edit';
+import LogoutIcon from '@mui/icons-material/Logout';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import FFNLogo from '../assets/FFNLogoTrans.png';
@@ -37,7 +39,6 @@ const pages = [
   { name: 'Pantry', path: '/pantry', icon: <KitchenIcon /> },
   { name: 'Shopping List', path: '/shopping-list', icon: <ShoppingCartIcon /> },
   { name: 'Ingredients', path: '/ingredients', icon: <LocalDiningIcon /> },
-  { name: 'Achievements', path: '/achievements', icon: <EmojiEventsIcon /> }
 ];
 
 const Navbar = () => {
@@ -125,6 +126,10 @@ const Navbar = () => {
                       <ListItemText primary={page.name} />
                     </ListItem>
                   ))}
+                  <ListItem button onClick={() => navigate('/achievements')} selected={location.pathname === '/achievements'}>
+                    <ListItemIcon><EmojiEventsIcon /></ListItemIcon>
+                    <ListItemText primary="Achievements" />
+                  </ListItem>
                   <ListItem button onClick={handleLogout}>
                     <ListItemIcon><AccountCircle /></ListItemIcon>
                     <ListItemText primary="Logout" />
@@ -198,9 +203,17 @@ const Navbar = () => {
               onClose={handleClose}
             >
               <MenuItem onClick={() => { handleClose(); navigate('/profile'); }}>
+                <ListItemIcon sx={{ minWidth: 36 }}><EditIcon fontSize="small" /></ListItemIcon>
                 Edit Profile
               </MenuItem>
-              <MenuItem onClick={handleLogout}>Logout</MenuItem>
+              <MenuItem onClick={() => { handleClose(); navigate('/achievements'); }}>
+                <ListItemIcon sx={{ minWidth: 36 }}><EmojiEventsIcon fontSize="small" /></ListItemIcon>
+                Achievements
+              </MenuItem>
+              <MenuItem onClick={handleLogout}>
+                <ListItemIcon sx={{ minWidth: 36 }}><LogoutIcon fontSize="small" /></ListItemIcon>
+                Logout
+              </MenuItem>
             </Menu>
           </Box>
         )}
