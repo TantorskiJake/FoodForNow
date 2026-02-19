@@ -73,10 +73,25 @@ FoodForNow/
 │   │   └── utils/              # Utility functions
 │   ├── Dockerfile              # Frontend container
 │   └── package.json
+├── docs/                       # Project documentation
+│   ├── api.md                  # API reference
+│   ├── frontend.md             # Frontend documentation
+│   ├── technical.md            # Architecture & technical guide
+│   └── deployment.md           # Deployment & CI/CD
+├── e2e/                        # Playwright end-to-end tests
 ├── .github/workflows/          # CI/CD pipelines
 ├── package.json                # Root workspace configuration
 └── README.md
 ```
+
+## 📚 Documentation
+
+Detailed docs live in **[docs/](docs/)**:
+
+- **[API Reference](docs/api.md)** — Endpoints, auth, request/response formats
+- **[Frontend](docs/frontend.md)** — React app structure and components
+- **[Technical](docs/technical.md)** — Architecture, database, and dev guidelines
+- **[Deployment](docs/deployment.md)** — Docker, env config, and production
 
 ## 🚀 Quick Start
 
