@@ -69,6 +69,7 @@ coverage/
 jest.config.js
 tests/temp/
 *.test.log
+test-results/
 
 # Snyk CLI binary and reports (do not commit)
 snyk
