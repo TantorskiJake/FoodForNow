@@ -200,18 +200,64 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Toggle cooked status
+// Toggle cooked status (uncook: restock pantry with recipe ingredients)
 router.patch('/:id/cooked', authMiddleware, async (req, res) => {
   try {
-    const mealPlanItem = await MealPlan.findOne({ _id: req.params.id, user: req.userId });
-    
+    const mealPlanItem = await MealPlan.findOne({ _id: req.params.id, user: req.userId })
+      .populate({
+        path: 'recipe',
+        populate: {
+          path: 'ingredients.ingredient'
+        }
+      });
+
     if (!mealPlanItem) {
       return res.status(404).json({ error: 'Meal plan item not found' });
     }
 
+    const wasCooked = mealPlanItem.cooked;
     mealPlanItem.cooked = !mealPlanItem.cooked;
+
+    // When uncooking: add recipe ingredients back to the pantry
+    if (wasCooked && mealPlanItem.cooked === false) {
+      if (!mealPlanItem.eatingOut && mealPlanItem.recipe && mealPlanItem.recipe.ingredients && mealPlanItem.recipe.ingredients.length > 0) {
+        const Pantry = require('../models/pantry');
+        let pantry = await Pantry.findOne({ user: req.userId });
+        if (!pantry) {
+          pantry = new Pantry({ user: req.userId, items: [] });
+          await pantry.save();
+        }
+        const ingredientName = (ing) => (ing && ing.ingredient && ing.ingredient.name) ? ing.ingredient.name : '';
+        for (const recipeIngredient of mealPlanItem.recipe.ingredients) {
+          if (!recipeIngredient.ingredient) continue;
+          if (isAlwaysAvailableIngredient(recipeIngredient.ingredient.name)) continue;
+          const name = ingredientName(recipeIngredient);
+          const addQuantity = recipeIngredient.quantity;
+          const addUnit = recipeIngredient.unit;
+          const addInStandard = toStandard(addQuantity, addUnit, name);
+          const ingredientId = recipeIngredient.ingredient._id;
+          const existingItems = (pantry.items || []).filter(
+            item => item.ingredient && item.ingredient.toString() === ingredientId.toString()
+          );
+          if (existingItems.length > 0) {
+            const target = existingItems[0];
+            const currentInStandard = toStandard(target.quantity, target.unit, name);
+            const newInStandard = currentInStandard + addInStandard;
+            const newQuantity = fromStandard(newInStandard, target.unit, name);
+            target.quantity = Math.round(newQuantity * 100) / 100;
+          } else {
+            pantry.items.push({
+              ingredient: ingredientId,
+              quantity: addQuantity,
+              unit: addUnit
+            });
+          }
+        }
+        await pantry.save();
+      }
+    }
+
     await mealPlanItem.save();
-    
     await mealPlanItem.populate('recipe');
     res.json(mealPlanItem);
   } catch (error) {
@@ -512,16 +558,16 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
       if (mealPlan.recipe && mealPlan.recipe.ingredients) {
         mealPlan.recipe.ingredients.forEach(ing => {
           if (!ing.ingredient) return;
-          if (isAlwaysAvailableIngredient(ing.ingredient.name)) return;
-          const idStr = ing.ingredient._id.toString();
-          const name = ing.ingredient.name;
+          const idStr = (ing.ingredient._id || ing.ingredient).toString();
+          const name = (ing.ingredient.name != null && typeof ing.ingredient.name === 'string') ? ing.ingredient.name : '';
+          if (isAlwaysAvailableIngredient(name)) return;
           if (aggregateByIngredient) {
             const needInStandard = toStandard(ing.quantity, ing.unit, name);
             if (!ingredients.has(idStr)) {
               ingredients.set(idStr, {
-                _id: ing.ingredient._id,
+                _id: ing.ingredient._id || ing.ingredient,
                 name,
-                category: ing.ingredient.category,
+                category: ing.ingredient.category != null ? ing.ingredient.category : undefined,
                 quantityInStandard: needInStandard,
                 usages: [{ quantity: ing.quantity, unit: ing.unit }]
               });
@@ -534,9 +580,9 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
             const key = `${idStr}-${ing.unit}`;
             if (!ingredients.has(key)) {
               ingredients.set(key, {
-                _id: ing.ingredient._id,
+                _id: ing.ingredient._id || ing.ingredient,
                 name,
-                category: ing.ingredient.category,
+                category: ing.ingredient.category != null ? ing.ingredient.category : undefined,
                 quantity: ing.quantity,
                 unit: ing.unit
               });

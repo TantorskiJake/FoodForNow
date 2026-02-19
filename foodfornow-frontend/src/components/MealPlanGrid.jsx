@@ -47,6 +47,8 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('error');
+  const [uncookConfirmOpen, setUncookConfirmOpen] = useState(false);
+  const [mealToUncook, setMealToUncook] = useState(null);
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
 
@@ -79,9 +81,11 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
 
   const handleToggleCooked = async (meal, event) => {
     event.stopPropagation();
-    
-    // If already cooked, do nothing (cooked meals cannot be uncooked)
+
+    // If already cooked, show confirmation before uncooking
     if (meal.cooked) {
+      setMealToUncook(meal);
+      setUncookConfirmOpen(true);
       return;
     }
 
@@ -135,8 +139,15 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
         showAchievements(response.data.achievements);
       }
       
+      const addedCount = response.data.addedToShoppingList ?? missingIngredients.length;
+      setSnackbarMessage(addedCount === 1
+        ? 'Added 1 ingredient to your shopping list'
+        : `Added all ${addedCount} ingredients to your shopping list`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
       // Only update the meal plan if it was actually marked as cooked
-      if (response.data.mealPlanItem.cooked) {
+      if (response.data.mealPlanItem?.cooked) {
         if (onMealPlanUpdate) {
           onMealPlanUpdate(response.data.mealPlanItem);
         }
@@ -151,6 +162,9 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
       setSelectedMealForCooking(null);
     } catch (error) {
       console.error('Error cooking meal with shopping list:', error);
+      setSnackbarMessage(error.response?.data?.error || 'Failed to add ingredients to shopping list. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
     }
   };
 
@@ -158,6 +172,29 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
     setMissingIngredientsDialog(false);
     setMissingIngredients([]);
     setSelectedMealForCooking(null);
+  };
+
+  const handleUncookConfirm = async () => {
+    if (!mealToUncook) return;
+    try {
+      const response = await api.patch(`/mealplan/${mealToUncook._id}/cooked`);
+      if (onMealPlanUpdate) {
+        onMealPlanUpdate(response.data);
+      }
+      setUncookConfirmOpen(false);
+      setMealToUncook(null);
+    } catch (error) {
+      setSnackbarMessage(error.response?.data?.error || 'Failed to uncook meal. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      setUncookConfirmOpen(false);
+      setMealToUncook(null);
+    }
+  };
+
+  const handleUncookCancel = () => {
+    setUncookConfirmOpen(false);
+    setMealToUncook(null);
   };
 
   const handleCopyRecipe = (meal, event) => {
@@ -318,7 +355,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                               left: 2,
                               zIndex: 1
                             }}>
-                              <Tooltip title={isCooked ? (isEatingOut ? 'Already marked' : 'Already cooked') : (isEatingOut ? 'Mark as eaten' : 'Mark as cooked')}>
+                              <Tooltip title={isCooked ? (isEatingOut ? 'Already marked' : 'Uncook (mark as not cooked)') : (isEatingOut ? 'Mark as eaten' : 'Mark as cooked')}>
                                 <span>
                                   <IconButton
                                     size="small"
@@ -466,13 +503,34 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
             ))}
           </List>
           <Typography variant="body2" sx={{ mt: 2 }}>
-            Would you like to add the missing ingredients to your shopping list?
+            Would you like to add all missing ingredients to your shopping list?
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseMissingIngredientsDialog}>Cancel</Button>
           <Button onClick={handleAddMissingToShoppingList} variant="contained" color="primary">
-            Add to Shopping List
+            Add all to Shopping List
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Uncook confirmation dialog */}
+      <Dialog
+        open={uncookConfirmOpen}
+        onClose={handleUncookCancel}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Uncook this meal?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Are you sure you want to mark this meal as not cooked? This will not restore ingredients to your pantry.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleUncookCancel}>Cancel</Button>
+          <Button onClick={handleUncookConfirm} variant="contained" color="primary">
+            Yes, uncook
           </Button>
         </DialogActions>
       </Dialog>

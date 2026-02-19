@@ -689,7 +689,7 @@ const ShoppingList = () => {
           tertiaryAction={{ label: 'Scan Barcode', onClick: () => setScannerOpen(true), startIcon: <QrCodeScannerIcon /> }}
         />
       ) : (
-        <Grid container spacing={2}>
+        <Grid container spacing={1.5}>
           {(() => {
             // Group items by ingredient name
             const groupedItems = sortedShoppingItems.reduce((groups, item) => {
@@ -702,11 +702,11 @@ const ShoppingList = () => {
             }, {});
 
             return Object.entries(groupedItems).map(([ingredientName, items]) => (
-              <Grid item xs={12} sm={6} md={4} key={ingredientName}>
+              <Grid item xs={12} sm={4} md={3} lg={2} key={ingredientName}>
                 <Paper
                   elevation={1}
                   sx={{
-                    p: 2,
+                    p: 1.25,
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
@@ -718,17 +718,18 @@ const ShoppingList = () => {
                 >
                   {/* Ingredient Name Header */}
                   <Typography
-                    variant="h6"
+                    variant="subtitle1"
                     sx={{
                       fontWeight: 600,
-                      mb: 1,
+                      mb: 0.5,
                       color: 'text.primary',
                       borderBottom: '1px solid',
                       borderColor: 'divider',
-                      pb: 1,
+                      pb: 0.5,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 1
+                      gap: 0.75,
+                      fontSize: '0.875rem',
                     }}
                   >
                     <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
@@ -739,7 +740,7 @@ const ShoppingList = () => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           display: 'block',
-                          fontSize: '0.9rem'
+                          fontSize: '0.85rem'
                         }}
                       >
                         {capitalizeWords(ingredientName)}
@@ -751,7 +752,7 @@ const ShoppingList = () => {
                         size="small"
                         color="primary"
                         variant="outlined"
-                        sx={{ fontSize: '0.7rem', height: 20 }}
+                        sx={{ fontSize: '0.65rem', height: 18 }}
                       />
                     )}
                   </Typography>
@@ -764,8 +765,8 @@ const ShoppingList = () => {
                         sx={{
                           display: 'flex',
                           alignItems: 'center',
-                          mb: index < items.length - 1 ? 1 : 0,
-                          p: 1,
+                          mb: index < items.length - 1 ? 0.5 : 0,
+                          p: 0.75,
                           borderRadius: 1,
                           backgroundColor: theme.palette.mode === 'dark' 
                             ? 'rgba(255, 255, 255, 0.03)' 
@@ -777,16 +778,17 @@ const ShoppingList = () => {
                           onChange={() => handleToggleComplete(item)}
                           color="primary"
                           size="small"
-                          sx={{ mr: 1 }}
+                          sx={{ mr: 0.75, p: 0.25 }}
                         />
                         <Box sx={{ flex: 1 }}>
-                          <Box display="flex" alignItems="center" gap={1}>
+                          <Box display="flex" alignItems="center" gap={0.75}>
                             <Typography 
                               variant="body2" 
                               color="textSecondary"
                               sx={{
                                 textDecoration: item.completed ? 'line-through' : 'none',
                                 color: item.completed ? 'text.disabled' : 'text.secondary',
+                                fontSize: '0.8125rem',
                               }}
                             >
                               {item.pantryQuantity > 0 
@@ -795,7 +797,7 @@ const ShoppingList = () => {
                               } {item.unit}
                             </Typography>
                             {item.pantryQuantity > 0 && (
-                              <Box sx={{ width: '30px', ml: 1 }}>
+                              <Box sx={{ width: '28px', ml: 0.75 }}>
                                 <LinearProgress
                                   variant="determinate"
                                   value={Math.min(100, (item.pantryQuantity / (item.quantity + item.pantryQuantity)) * 100)}
@@ -818,12 +820,13 @@ const ShoppingList = () => {
                             )}
                           </Box>
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', gap: 0.25 }}>
                           <IconButton
                             size="small"
                             onClick={() => handleAddToPantry(item)}
                             disabled={!item.completed}
                             sx={{ 
+                              p: 0.375,
                               color: 'success.main',
                               '&:hover': {
                                 backgroundColor: theme.palette.mode === 'dark'
@@ -832,12 +835,13 @@ const ShoppingList = () => {
                               },
                             }}
                           >
-                            <AddShoppingCartIcon fontSize="small" />
+                            <AddShoppingCartIcon sx={{ fontSize: 18 }} />
                           </IconButton>
                           <IconButton
                             size="small"
                             onClick={() => handleDeleteItem(item._id)}
                             sx={{ 
+                              p: 0.375,
                               color: 'error.main',
                               '&:hover': {
                                 backgroundColor: theme.palette.mode === 'dark'
@@ -846,7 +850,7 @@ const ShoppingList = () => {
                               },
                             }}
                           >
-                            <DeleteIcon fontSize="small" />
+                            <DeleteIcon sx={{ fontSize: 18 }} />
                           </IconButton>
                         </Box>
                       </Box>
@@ -858,13 +862,13 @@ const ShoppingList = () => {
                   <Box sx={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
-                    mt: 1, 
-                    pt: 1,
+                    mt: 0.5, 
+                    pt: 0.5,
                     borderTop: '1px solid',
                     borderColor: 'divider'
                   }}>
                     <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
                         Total: {items.reduce((sum, item) => sum + item.quantity, 0)} units
                       </Typography>
                     </Box>
@@ -878,7 +882,7 @@ const ShoppingList = () => {
                           });
                         }}
                         disabled={items.every(item => item.completed)}
-                        sx={{ fontSize: '0.75rem', py: 0.5 }}
+                        sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75 }}
                       >
                         Check All
                       </Button>
@@ -891,7 +895,7 @@ const ShoppingList = () => {
                           });
                         }}
                         disabled={items.every(item => !item.completed)}
-                        sx={{ fontSize: '0.75rem', py: 0.5 }}
+                        sx={{ fontSize: '0.7rem', py: 0.25, px: 0.75 }}
                       >
                         Uncheck All
                       </Button>

@@ -67,7 +67,7 @@ const Navbar = () => {
 
   if (loading) {
     return (
-      <AppBar position="static">
+      <AppBar position="sticky" sx={{ top: 0 }}>
         <Toolbar>
           <RestaurantIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -85,7 +85,7 @@ const Navbar = () => {
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '';
 
   return (
-    <AppBar position="static">
+    <AppBar position="sticky" sx={{ top: 0 }}>
       <Toolbar>
         <img 
           src={FFNLogo} 
