@@ -190,10 +190,24 @@ const BROWSER_HEADERS_FIREFOX = {
   'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
 };
 
+/** Reject URLs that could lead to SSRF (localhost, private IPs). Call before any fetch. */
+function assertUrlAllowedForFetch(urlString) {
+  try {
+    const u = new URL(urlString);
+    const host = (u.hostname || '').toLowerCase();
+    if (!host || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('127.')) throw new Error('URL not allowed');
+    if (host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('169.254.') || host.endsWith('.local') || host === '0.0.0.0') throw new Error('URL not allowed');
+  } catch (e) {
+    if (e.message === 'URL not allowed') throw e;
+    throw new Error('Invalid URL');
+  }
+}
+
 /**
  * Fetch HTML with browser-like headers. Retries with alternate User-Agent on 403.
  */
 async function fetchRecipeHtml(url) {
+  assertUrlAllowedForFetch(url);
   const baseHeaders = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
@@ -302,6 +316,7 @@ async function parseRecipeFromUrlFallback(url) {
  * @returns {Promise<Object>} Parsed recipe data
  */
 async function parseRecipeFromUrl(url) {
+  assertUrlAllowedForFetch(url);
   let data = null;
 
   // Try fallback first: it uses browser-like headers and retries with alternate User-Agent on 403.

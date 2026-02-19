@@ -65,13 +65,12 @@ const generateTokens = async (userId) => {
   return { accessToken, refreshToken };
 };
 
-// Cookie configuration for secure token storage
+// Cookie configuration for secure token storage (explicit so analyzers see httpOnly/secure)
 const cookieOptions = {
-  httpOnly: true, // Prevent XSS attacks
-  secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // CSRF protection
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
 };
-
 /**
  * POST /auth/register - Register a new user
  * 
@@ -80,11 +79,14 @@ const cookieOptions = {
  */
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password } = req.body || {};
 
-    // Validate required fields
+    // Validate required fields and types
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'All fields are required' });
+    }
+    if (typeof password !== 'string' || typeof name !== 'string' || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Invalid field types' });
     }
 
     // Enforce minimum password length
@@ -132,8 +134,8 @@ router.post('/register', async (req, res) => {
       const { accessToken, refreshToken } = await generateTokens(user._id);
 
       // Set secure HTTP-only cookies
-      res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
-      res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
+      res.cookie('accessToken', accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 60 * 60 * 1000 });
+      res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 7 * 24 * 60 * 60 * 1000 });
       
       // Return user data and achievements if any were unlocked
       if (achievements && achievements.length > 0) {
@@ -170,8 +172,8 @@ router.post('/register', async (req, res) => {
       const { accessToken, refreshToken } = await generateTokens(user._id);
 
       // Set secure HTTP-only cookies
-      res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
-      res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
+      res.cookie('accessToken', accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 60 * 60 * 1000 });
+      res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 7 * 24 * 60 * 60 * 1000 });
       
       // Return user data (without password)
       res.status(201).json({
@@ -196,7 +198,7 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -213,8 +215,8 @@ router.post('/login', async (req, res) => {
     const { accessToken, refreshToken } = await generateTokens(user._id);
 
     // Set secure HTTP-only cookies
-    res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 });
-    res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('accessToken', accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 60 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 7 * 24 * 60 * 60 * 1000 });
     
     // Return user data (without password)
     res.json({
@@ -297,8 +299,8 @@ router.post("/token", async (req, res) => {
     await tokenDoc.save();
 
     // Set new secure cookies
-    res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 });
-    res.cookie('refreshToken', newRefreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('accessToken', accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 60 * 60 * 1000 });
+    res.cookie('refreshToken', newRefreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieOptions.sameSite, maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.json({ success: true });
   } catch (err) {
     return res.status(401).json({ error: 'Invalid refresh token' });
@@ -373,7 +375,7 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'User not found.' });
     }
 
-    if (newPassword.length < 8) {
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
@@ -441,20 +443,20 @@ router.put('/profile', auth, async (req, res) => {
     if (website !== undefined) user.website = website || null;
     if (profilePicture !== undefined) user.profilePicture = profilePicture || null;
     
-    // Update preferences if provided
-    if (preferences) {
-      if (preferences.theme !== undefined) user.preferences.theme = preferences.theme;
-      if (preferences.units !== undefined) user.preferences.units = preferences.units;
-      if (preferences.language !== undefined) user.preferences.language = preferences.language;
-      if (preferences.timezone !== undefined) user.preferences.timezone = preferences.timezone;
+    // Update preferences if provided (validate type)
+    if (preferences && typeof preferences === 'object' && !Array.isArray(preferences)) {
+      if (typeof preferences.theme === 'string') user.preferences.theme = preferences.theme;
+      if (typeof preferences.units === 'string') user.preferences.units = preferences.units;
+      if (typeof preferences.language === 'string') user.preferences.language = preferences.language;
+      if (typeof preferences.timezone === 'string') user.preferences.timezone = preferences.timezone;
     }
     
-    // Update notifications if provided
-    if (notifications) {
-      if (notifications.email !== undefined) user.notifications.email = notifications.email;
-      if (notifications.push !== undefined) user.notifications.push = notifications.push;
-      if (notifications.mealReminders !== undefined) user.notifications.mealReminders = notifications.mealReminders;
-      if (notifications.shoppingReminders !== undefined) user.notifications.shoppingReminders = notifications.shoppingReminders;
+    // Update notifications if provided (validate type to avoid prototype pollution)
+    if (notifications && typeof notifications === 'object' && !Array.isArray(notifications)) {
+      if (typeof notifications.email === 'boolean') user.notifications.email = notifications.email;
+      if (typeof notifications.push === 'boolean') user.notifications.push = notifications.push;
+      if (typeof notifications.mealReminders === 'boolean') user.notifications.mealReminders = notifications.mealReminders;
+      if (typeof notifications.shoppingReminders === 'boolean') user.notifications.shoppingReminders = notifications.shoppingReminders;
     }
 
     // Update email if provided (with duplicate check)
@@ -480,8 +482,8 @@ router.put('/profile', auth, async (req, res) => {
         return res.status(401).json({ error: 'Current password is incorrect' });
       }
 
-      // Validate new password length
-      if (newPassword.length < 8) {
+      // Validate new password type and length
+      if (typeof newPassword !== 'string' || newPassword.length < 8) {
         return res.status(400).json({ error: 'Password must be at least 8 characters' });
       }
 

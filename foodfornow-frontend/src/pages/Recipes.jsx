@@ -1323,7 +1323,8 @@ const Recipes = () => {
                       value={ingredient.quantity}
                       onChange={(e) => {
                         const newIngredients = [...formData.ingredients];
-                        newIngredients[index].quantity = e.target.value;
+                        const val = e?.target?.value;
+                        newIngredients[index].quantity = typeof val === 'string' ? val : String(val ?? '');
                         setFormData({ ...formData, ingredients: newIngredients });
                       }}
                       required
@@ -1335,7 +1336,8 @@ const Recipes = () => {
                         value={ingredient.unit}
                         onChange={(e) => {
                           const newIngredients = [...formData.ingredients];
-                          newIngredients[index].unit = e.target.value;
+                          const v = e?.target?.value;
+                          newIngredients[index].unit = validUnits.includes(v) ? v : (ingredient.unit || '');
                           setFormData({ ...formData, ingredients: newIngredients });
                         }}
                         required

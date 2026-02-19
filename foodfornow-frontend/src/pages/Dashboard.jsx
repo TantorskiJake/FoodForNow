@@ -151,15 +151,17 @@ const Dashboard = () => {
     });
   }, []);
 
+  // Refresh all dashboard data every time we land on the dashboard so needed ingredients
+  // reflect the latest pantry (no manual refresh needed after adding pantry items).
   useEffect(() => {
     if (!authenticated || !selectedWeekStart) return;
 
     const fetchAll = async () => {
       await runTask(async () => {
         await Promise.all([
-          fetchRecipes(),
-          fetchMealPlan(),
-          fetchIngredients()
+          fetchRecipes({ forceRefresh: true }),
+          fetchMealPlan({ forceRefresh: true }),
+          fetchIngredients({ forceRefresh: true })
         ]);
       }, { hydrate: true });
     };
@@ -195,7 +197,7 @@ const Dashboard = () => {
 
   const fetchIngredients = async ({ forceRefresh = false } = {}) => {
     try {
-      const response = await api.cachedGet(`/mealplan/ingredients?weekStart=${selectedWeekStart}`, {
+      const response = await api.cachedGet(`/mealplan/ingredients?weekStart=${selectedWeekStart}&aggregateByIngredient=true`, {
         cacheTtl: 45 * 1000,
         forceRefresh,
       });
@@ -222,149 +224,38 @@ const Dashboard = () => {
     }
   };
 
-  // Helper function to aggregate ingredients by name
+  // Helper function to aggregate ingredients by name (backend sends one row per ingredient in standard unit when aggregateByIngredient=true)
   const aggregateIngredientsByName = (ingredients) => {
     const ingredientMap = new Map();
-    
+
     ingredients.forEach(ingredient => {
-      if (!ingredient || !ingredient.name) {
-        return;
-      }
+      if (!ingredient || !ingredient.name) return;
       const name = ingredient.name;
-      
+
       if (ingredientMap.has(name)) {
-        // Combine with existing ingredient
         const existing = ingredientMap.get(name);
-        
-        // Try to combine quantities if units are the same
         if (existing.unit === ingredient.unit) {
           existing.quantity += ingredient.quantity;
-          existing.pantryQuantity = (existing.pantryQuantity || 0) + (ingredient.pantryQuantity || 0);
+          existing.pantryQuantity = Math.max(existing.pantryQuantity || 0, ingredient.pantryQuantity || 0);
         } else {
-          // Different units - convert to standard unit and combine needed; pantry is same stock so use max (no double-count)
-          const convertedQuantity = convertToStandardUnit(ingredient.quantity, ingredient.unit, name);
-          const convertedPantryQuantity = convertToStandardUnit(ingredient.pantryQuantity || 0, ingredient.unit, name);
-
-          const existingConvertedQuantity = convertToStandardUnit(existing.quantity, existing.unit, name);
-          const existingConvertedPantryQuantity = convertToStandardUnit(existing.pantryQuantity || 0, existing.unit, name);
-
-          const standardUnit = getStandardUnit(name);
-
-          const totalConvertedQuantity = existingConvertedQuantity + convertedQuantity;
-          // Pantry is the same for both rows (e.g. 1000 ml = 4.23 cups) - take max to avoid double-counting
-          const totalConvertedPantryQuantity = Math.max(existingConvertedPantryQuantity, convertedPantryQuantity);
-
-          existing.quantity = convertFromStandardUnit(totalConvertedQuantity, standardUnit, name);
-          existing.pantryQuantity = convertFromStandardUnit(totalConvertedPantryQuantity, standardUnit, name);
-          existing.unit = standardUnit;
+          // Same name, different units: can't add quantities; keep pantry as max (same stock)
+          existing.pantryQuantity = Math.max(existing.pantryQuantity || 0, ingredient.pantryQuantity || 0);
         }
       } else {
-        // First occurrence of this ingredient
         ingredientMap.set(name, { ...ingredient });
       }
     });
-    
+
     return Array.from(ingredientMap.values());
   };
 
-  // Helper function to convert to standard unit (grams for most ingredients)
-  const convertToStandardUnit = (quantity, unit, ingredientName) => {
-    const conversions = {
-      // Weight conversions (to grams)
-      'g': 1,
-      'kg': 1000,
-      'oz': 28.35,
-      'lb': 453.59,
-      
-      // Volume conversions (to ml)
-      'ml': 1,
-      'l': 1000,
-      'cup': 236.59,
-      'tbsp': 14.79,
-      'tsp': 4.93,
-      
-      // Special cases
-      'piece': 1, // Keep as pieces
-      'pinch': 0.36, // Approximate pinch to grams
-      'box': 1, // Keep as boxes
-    };
-    
-    // For liquids and some ingredients, use volume as standard
-    const liquidIngredients = ['milk', 'water', 'oil', 'juice', 'broth', 'sauce'];
-    const isLiquid = liquidIngredients.some(liquid => 
-      ingredientName.toLowerCase().includes(liquid)
-    );
-    
-    if (isLiquid && ['ml', 'l', 'cup', 'tbsp', 'tsp'].includes(unit)) {
-      // Convert to ml for liquids
-      return quantity * (conversions[unit] || 1);
-    } else if (['g', 'kg', 'oz', 'lb'].includes(unit)) {
-      // Convert to grams for solids
-      return quantity * (conversions[unit] || 1);
-    } else if (unit === 'piece' || unit === 'pinch' || unit === 'box') {
-      // Keep pieces/boxes as is, convert pinches to grams
-      return (unit === 'piece' || unit === 'box') ? quantity : quantity * conversions[unit];
-    }
-    
-    return quantity; // Default fallback
-  };
-
-  // Helper function to convert from standard unit back to display unit
-  const convertFromStandardUnit = (quantity, targetUnit, ingredientName) => {
-    const conversions = {
-      // Weight conversions (from grams)
-      'g': 1,
-      'kg': 1/1000,
-      'oz': 1/28.35,
-      'lb': 1/453.59,
-      
-      // Volume conversions (from ml)
-      'ml': 1,
-      'l': 1/1000,
-      'cup': 1/236.59,
-      'tbsp': 1/14.79,
-      'tsp': 1/4.93,
-      
-      // Special cases
-      'piece': 1,
-      'pinch': 1/0.36,
-      'box': 1,
-    };
-    
-    return quantity * (conversions[targetUnit] || 1);
-  };
-
-  // Helper function to determine the best standard unit for an ingredient
-  const getStandardUnit = (ingredientName) => {
-    const name = ingredientName.toLowerCase();
-    
-    // Liquids
-    if (['milk', 'water', 'oil', 'juice', 'broth', 'sauce', 'vinegar', 'lemon juice'].some(liquid => name.includes(liquid))) {
-      return 'ml';
-    }
-    
-    // Small quantities of spices/herbs
-    if (['salt', 'pepper', 'spice', 'herb', 'garlic', 'onion powder', 'cinnamon', 'nutmeg'].some(spice => name.includes(spice))) {
-      return 'g';
-    }
-    
-    // Large quantities
-    if (['flour', 'sugar', 'rice', 'pasta', 'beans'].some(bulk => name.includes(bulk))) {
-      return 'g';
-    }
-    
-    // Proteins
-    if (['chicken', 'beef', 'pork', 'fish', 'meat', 'lobster', 'shrimp'].some(protein => name.includes(protein))) {
-      return 'g';
-    }
-    
-    // Fruits and vegetables
-    if (['banana', 'apple', 'orange', 'tomato', 'carrot', 'lettuce', 'spinach'].some(produce => name.includes(produce))) {
-      return 'piece';
-    }
-    
-    // Default to grams for most ingredients
-    return 'g';
+  const formatIngredientQuantity = (value, unit) => {
+    if (value == null || Number.isNaN(Number(value))) return String(value ?? '');
+    const n = Number(value);
+    const countable = ['piece', 'box'].includes(unit);
+    if (countable) return Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10);
+    const rounded = Math.round(n * 100) / 100;
+    return rounded % 1 === 0 ? String(Math.round(rounded)) : String(rounded);
   };
 
   const handleAddAllToShoppingList = async () => {
@@ -1218,11 +1109,11 @@ const Dashboard = () => {
                                     textTransform: 'capitalize'
                                   }}
                                 >
-                                  {ingredient.quantity} {ingredient.unit}
+                                  {formatIngredientQuantity(ingredient.quantity, ingredient.unit)} {ingredient.unit}
                                 </Typography>
                                 {(ingredient.pantryQuantity ?? 0) > 0 && (
                                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>
-                                    · You have: {ingredient.pantryQuantity} {ingredient.unit}
+                                    · You have: {formatIngredientQuantity(ingredient.pantryQuantity, ingredient.unit)} {ingredient.unit}
                                   </Typography>
                                 )}
                               </Box>

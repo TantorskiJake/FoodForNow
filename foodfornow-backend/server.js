@@ -28,6 +28,7 @@ const scanSessionRoutes = require("./src/routes/scan-session");
 const achievementsRoutes = require("./src/routes/achievements");
 
 // Create Express application instance
+// CSRF: We rely on SameSite cookie attribute (see auth routes cookieOptions) plus CORS allowlist for API requests.
 const app = express();
 
 /**
@@ -50,9 +51,18 @@ if (process.env.NODE_ENV !== 'production') {
  * cors: Configures Cross-Origin Resource Sharing
  */
 app.use(helmet()); // Adds various HTTP headers for security
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173', // Frontend URL
-  credentials: true // Allow cookies to be sent with requests
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, origin || allowedOrigins[0]);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
 }));
 
 /**
@@ -64,6 +74,17 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies up to 10MB
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-encoded bodies
 app.use(cookieParser()); // Parse cookies from requests
+
+// Rate limit auth routes to mitigate brute-force (e.g. login)
+const rateLimit = require('express-rate-limit');
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // limit each IP to 50 requests per window
+  message: { error: 'Too many attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth', authLimiter);
 
 /**
  * API Routes Configuration

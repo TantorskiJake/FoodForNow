@@ -131,6 +131,21 @@ FoodForNow/
    - **Frontend**: http://localhost:5173
    - **Backend API**: http://localhost:3001
 
+6. **Run the full-flow E2E test** (optional)
+   With both frontend and backend running, from the repo root:
+   ```bash
+   npm run e2e
+   ```
+   This Playwright test registers a user, creates a recipe, adds it to the meal plan, adds ingredients to the shopping list, moves them to the pantry, and marks the meal as cooked.
+
+**If you see "Connection failed" or the app can't load data:**  
+You need **both** the frontend and backend running. From the **repo root** (FoodForNow/), run:
+   ```bash
+   npm run dev
+   ```
+   That starts the backend (port 3001) and the frontend (port 5173). Then open **http://localhost:5173** in your browser.  
+   If you started only the backend (e.g. `cd foodfornow-backend && npm run dev`), open a second terminal, go to the repo root, and run `npm run dev` so both run together. Or run the frontend alone in a second terminal: `cd foodfornow-frontend && npm run dev`.
+
 ## 🐳 Docker Deployment
 
 ### Production Builds

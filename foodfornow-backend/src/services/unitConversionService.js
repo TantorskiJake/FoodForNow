@@ -49,6 +49,12 @@ const LIQUID_KEYWORDS = [
 ];
 
 /**
+ * Fallback density (g per US cup) when ingredient is not in GRAMS_PER_CUP.
+ * Used so volume amounts are never treated as 0 need (avoids wrong deduction).
+ */
+const FALLBACK_GRAMS_PER_CUP = 120;
+
+/**
  * Approximate grams per US cup for weight-based ingredients often measured by volume.
  * Used to convert recipe volume (cups/tbsp/tsp) <-> pantry weight (g) for display/deduction.
  */
@@ -125,6 +131,7 @@ function getMlPerPiece(ingredientName) {
 
 /**
  * Get the standard unit for an ingredient by name (ml for liquids, g for weight, piece for countable).
+ * Ingredients with a density (grams per cup) use grams so volume/weight conversion is consistent.
  * @param {string} ingredientName
  * @returns {'ml'|'g'|'piece'}
  */
@@ -132,6 +139,7 @@ function getStandardUnit(ingredientName) {
   if (!ingredientName || typeof ingredientName !== 'string') return 'g';
   const name = ingredientName.toLowerCase();
 
+  if (getGramsPerCup(ingredientName) != null) return 'g';
   if (LIQUID_KEYWORDS.some((kw) => name.includes(kw))) return 'ml';
   if (['salt', 'pepper', 'spice', 'herb', 'garlic', 'onion powder', 'cinnamon', 'nutmeg'].some((s) => name.includes(s))) return 'g';
   if (['flour', 'sugar', 'rice', 'pasta', 'beans'].some((b) => name.includes(b))) return 'g';
@@ -173,8 +181,8 @@ function toStandard(quantity, unit, ingredientName) {
   }
   if (VOLUME_UNITS.includes(unit)) {
     if (!hasName || std === 'ml') return q * (VOLUME_TO_ML[unit] ?? 1);
-    if (std === 'g' || (std === 'piece' && getGramsPerCup(ingredientName) != null)) {
-      const density = getGramsPerCup(ingredientName);
+    if (std === 'g' || (std === 'piece' && (getGramsPerCup(ingredientName) != null || std === 'g'))) {
+      const density = getGramsPerCup(ingredientName) ?? (std === 'g' ? FALLBACK_GRAMS_PER_CUP : null);
       if (density != null) {
         const ml = q * (VOLUME_TO_ML[unit] ?? 1);
         const cups = ml / 236.59;
@@ -223,8 +231,8 @@ function fromStandard(quantityInStandard, targetUnit, ingredientName) {
   }
   if (VOLUME_UNITS.includes(targetUnit)) {
     if (!hasName || std === 'ml') return q * (ML_TO_VOLUME[targetUnit] ?? 1);
-    if (std === 'g' || (std === 'piece' && getGramsPerCup(ingredientName) != null)) {
-      const density = getGramsPerCup(ingredientName);
+    if (std === 'g' || (std === 'piece' && (getGramsPerCup(ingredientName) != null || std === 'g'))) {
+      const density = getGramsPerCup(ingredientName) ?? (std === 'g' ? FALLBACK_GRAMS_PER_CUP : null);
       if (density != null && density > 0) {
         const cups = q / density;
         return cups * (CUPS_TO_VOLUME[targetUnit] ?? 1);

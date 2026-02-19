@@ -188,9 +188,14 @@ api.interceptors.response.use(
         isRefreshing = false;
         refreshSubscribers = [];
         
-        // Redirect to login page if in browser environment
+        // Only redirect if not already on a public auth page (avoids reload loop when
+        // initial /auth/me returns 401 on login page)
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          const path = window.location.pathname || '';
+          const isPublicAuthPage = /^\/(login|register|forgot-password|reset-password)(\/|$)/.test(path);
+          if (!isPublicAuthPage) {
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(refreshError);
       }

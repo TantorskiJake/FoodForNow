@@ -3,7 +3,7 @@ const authMiddleware = require('../middleware/auth');
 const MealPlan = require('../models/mealPlan');
 const Recipe = require('../models/recipe');
 const { isAlwaysAvailableIngredient } = require('../constants/ingredients');
-const { toStandard, fromStandard } = require('../services/unitConversionService');
+const { toStandard, fromStandard, getStandardUnit } = require('../services/unitConversionService');
 
 const router = express.Router();
 
@@ -406,7 +406,8 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
         const deductFromThis = Math.min(remainingToDeduct, itemInStandard);
         if (deductFromThis <= 0) continue;
         const deductInItemUnit = fromStandard(deductFromThis, item.unit, ded.name);
-        item.quantity = Math.max(0, item.quantity - deductInItemUnit);
+        const newQuantity = Math.max(0, item.quantity - deductInItemUnit);
+        item.quantity = Math.round(newQuantity * 100) / 100;
         remainingToDeduct -= deductFromThis;
       }
     }
@@ -503,25 +504,46 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
     const uncookedMealPlans = mealPlans.filter(
       mealPlan => !mealPlan.cooked && !mealPlan.eatingOut && mealPlan.recipe
     );
-    // Aggregate needed ingredients (by ingredient+unit) from uncooked meals only
+    const aggregateByIngredient = req.query.aggregateByIngredient === 'true';
+
+    // Aggregate needed ingredients from uncooked meals only
     const ingredients = new Map();
     uncookedMealPlans.forEach(mealPlan => {
       if (mealPlan.recipe && mealPlan.recipe.ingredients) {
         mealPlan.recipe.ingredients.forEach(ing => {
           if (!ing.ingredient) return;
           if (isAlwaysAvailableIngredient(ing.ingredient.name)) return;
-          const key = `${ing.ingredient._id.toString()}-${ing.unit}`;
-          if (!ingredients.has(key)) {
-            ingredients.set(key, {
-              _id: ing.ingredient._id,
-              name: ing.ingredient.name,
-              category: ing.ingredient.category,
-              quantity: ing.quantity,
-              unit: ing.unit
-            });
+          const idStr = ing.ingredient._id.toString();
+          const name = ing.ingredient.name;
+          if (aggregateByIngredient) {
+            const needInStandard = toStandard(ing.quantity, ing.unit, name);
+            if (!ingredients.has(idStr)) {
+              ingredients.set(idStr, {
+                _id: ing.ingredient._id,
+                name,
+                category: ing.ingredient.category,
+                quantityInStandard: needInStandard,
+                usages: [{ quantity: ing.quantity, unit: ing.unit }]
+              });
+            } else {
+              const existing = ingredients.get(idStr);
+              existing.quantityInStandard += needInStandard;
+              existing.usages.push({ quantity: ing.quantity, unit: ing.unit });
+            }
           } else {
-            const existing = ingredients.get(key);
-            existing.quantity += ing.quantity;
+            const key = `${idStr}-${ing.unit}`;
+            if (!ingredients.has(key)) {
+              ingredients.set(key, {
+                _id: ing.ingredient._id,
+                name,
+                category: ing.ingredient.category,
+                quantity: ing.quantity,
+                unit: ing.unit
+              });
+            } else {
+              const existing = ingredients.get(key);
+              existing.quantity += ing.quantity;
+            }
           }
         });
       }
@@ -561,18 +583,49 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
       });
     }
 
-    // Add pantryQuantity in the same unit as needed (recipe unit), using conversion
-    const result = Array.from(ingredients.values()).map(ing => {
-      const idStr = ing._id.toString();
-      const nameKey = normalizeIngredientName(ing.name);
-      const totalInStandard = pantryByIngredientStandard.get(idStr) ||
-        (nameKey ? pantryByNormalizedName.get(nameKey) : 0) || 0;
-      const pantryQuantityInNeededUnit = fromStandard(totalInStandard, ing.unit, ing.name);
-      return {
-        ...ing,
-        pantryQuantity: pantryQuantityInNeededUnit
-      };
-    });
+    const roundForDisplay = (val, unit) => {
+      if (val == null || Number.isNaN(Number(val))) return val;
+      const n = Number(val);
+      if (['piece', 'box'].includes(unit)) return Math.round(n * 10) / 10;
+      return Math.round(n * 100) / 100;
+    };
+
+    // Add pantryQuantity in the same unit as needed (recipe unit when single, else standard)
+    const result = aggregateByIngredient
+      ? Array.from(ingredients.values()).map(ing => {
+          const idStr = ing._id.toString();
+          const nameKey = normalizeIngredientName(ing.name);
+          const totalInStandard = pantryByIngredientStandard.get(idStr) ||
+            (nameKey ? pantryByNormalizedName.get(nameKey) : 0) || 0;
+          const stdUnit = getStandardUnit(ing.name);
+          const uniqueUnits = [...new Set((ing.usages || []).map(u => u.unit))];
+          const singleUnit = uniqueUnits.length === 1 ? uniqueUnits[0] : null;
+          const displayUnit = singleUnit != null ? singleUnit : stdUnit;
+          const quantity = singleUnit != null
+            ? (ing.usages || []).reduce((sum, u) => sum + u.quantity, 0)
+            : fromStandard(ing.quantityInStandard, stdUnit, ing.name);
+          const pantryQuantity = fromStandard(totalInStandard, displayUnit, ing.name);
+          return {
+            _id: ing._id,
+            name: ing.name,
+            category: ing.category,
+            quantity: roundForDisplay(quantity, displayUnit),
+            unit: displayUnit,
+            pantryQuantity: roundForDisplay(pantryQuantity, displayUnit)
+          };
+        })
+      : Array.from(ingredients.values()).map(ing => {
+          const idStr = ing._id.toString();
+          const nameKey = normalizeIngredientName(ing.name);
+          const totalInStandard = pantryByIngredientStandard.get(idStr) ||
+            (nameKey ? pantryByNormalizedName.get(nameKey) : 0) || 0;
+          const pantryQuantityInNeededUnit = fromStandard(totalInStandard, ing.unit, ing.name);
+          return {
+            ...ing,
+            quantity: roundForDisplay(ing.quantity, ing.unit),
+            pantryQuantity: roundForDisplay(pantryQuantityInNeededUnit, ing.unit)
+          };
+        });
     res.json(result);
   } catch (error) {
     console.error('Error fetching ingredients:', error);
@@ -592,12 +645,15 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
 
     // Use provided weekStart or calculate the start of the current week (Monday)
     let monday;
-    if (req.body.weekStart) {
-      // Parse the date string properly to avoid timezone issues
-      const [year, month, day] = req.body.weekStart.split('-').map(Number);
-      monday = new Date(year, month - 1, day); // month is 0-indexed
-      monday.setHours(0, 0, 0, 0);
-    } else {
+    if (req.body && typeof req.body.weekStart === 'string') {
+      const parts = req.body.weekStart.split('-').map(Number);
+      const [year, month, day] = parts.length >= 3 ? parts : [NaN, NaN, NaN];
+      if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+        monday = new Date(year, month - 1, day);
+        monday.setHours(0, 0, 0, 0);
+      }
+    }
+    if (!monday) {
       const today = new Date();
       monday = new Date(today);
       monday.setDate(today.getDate() - today.getDay() + 1);

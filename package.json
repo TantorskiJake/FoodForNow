@@ -6,13 +6,20 @@
     "foodfornow-backend",
     "foodfornow-frontend"
   ],
+  "overrides": {
+    "ajv": "^8.18.0",
+    "minimatch": "^10.2.1",
+    "tar": "^7.5.8"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev -w foodfornow-backend\" \"npm run dev -w foodfornow-frontend\"",
     "dev:host": "concurrently \"npm run dev -w foodfornow-backend\" \"npm run dev:host -w foodfornow-frontend\"",
     "build": "npm run build -w foodfornow-frontend",
-    "start": "npm run start -w foodfornow-backend"
+    "start": "npm run start -w foodfornow-backend",
+    "e2e": "playwright test"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "@playwright/test": "^1.49.0"
   }
 }

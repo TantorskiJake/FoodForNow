@@ -27,7 +27,7 @@ import { useAchievements } from '../context/AchievementContext';
 const Register = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { refreshAuth } = useAuth();
+  const { setAuthFromLogin } = useAuth();
   const { showAchievements } = useAchievements();
   const [formData, setFormData] = useState({
     name: '',
@@ -122,7 +122,7 @@ const Register = () => {
         }
       }
 
-      await refreshAuth();
+      setAuthFromLogin(response.data.user);
       navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Registration error:', err);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, useAuth, AuthInitializer } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AchievementProvider } from './context/AchievementContext';
 import Navbar from './components/Navbar';
@@ -97,7 +97,7 @@ function AppRoutes() {
   }, [authenticated, user?._id]);
 
   return (
-    <>
+    <AuthInitializer>
       <Navbar />
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -179,7 +179,7 @@ function AppRoutes() {
           userId={user?._id}
         />
       )}
-    </>
+    </AuthInitializer>
   );
 }
 

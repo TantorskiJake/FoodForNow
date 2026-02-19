@@ -9,10 +9,25 @@ const router = express.Router();
 
 const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
 
+/** Reject URLs that could lead to SSRF (localhost, private IPs, etc.) */
+function isUrlAllowedForFetch(urlString) {
+  try {
+    const u = new URL(urlString);
+    const host = (u.hostname || '').toLowerCase();
+    if (!host) return false;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('127.')) return false;
+    if (host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('169.254.')) return false;
+    if (host.endsWith('.local') || host === '0.0.0.0') return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { search } = req.query;
+    const search = req.query && typeof req.query.search === 'string' ? req.query.search : '';
     
     let query = { createdBy: req.userId };
     
@@ -44,6 +59,9 @@ router.post('/parse-url', authMiddleware, async (req, res) => {
     const trimmed = url.trim();
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
       return res.status(400).json({ error: 'Please provide a valid URL starting with http:// or https://' });
+    }
+    if (!isUrlAllowedForFetch(trimmed)) {
+      return res.status(400).json({ error: 'This URL is not allowed for recipe import.' });
     }
 
     const parsed = await parseRecipeFromUrl(trimmed);

@@ -92,21 +92,26 @@ router.post('/:id/duplicate', authMiddleware, async (req, res) => {
 });
 
 // Add new ingredient (avoid near-duplicates: if a similar-named ingredient exists, return it)
+// Send forceCreate: true in body to skip the similar check and add the new name anyway.
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const name = (req.body.name || '').trim();
+    const name = (typeof req.body?.name === 'string' ? req.body.name : '').trim();
     if (!name) {
       return res.status(400).json({ message: 'Ingredient name is required' });
     }
-    const similar = await findSimilarIngredient(Ingredient, req.userId, name);
-    if (similar) {
-      return res.status(409).json({
-        message: 'An ingredient with a similar name already exists',
-        existingIngredient: { _id: similar._id, name: similar.name, category: similar.category },
-      });
+    const forceCreate = req.body.forceCreate === true;
+    if (!forceCreate) {
+      const similar = await findSimilarIngredient(Ingredient, req.userId, name);
+      if (similar) {
+        return res.status(409).json({
+          message: 'An ingredient with a similar name already exists',
+          existingIngredient: { _id: similar._id, name: similar.name, category: similar.category },
+        });
+      }
     }
+    const { forceCreate: _, ...bodyWithoutFlag } = req.body;
     const ingredient = new Ingredient({
-      ...req.body,
+      ...bodyWithoutFlag,
       user: req.userId
     });
     await ingredient.save();

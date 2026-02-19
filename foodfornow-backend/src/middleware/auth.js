@@ -9,8 +9,11 @@ const User = require('../models/user');
  * It extracts the user ID from the token and adds it to the request object.
  */
 
-// JWT secret key from environment variables with fallback
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+// JWT secret must come from environment (no hardcoded fallback)
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
 
 /**
  * Authentication middleware function

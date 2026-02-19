@@ -64,6 +64,11 @@ const Ingredients = () => {
   });
   const [ingredientToDelete, setIngredientToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [similarIngredientDialog, setSimilarIngredientDialog] = useState({
+    open: false,
+    existing: null,
+    pending: null,
+  });
 
   useEffect(() => {
     if (!authenticated) return;
@@ -143,24 +148,56 @@ const Ingredients = () => {
 
   const handleSaveIngredient = async (e) => {
     e.preventDefault(); // Prevent form from submitting normally
-    
-    try {
-      const ingredientData = {
-        name: editingIngredient.name,
-        category: editingIngredient.category,
-        description: editingIngredient.description,
-      };
 
+    const ingredientData = {
+      name: editingIngredient.name,
+      category: editingIngredient.category,
+      description: editingIngredient.description,
+    };
+
+    try {
       if (editingIngredient.id) {
         await api.put(`/ingredients/${editingIngredient.id}`, ingredientData);
+        setOpenDialog(false);
+        fetchIngredients();
       } else {
         await api.post('/ingredients', ingredientData);
+        setOpenDialog(false);
+        fetchIngredients();
+        toast.success('Ingredient added.');
       }
-
-      setOpenDialog(false);
-      fetchIngredients();
     } catch (error) {
-      console.error('Error saving ingredient:', error);
+      if (error.response?.status === 409 && error.response?.data?.existingIngredient) {
+        setSimilarIngredientDialog({
+          open: true,
+          existing: error.response.data.existingIngredient,
+          pending: ingredientData,
+        });
+      } else {
+        console.error('Error saving ingredient:', error);
+        toast.error(error.response?.data?.message || 'Failed to save ingredient.');
+      }
+    }
+  };
+
+  const handleSimilarUseExisting = () => {
+    setSimilarIngredientDialog({ open: false, existing: null, pending: null });
+    handleCloseDialog();
+    fetchIngredients();
+    toast.success('Using existing ingredient.');
+  };
+
+  const handleSimilarAddAnyway = async () => {
+    const { pending } = similarIngredientDialog;
+    if (!pending) return;
+    try {
+      await api.post('/ingredients', { ...pending, forceCreate: true });
+      setSimilarIngredientDialog({ open: false, existing: null, pending: null });
+      handleCloseDialog();
+      await fetchIngredients();
+      toast.success(`Added "${pending.name}" as a new ingredient.`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add ingredient.');
     }
   };
 
@@ -211,14 +248,30 @@ const Ingredients = () => {
         toast.success(`Found existing ingredient: ${productName}`);
       } else {
         // Create new ingredient and open dialog to edit
-        const response = await api.post('/ingredients', {
-          name: productName,
-          category: category || 'Other',
-          description: `Added from barcode scan`,
-        });
-        await fetchIngredients();
-        handleOpenDialog({ _id: response.data._id, name: productName, category: category || 'Other', description: 'Added from barcode scan' });
-        toast.success(`Created new ingredient: ${productName}`);
+        try {
+          const response = await api.post('/ingredients', {
+            name: productName,
+            category: category || 'Other',
+            description: `Added from barcode scan`,
+          });
+          await fetchIngredients();
+          handleOpenDialog({ _id: response.data._id, name: productName, category: category || 'Other', description: 'Added from barcode scan' });
+          toast.success(`Created new ingredient: ${productName}`);
+        } catch (createErr) {
+          if (createErr.response?.status === 409 && createErr.response?.data?.existingIngredient) {
+            setSimilarIngredientDialog({
+              open: true,
+              existing: createErr.response.data.existingIngredient,
+              pending: {
+                name: productName,
+                category: category || 'Other',
+                description: 'Added from barcode scan',
+              },
+            });
+          } else {
+            throw createErr;
+          }
+        }
       }
     } catch (err) {
       console.error('Barcode lookup failed:', err?.response?.status, err?.response?.data, err?.message);
@@ -552,6 +605,49 @@ const Ingredients = () => {
               disabled={deleting}
             >
               {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={similarIngredientDialog.open}
+          onClose={() => setSimilarIngredientDialog({ open: false, existing: null, pending: null })}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Similar ingredient found</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              You already have an ingredient called &quot;{similarIngredientDialog.existing?.name}&quot;.
+              The name you entered &quot;{similarIngredientDialog.pending?.name}&quot; is similar.
+              Would you like to use the existing ingredient or add the new one anyway?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setSimilarIngredientDialog({ open: false, existing: null, pending: null })}
+            >
+              Cancel
+            </Button>
+            <Button variant="outlined" onClick={handleSimilarUseExisting}>
+              Use existing &quot;{similarIngredientDialog.existing?.name}&quot;
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSimilarAddAnyway}
+              sx={{
+                textTransform: 'none',
+                background: theme.palette.mode === 'dark'
+                  ? 'linear-gradient(45deg, #228B22 0%, #006400 100%)'
+                  : '#228B22',
+                '&:hover': {
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(45deg, #1B6B1B 0%, #004D00 100%)'
+                    : '#1B6B1B',
+                },
+              }}
+            >
+              Add &quot;{similarIngredientDialog.pending?.name}&quot; as new
             </Button>
           </DialogActions>
         </Dialog>

@@ -69,3 +69,10 @@ coverage/
 jest.config.js
 tests/temp/
 *.test.log
+
+# Snyk CLI binary and reports (do not commit)
+snyk
+snyk-report.json
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.cursor/rules/snyk_rules.mdc

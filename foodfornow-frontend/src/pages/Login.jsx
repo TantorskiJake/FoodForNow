@@ -12,13 +12,14 @@ import {
   CircularProgress,
 } from '@mui/material';
 import PasswordField from '../components/PasswordField';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const Login = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { authenticated, loading, refreshAuth } = useAuth();
+  const { authenticated, loading, setAuthFromLogin } = useAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -61,40 +62,55 @@ const Login = () => {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    // Safety: stop spinner after 10s no matter what (in case fetch never settles)
+    const safetyTimeoutId = setTimeout(() => {
+      setIsLoading(false);
+      setError('Request is taking too long. Please try again.');
+    }, 10000);
+
     try {
-      setIsLoading(true);
-      setError('');
-      await api.post('/auth/login', {
-        email,
-        password,
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
       });
+      const data = await res.json().catch(() => ({}));
+
+      clearTimeout(safetyTimeoutId);
+
+      if (!res.ok) {
+        setError(data?.error || 'Login failed. Please try again.');
+        return;
+      }
+
+      const user = data?.user ?? data;
+      if (!user?.id && !user?._id) {
+        setError('Invalid response from server. Please try again.');
+        return;
+      }
 
       if ('PasswordCredential' in window && 'credentials' in navigator) {
-        try {
-          const cred = new window.PasswordCredential({
-            id: email,
-            password,
-            name: email,
-          });
-          await navigator.credentials.store(cred).catch((e) =>
-            console.error('Credential store failed:', e)
-          );
-        } catch (credErr) {
-          console.error('Credential store failed:', credErr);
-        }
+        const cred = new window.PasswordCredential({
+          id: email,
+          password,
+          name: email,
+        });
+        navigator.credentials.store(cred).catch(() => {});
       }
 
-      await refreshAuth();
-      navigate('/dashboard', { replace: true });
+      setAuthFromLogin(user);
+      setIsLoading(false);
+      window.location.replace('/dashboard');
     } catch (err) {
+      clearTimeout(safetyTimeoutId);
       console.error('Login error:', err);
-      if (err.response) {
-        console.error('Error response:', err.response.data);
-        setError(err.response.data.error || 'Login failed. Please try again.');
-      } else {
-        setError('Login failed. Please try again.');
-      }
+      setError(err.message || 'Login failed. Please try again.');
     } finally {
+      clearTimeout(safetyTimeoutId);
       setIsLoading(false);
     }
   };

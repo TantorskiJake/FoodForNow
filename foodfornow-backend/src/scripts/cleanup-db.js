@@ -32,16 +32,23 @@ async function cleanupDatabase() {
     await mongoose.connect('mongodb://localhost:27017/foodfornow');
     console.log('Connected to MongoDB');
 
-    // Find or create the system user
-    // This user is preserved during cleanup for system-level operations
-    const systemUser = await User.findOne({ email: 'system@foodfornow.com' });
+    // Find or create the system user (password from env; required in production)
+    const systemPassword = process.env.SYSTEM_USER_PASSWORD;
+    if (process.env.NODE_ENV === 'production' && !systemPassword) {
+      throw new Error('SYSTEM_USER_PASSWORD is required in production');
+    }
+    const passwordToUse = systemPassword || 'SystemUser123!';
+    let systemUser = await User.findOne({ email: 'system@foodfornow.com' });
     if (!systemUser) {
       console.log('System user not found, creating...');
-      const newSystemUser = await User.create({
+      const bcrypt = require('bcrypt');
+      const hashed = await bcrypt.hash(passwordToUse, 12);
+      await User.create({
         email: 'system@foodfornow.com',
-        password: 'SystemUser123!',
+        password: hashed,
         name: 'System'
       });
+      systemUser = await User.findOne({ email: 'system@foodfornow.com' });
       console.log('System user created');
     }
 
