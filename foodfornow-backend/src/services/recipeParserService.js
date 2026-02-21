@@ -620,6 +620,38 @@ function isLikelyIngredientLine(line, parsed) {
 }
 
 /**
+ * Split a long instruction paragraph into steps when there are no numbered steps.
+ * Looks for sentence boundaries before common recipe step starters (Preheat, Season, Make the, Bake, Finish with, etc.).
+ */
+function splitLongInstructionIntoSteps(text) {
+  if (!text || typeof text !== 'string') return [text];
+  const t = text.trim();
+  if (t.length < 120) return [t];
+
+  // 1) Already numbered in the middle of text (e.g. " ... 2. Next step ... ")
+  const numberedParts = t.split(/\s+(?=\d+[\.\)]\s+)/);
+  if (numberedParts.length > 1) {
+    const steps = numberedParts.map((s) => s.replace(/^\d+[\.\)]\s+/, '').trim()).filter(Boolean);
+    if (steps.length > 1) return steps;
+  }
+
+  // 2) Split on colon before step phrases (e.g. "Make the sauce:In a pan" or "Bake the cod:Place fillets")
+  let working = t;
+  const colonStepStart = /:\s*(?=(?:In\s+a\s|Place\s+(?:the|fillets)))/i;
+  const afterColon = working.split(colonStepStart);
+  if (afterColon.length > 1) {
+    working = afterColon.map((s) => s.trim()).filter(Boolean).join('.\n');
+  }
+
+  // 3) Split on period (with optional space) before common step-start phrases
+  const stepStartPattern = /\.\s*(?=(?:Preheat|Season\s+(?:the|with)|Make\s+the|Bake\s+(?:the|\d)|Finish\s+with|In\s+a\s|Add\s+(?:the|garlic|oil)|Stir\s+in|Place\s+(?:the|fillets)|Combine|Whisk|Mix\s+|Heat\s+|Melt\s+|Remove|Bring\s+|Reduce|Pour\s+|Transfer|Serve\s+|Garnish|Sprinkle|Top\s+with|Cover\s+|Uncover|Let\s+|Cool\s+|Slice|Cut\s+|Chop\s+|Drizzle|Sauté|Cook\s+|Fry\s+|Boil|Simmer|Pat\s+dry))/i;
+  const parts = working.split(stepStartPattern).map((s) => s.trim()).filter(Boolean);
+  if (parts.length > 1) return parts;
+
+  return [t];
+}
+
+/**
  * Parse raw text of any format into a structured recipe.
  * Scans the whole text for servings and time. If "Ingredients"/"Instructions" sections exist, uses them.
  * Otherwise classifies each line: lines that parse as ingredients (and don't look like instructions)
@@ -793,6 +825,15 @@ function parseRecipeFromText(rawText) {
     currentStep.push(isNewStep ? trimmed.replace(/^\d+[\.\)]\s+/, '') : trimmed);
   }
   flushStep();
+
+  // If we ended up with one long paragraph (e.g. pasted without line breaks), split into steps
+  if (instructions.length === 1 && instructions[0].length > 120) {
+    const split = splitLongInstructionIntoSteps(instructions[0]);
+    if (split.length > 1) {
+      instructions.length = 0;
+      instructions.push(...split);
+    }
+  }
 
   const prepTime = totalTimeMinutes > 0 ? Math.floor(totalTimeMinutes / 2) : 15;
   const cookTime = totalTimeMinutes > 0 ? totalTimeMinutes - prepTime : 30;
