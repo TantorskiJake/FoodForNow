@@ -10,6 +10,7 @@ Thumbs.db
 # Editor and IDE files
 .vscode/
 !.vscode/extensions.json
+.cursor/
 .idea/
 *.suo
 *.ntvs*
@@ -51,6 +52,9 @@ dist-ssr/
 tmp/
 temp/
 *.tgz
+snyk
+snyk-report.json
+test-results/
 
 # ESLint and other tool caches
 .eslintcache
