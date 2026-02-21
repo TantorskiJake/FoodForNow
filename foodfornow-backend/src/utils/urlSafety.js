@@ -33,6 +33,8 @@ const BLOCKED_IPV4_RANGES = createIpv4Ranges([
   ['240.0.0.0', '255.255.255.255'],
 ]);
 
+const MAX_IPV6 = (1n << 128n) - 1n;
+
 const BLOCKED_IPV6_RANGES = createIpv6Ranges([
   '::/128', // unspecified
   '::1/128', // loopback
@@ -40,8 +42,6 @@ const BLOCKED_IPV6_RANGES = createIpv6Ranges([
   'fe80::/10', // link-local
   'fec0::/10', // site-local (deprecated but often routed internally)
 ]);
-
-const MAX_IPV6 = (1n << 128n) - 1n;
 
 function stripZoneIndex(value) {
   if (!value) return '';
