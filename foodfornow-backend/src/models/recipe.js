@@ -83,5 +83,8 @@ recipeSchema.index(
   }
 );
 
+// Multikey index: find recipes that use a given ingredient
+recipeSchema.index({ 'ingredients.ingredient': 1 });
+
 // Export the Recipe model
 module.exports = mongoose.model("Recipe", recipeSchema);

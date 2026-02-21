@@ -2,7 +2,7 @@ const Achievement = require('../models/achievement');
 const achievements = require('../config/achievements');
 const Recipe = require('../models/recipe');
 const MealPlan = require('../models/mealPlan');
-const Pantry = require('../models/pantry');
+const PantryItem = require('../models/pantry-item');
 const ShoppingListItem = require('../models/shopping-list-item');
 const User = require('../models/user');
 
@@ -319,18 +319,13 @@ class AchievementService {
   }
 
   static async getUniquePantryItemsCount(userId) {
-    const pantry = await Pantry.findOne({ user: userId });
-    if (!pantry) return 0;
-    
-    const uniqueIngredientIds = new Set(pantry.items.map(item => item.ingredient.toString()));
-    return uniqueIngredientIds.size;
+    const ids = await PantryItem.distinct('ingredient', { user: userId });
+    return ids.length;
   }
 
   static async getTotalPantryItemsCount(userId) {
-    const pantry = await Pantry.findOne({ user: userId });
-    if (!pantry) return 0;
-    
-    return pantry.items.reduce((total, item) => total + item.quantity, 0);
+    const items = await PantryItem.find({ user: userId }).select('quantity').lean();
+    return items.reduce((sum, i) => sum + (i.quantity || 0), 0);
   }
 
   static async getWeekMealsCount(userId) {

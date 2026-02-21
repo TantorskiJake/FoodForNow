@@ -221,39 +221,19 @@ router.patch('/:id/cooked', authMiddleware, async (req, res) => {
     // When uncooking: add recipe ingredients back to the pantry
     if (wasCooked && mealPlanItem.cooked === false) {
       if (!mealPlanItem.eatingOut && mealPlanItem.recipe && mealPlanItem.recipe.ingredients && mealPlanItem.recipe.ingredients.length > 0) {
-        const Pantry = require('../models/pantry');
-        let pantry = await Pantry.findOne({ user: req.userId });
-        if (!pantry) {
-          pantry = new Pantry({ user: req.userId, items: [] });
-          await pantry.save();
-        }
-        const ingredientName = (ing) => (ing && ing.ingredient && ing.ingredient.name) ? ing.ingredient.name : '';
+        const PantryItem = require('../models/pantry-item');
         for (const recipeIngredient of mealPlanItem.recipe.ingredients) {
           if (!recipeIngredient.ingredient) continue;
           if (isAlwaysAvailableIngredient(recipeIngredient.ingredient.name)) continue;
-          const name = ingredientName(recipeIngredient);
+          const ingredientId = recipeIngredient.ingredient._id;
           const addQuantity = recipeIngredient.quantity;
           const addUnit = recipeIngredient.unit;
-          const addInStandard = toStandard(addQuantity, addUnit, name);
-          const ingredientId = recipeIngredient.ingredient._id;
-          const existingItems = (pantry.items || []).filter(
-            item => item.ingredient && item.ingredient.toString() === ingredientId.toString()
+          await PantryItem.findOneAndUpdate(
+            { user: req.userId, ingredient: ingredientId, unit: addUnit },
+            { $inc: { quantity: addQuantity } },
+            { upsert: true, new: true }
           );
-          if (existingItems.length > 0) {
-            const target = existingItems[0];
-            const currentInStandard = toStandard(target.quantity, target.unit, name);
-            const newInStandard = currentInStandard + addInStandard;
-            const newQuantity = fromStandard(newInStandard, target.unit, name);
-            target.quantity = Math.round(newQuantity * 100) / 100;
-          } else {
-            pantry.items.push({
-              ingredient: ingredientId,
-              quantity: addQuantity,
-              unit: addUnit
-            });
-          }
         }
-        await pantry.save();
       }
     }
 
@@ -323,16 +303,11 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Recipe has no ingredients' });
     }
 
-    const Pantry = require('../models/pantry');
-    let pantry = await Pantry.findOne({ user: req.userId });
-    // Auto-create pantry if it doesn't exist
-    if (!pantry) {
-      pantry = new Pantry({ user: req.userId, items: [] });
-      await pantry.save();
-    }
+    const PantryItem = require('../models/pantry-item');
+    const pantryItems = await PantryItem.find({ user: req.userId }).populate('ingredient');
 
     const missingIngredients = [];
-    /** @type {Array<{ itemId: any, deductInStandard: number, ingredientName: string }>} */
+    /** @type {Array<{ ingredientId: string, name: string, deductInStandard: number }>} */
     const pantryDeductions = [];
 
     const ingredientName = (ing) => (ing && ing.ingredient && ing.ingredient.name) ? ing.ingredient.name : '';
@@ -351,8 +326,8 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
       const neededInStandard = toStandard(neededQuantity, neededUnit, name);
 
       // All pantry items for this ingredient (any unit)
-      const pantryItemsForIngredient = (pantry.items || []).filter(
-        item => item.ingredient && item.ingredient.toString() === ingredientId.toString()
+      const pantryItemsForIngredient = pantryItems.filter(
+        item => item.ingredient && item.ingredient._id && item.ingredient._id.toString() === ingredientId.toString()
       );
 
       let totalAvailableInStandard = 0;
@@ -440,11 +415,12 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
       });
     }
 
-    // Update pantry - deduct in standard units, updating each pantry item in its own unit
+    // Update pantry - deduct in standard units, updating each PantryItem in its own unit
+    const pantryItemsForDeduct = await PantryItem.find({ user: req.userId }).populate('ingredient');
     for (const ded of pantryDeductions) {
       let remainingToDeduct = ded.deductInStandard;
-      const itemsForIngredient = (pantry.items || []).filter(
-        item => item.ingredient && item.ingredient.toString() === ded.ingredientId
+      const itemsForIngredient = pantryItemsForDeduct.filter(
+        item => item.ingredient && item.ingredient._id && item.ingredient._id.toString() === ded.ingredientId
       );
       for (const item of itemsForIngredient) {
         if (remainingToDeduct <= 0) break;
@@ -453,13 +429,16 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
         if (deductFromThis <= 0) continue;
         const deductInItemUnit = fromStandard(deductFromThis, item.unit, ded.name);
         const newQuantity = Math.max(0, item.quantity - deductInItemUnit);
-        item.quantity = Math.round(newQuantity * 100) / 100;
+        const rounded = Math.round(newQuantity * 100) / 100;
         remainingToDeduct -= deductFromThis;
+        if (rounded < 1e-9) {
+          await PantryItem.findByIdAndDelete(item._id);
+        } else {
+          item.quantity = rounded;
+          await item.save();
+        }
       }
     }
-
-    pantry.items = pantry.items.filter(item => item.quantity > 1e-9);
-    await pantry.save();
 
     // Mark meal as cooked only if all ingredients were available
     mealPlanItem.cooked = true;
@@ -606,27 +585,25 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
     };
 
     // Fetch pantry and build per-ingredient total in standard units (for conversion)
-    const Pantry = require('../models/pantry');
-    const pantry = await Pantry.findOne({ user: req.userId })
-      .populate({ path: 'items.ingredient', select: 'name' });
+    const PantryItem = require('../models/pantry-item');
+    const pantryItems = await PantryItem.find({ user: req.userId })
+      .populate('ingredient', 'name');
     /** @type {Map<string, number>} ingredientId -> total quantity in standard unit */
     const pantryByIngredientStandard = new Map();
     /** @type {Map<string, number>} normalized name -> total (fallback when recipe name differs from pantry, e.g. "Lemon (juiced...)" vs "Lemon") */
     const pantryByNormalizedName = new Map();
-    if (pantry && pantry.items) {
-      pantry.items.forEach(item => {
-        if (!item.ingredient) return;
-        const idStr = (item.ingredient._id || item.ingredient).toString();
-        const name = (item.ingredient.name != null && item.ingredient.name !== '')
-          ? String(item.ingredient.name).trim()
-          : '';
-        const inStandard = toStandard(item.quantity, item.unit, name);
-        pantryByIngredientStandard.set(idStr, (pantryByIngredientStandard.get(idStr) || 0) + inStandard);
-        const key = normalizeIngredientName(name);
-        if (key) {
-          pantryByNormalizedName.set(key, (pantryByNormalizedName.get(key) || 0) + inStandard);
-        }
-      });
+    for (const item of pantryItems) {
+      if (!item.ingredient) continue;
+      const idStr = (item.ingredient._id || item.ingredient).toString();
+      const name = (item.ingredient.name != null && item.ingredient.name !== '')
+        ? String(item.ingredient.name).trim()
+        : '';
+      const inStandard = toStandard(item.quantity, item.unit, name);
+      pantryByIngredientStandard.set(idStr, (pantryByIngredientStandard.get(idStr) || 0) + inStandard);
+      const key = normalizeIngredientName(name);
+      if (key) {
+        pantryByNormalizedName.set(key, (pantryByNormalizedName.get(key) || 0) + inStandard);
+      }
     }
 
     const roundForDisplay = (val, unit) => {

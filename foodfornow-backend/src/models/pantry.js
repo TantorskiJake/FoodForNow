@@ -32,11 +32,10 @@ const pantryItemSchema = new mongoose.Schema({
 });
 
 /**
- * Pantry Schema - Defines the structure for a user's pantry
- * 
- * This model stores all items in a user's pantry. Each user has one pantry
- * that contains multiple pantry items. The pantry is used for meal planning
- * and shopping list generation.
+ * Pantry Schema (LEGACY) - One doc per user with embedded items[].
+ * Application code uses the PantryItem collection (see pantry-item.js).
+ * This model is kept only for migration (migrate-pantry-to-pantry-item.js)
+ * and cleanup-db.js to clear old data.
  */
 const pantrySchema = new mongoose.Schema({
   // User who owns this pantry

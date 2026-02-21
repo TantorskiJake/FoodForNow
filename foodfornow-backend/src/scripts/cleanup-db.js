@@ -3,6 +3,7 @@ const User = require('../models/user');
 const Ingredient = require('../models/ingredient');
 const Recipe = require('../models/recipe');
 const Pantry = require('../models/pantry');
+const PantryItem = require('../models/pantry-item');
 const ShoppingListItem = require('../models/shopping-list-item');
 const MealPlan = require('../models/mealPlan');
 
@@ -66,9 +67,17 @@ async function cleanupDatabase() {
     const recipeResult = await Recipe.deleteMany({});
     console.log(`Deleted ${recipeResult.deletedCount} recipes`);
 
-    // Delete all pantry items (all pantry data is user-specific)
-    const pantryResult = await Pantry.deleteMany({});
-    console.log(`Deleted ${pantryResult.deletedCount} pantry items`);
+    // Delete all pantry items (PantryItem collection; legacy Pantry if present)
+    const pantryItemResult = await PantryItem.deleteMany({});
+    console.log(`Deleted ${pantryItemResult.deletedCount} pantry items`);
+    try {
+      const pantryResult = await Pantry.deleteMany({});
+      if (pantryResult.deletedCount > 0) {
+        console.log(`Deleted ${pantryResult.deletedCount} legacy Pantry document(s)`);
+      }
+    } catch (e) {
+      // Old Pantry model may be removed
+    }
 
     // Delete all shopping list items (all shopping lists are user-specific)
     const shoppingListResult = await ShoppingListItem.deleteMany({});

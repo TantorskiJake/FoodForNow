@@ -52,6 +52,9 @@ const shoppingListItemSchema = new mongoose.Schema({
 // This allows quick lookups of shopping list items by user and ingredient
 shoppingListItemSchema.index({ user: 1, ingredient: 1 });
 
+// Compound index for "incomplete items" queries (common read pattern)
+shoppingListItemSchema.index({ user: 1, completed: 1 });
+
 // Create and export the ShoppingListItem model
 const ShoppingListItem = mongoose.model('ShoppingListItem', shoppingListItemSchema);
 

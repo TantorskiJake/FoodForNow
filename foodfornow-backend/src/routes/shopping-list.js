@@ -3,7 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const ShoppingListItem = require('../models/shopping-list-item');
 const Recipe = require('../models/recipe');
-const PantryItem = require('../models/pantry');
+const PantryItem = require('../models/pantry-item');
 const Ingredient = require('../models/ingredient');
 const MealPlan = require('../models/mealPlan');
 const { isAlwaysAvailableIngredient } = require('../constants/ingredients');
@@ -117,24 +117,18 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
     }
 
     // Step 2: Get current pantry items
-    const pantry = await PantryItem.findOne({ user: req.userId })
-      .populate({
-        path: 'items.ingredient',
-        model: 'Ingredient',
-        select: 'name category'
-      });
+    const pantryItems = await PantryItem.find({ user: req.userId })
+      .populate('ingredient', 'name category');
 
     // Step 3: Pantry total per ingredient in standard units (for conversion)
     const pantryByIngredientStandard = new Map();
-    if (pantry && pantry.items) {
-      pantry.items.forEach(item => {
-        if (item.ingredient) {
-          const idStr = item.ingredient._id.toString();
-          const name = item.ingredient.name || '';
-          const inStandard = toStandard(item.quantity, item.unit, name);
-          pantryByIngredientStandard.set(idStr, (pantryByIngredientStandard.get(idStr) || 0) + inStandard);
-        }
-      });
+    for (const item of pantryItems) {
+      if (item.ingredient) {
+        const idStr = item.ingredient._id.toString();
+        const name = item.ingredient.name || '';
+        const inStandard = toStandard(item.quantity, item.unit, name);
+        pantryByIngredientStandard.set(idStr, (pantryByIngredientStandard.get(idStr) || 0) + inStandard);
+      }
     }
 
     // Step 4: Calculate needed ingredients (pantryQuantity in same unit as needed, via conversion)
@@ -196,19 +190,16 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       .populate('recipe');
 
     // Add pantry quantities to the response (converted to each item's unit)
-    const pantryResponse = await PantryItem.findOne({ user: req.userId })
-      .populate('items.ingredient');
+    const pantryResponseItems = await PantryItem.find({ user: req.userId }).populate('ingredient');
 
     const pantryByIngredientResponse = new Map();
-    if (pantryResponse && pantryResponse.items) {
-      pantryResponse.items.forEach(item => {
-        if (item.ingredient) {
-          const idStr = item.ingredient._id.toString();
-          const name = item.ingredient.name || '';
-          const inStandard = toStandard(item.quantity, item.unit, name);
-          pantryByIngredientResponse.set(idStr, (pantryByIngredientResponse.get(idStr) || 0) + inStandard);
-        }
-      });
+    for (const item of pantryResponseItems) {
+      if (item.ingredient) {
+        const idStr = item.ingredient._id.toString();
+        const name = item.ingredient.name || '';
+        const inStandard = toStandard(item.quantity, item.unit, name);
+        pantryByIngredientResponse.set(idStr, (pantryByIngredientResponse.get(idStr) || 0) + inStandard);
+      }
     }
 
     const responseWithPantryQuantities = updatedList.map(item => {
