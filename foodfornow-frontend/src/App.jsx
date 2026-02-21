@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth, AuthInitializer } from './context/AuthContext';
+import { AuthProvider, AuthInitializer } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AchievementProvider } from './context/AchievementContext';
 import Navbar from './components/Navbar';
-import OnboardingOverlay, { hasCompletedOnboarding } from './components/OnboardingOverlay';
+import LoginToDashboardOverlay from './components/LoginToDashboardOverlay';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -84,18 +84,9 @@ class ErrorBoundary extends React.Component {
 }
 
 /**
- * AppRoutes - Renders routes and onboarding overlay when user is authenticated.
+ * AppRoutes - Renders routes and login-to-dashboard transition overlay.
  */
 function AppRoutes() {
-  const { authenticated, user } = useAuth();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  useEffect(() => {
-    if (authenticated && user?._id && !hasCompletedOnboarding(user._id)) {
-      setShowOnboarding(true);
-    }
-  }, [authenticated, user?._id]);
-
   return (
     <AuthInitializer>
       <Navbar />
@@ -171,14 +162,8 @@ function AppRoutes() {
         <Route path="/scan" element={<Scan />} />
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>
+      <LoginToDashboardOverlay />
       <Toaster position="bottom-right" />
-      {showOnboarding && (
-        <OnboardingOverlay
-          open={showOnboarding}
-          onClose={() => setShowOnboarding(false)}
-          userId={user?._id}
-        />
-      )}
     </AuthInitializer>
   );
 }

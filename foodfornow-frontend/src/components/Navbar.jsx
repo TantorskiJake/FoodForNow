@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -52,12 +52,19 @@ const Navbar = () => {
   const { authenticated, loading, logout, user } = useAuth();
 
   const handleMenu = (event) => {
-    setAnchorEl(event.currentTarget);
+    // Only open from real user clicks (not focus/keyboard or programmatic)
+    if (event?.type !== 'click' || event?.detail === 0) return;
+    setAnchorEl((prev) => (prev ? null : event.currentTarget));
   };
 
   const handleClose = () => {
     setAnchorEl(null);
   };
+
+  // Keep menu closed on route change (e.g. after login -> dashboard so it doesn't appear open)
+  useEffect(() => {
+    setAnchorEl(null);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await api.post('/auth/logout');
@@ -202,6 +209,14 @@ const Navbar = () => {
               }}
               open={Boolean(anchorEl)}
               onClose={handleClose}
+              PaperProps={{
+                sx: {
+                  mt: 1.5,
+                  minWidth: 180,
+                  left: 'auto !important',
+                  right: 16,
+                },
+              }}
             >
               <MenuItem onClick={() => { handleClose(); navigate('/profile'); }}>
                 <ListItemIcon sx={{ minWidth: 36 }}><EditIcon fontSize="small" /></ListItemIcon>

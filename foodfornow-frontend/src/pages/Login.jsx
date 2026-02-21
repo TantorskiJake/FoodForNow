@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   Container,
   Typography,
@@ -11,15 +12,18 @@ import {
   useTheme,
   CircularProgress,
 } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+const LOGIN_PHASE = { FORM: 'form', SUCCESS: 'success', EXITING: 'exiting' };
+
 const Login = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { authenticated, loading, setAuthFromLogin } = useAuth();
+  const { authenticated, loading, setAuthFromLogin, setJustLoggedIn } = useAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -27,16 +31,24 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginPhase, setLoginPhase] = useState(LOGIN_PHASE.FORM);
 
-  // Redirect to dashboard if already signed in
+  // Redirect to dashboard if already signed in (and not in transition)
   useEffect(() => {
-    if (!loading && authenticated) {
+    if (!loading && authenticated && loginPhase === LOGIN_PHASE.FORM) {
       navigate('/dashboard', { replace: true });
     }
-  }, [authenticated, loading, navigate]);
+  }, [authenticated, loading, loginPhase, navigate]);
 
-  // Show spinner only when authenticated (redirecting to dashboard)
-  if (authenticated) {
+  // After success UI, move to exit phase
+  useEffect(() => {
+    if (loginPhase !== LOGIN_PHASE.SUCCESS) return;
+    const t = setTimeout(() => setLoginPhase(LOGIN_PHASE.EXITING), 500);
+    return () => clearTimeout(t);
+  }, [loginPhase]);
+
+  // Show spinner only when authenticated and still on form (e.g. redirect from refresh)
+  if (authenticated && loginPhase === LOGIN_PHASE.FORM) {
     return (
       <Box
         sx={{
@@ -104,7 +116,7 @@ const Login = () => {
 
       setAuthFromLogin(user);
       setIsLoading(false);
-      window.location.replace('/dashboard');
+      setLoginPhase(LOGIN_PHASE.SUCCESS);
     } catch (err) {
       clearTimeout(safetyTimeoutId);
       console.error('Login error:', err);
@@ -115,42 +127,83 @@ const Login = () => {
     }
   };
 
-  return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: theme.palette.mode === 'dark' 
-          ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
-          : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
-        py: 4,
-      }}
-    >
-      <Container maxWidth="xs">
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 3,
-          }}
-        >
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{
-              fontWeight: 600,
-              letterSpacing: '-0.5px',
-              color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
-              mb: 2,
-            }}
-          >
-            Welcome Back
-          </Typography>
+  const bgSx = {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 100%)'
+      : 'linear-gradient(45deg, #f5f5f7 0%, #ffffff 100%)',
+    py: 4,
+  };
 
-          <Paper
+  return (
+    <Box sx={bgSx}>
+      <motion.div
+        animate={{
+          opacity: loginPhase === LOGIN_PHASE.EXITING ? 0 : 1,
+          scale: loginPhase === LOGIN_PHASE.EXITING ? 0.96 : 1,
+          filter: loginPhase === LOGIN_PHASE.EXITING ? 'blur(8px)' : 'blur(0px)',
+        }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        onAnimationComplete={() => {
+          if (loginPhase === LOGIN_PHASE.EXITING) {
+            setJustLoggedIn(true);
+            navigate('/dashboard', { replace: true });
+          }
+        }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}
+      >
+          <Container maxWidth="xs">
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 3,
+              }}
+            >
+              {loginPhase === LOGIN_PHASE.SUCCESS || loginPhase === LOGIN_PHASE.EXITING ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  style={{ textAlign: 'center' }}
+                >
+                  <CheckCircleIcon
+                    sx={{
+                      fontSize: 72,
+                      color: theme.palette.mode === 'dark' ? '#228B22' : '#1B6B1B',
+                    }}
+                  />
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      mt: 2,
+                      fontWeight: 600,
+                      color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+                    }}
+                  >
+                    Welcome back
+                  </Typography>
+                </motion.div>
+              ) : (
+                <>
+                  <Typography
+                    variant="h4"
+                    component="h1"
+                    sx={{
+                      fontWeight: 600,
+                      letterSpacing: '-0.5px',
+                      color: theme.palette.mode === 'dark' ? '#ffffff' : '#1d1d1f',
+                      mb: 2,
+                    }}
+                  >
+                    Welcome Back
+                  </Typography>
+
+                  <Paper
             elevation={0}
             sx={{
               p: 4,
@@ -317,8 +370,11 @@ const Login = () => {
               </Button>
             </Box>
           </Paper>
-        </Box>
-      </Container>
+                </>
+              )}
+            </Box>
+          </Container>
+      </motion.div>
     </Box>
   );
 };

@@ -31,6 +31,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   // Ref so a late-running initial refreshAuth() doesn't clear state after login
   const userSetByLoginRef = useRef(false);
+  // Flag for login-to-dashboard transition animation (set by Login, read and cleared by Dashboard)
+  const [justLoggedIn, setJustLoggedInState] = useState(false);
 
   /**
    * Refresh Authentication State
@@ -95,14 +97,32 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setAuthenticated(false);
     setLoading(false);
+    setJustLoggedInState(false);
   };
+
+  /** Set flag so Dashboard can run entrance animation after login/register. */
+  const setJustLoggedIn = () => setJustLoggedInState(true);
+
+  /** Clear flag after dashboard entrance animation completes (so refresh doesn't replay). */
+  const clearJustLoggedIn = () => setJustLoggedInState(false);
 
   // Don't run refreshAuth here – AuthInitializer (inside Router) runs it only when not on login/register
   // so we avoid 401s for /auth/me and /auth/token when the user is on the login page.
 
   // Provide authentication context to child components
   return (
-    <AuthContext.Provider value={{ user, authenticated, loading, setLoading, refreshAuth, setAuthFromLogin, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      authenticated,
+      loading,
+      setLoading,
+      refreshAuth,
+      setAuthFromLogin,
+      logout,
+      justLoggedIn,
+      setJustLoggedIn,
+      clearJustLoggedIn,
+    }}>
       {children}
     </AuthContext.Provider>
   );

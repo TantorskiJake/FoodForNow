@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   Container,
   Grid,
@@ -80,7 +81,8 @@ const Dashboard = () => {
   const [mealActionLoading, setMealActionLoading] = useState(false);
   const [calendarAnchorEl, setCalendarAnchorEl] = useState(null);
 
-  const { authenticated, user } = useAuth();
+  const { authenticated, user, justLoggedIn, clearJustLoggedIn } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
   const { showAchievements } = useAchievements();
   const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
   const cancelledOptimisticIds = useRef(new Set());
@@ -686,14 +688,8 @@ const Dashboard = () => {
     );
   }
 
-  return (
-    <Container 
-      maxWidth={false}
-      sx={{ 
-        py: { xs: 1, sm: 2 },
-        px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 }
-      }}
-    >
+  const containerContent = (
+    <>
       {busyIndicator}
       <Grid container spacing={3}>
         <Grid item xs={12}>
@@ -1538,7 +1534,26 @@ const Dashboard = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </>
+  );
+
+  return (
+    <motion.div
+      initial={justLoggedIn && !prefersReducedMotion ? { opacity: 0, y: 28 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
+      onAnimationComplete={() => { if (justLoggedIn) clearJustLoggedIn(); }}
+    >
+      <Container
+        maxWidth={false}
+        sx={{
+          py: { xs: 1, sm: 2 },
+          px: { xs: 1, sm: 3, md: 4, lg: 6, xl: 8 },
+        }}
+      >
+        {containerContent}
+      </Container>
+    </motion.div>
   );
 };
 

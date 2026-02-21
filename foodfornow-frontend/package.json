@@ -19,6 +19,7 @@
     "@zxing/browser": "^0.1.5",
     "axios": "^1.12.0",
     "dayjs": "^1.11.19",
+    "framer-motion": "^12.34.3",
     "match-sorter": "^8.0.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
