@@ -530,58 +530,217 @@ async function transformToRecipeFormat(parsed, userId, Ingredient, validUnits, c
   };
 }
 
+// Section headers (with optional leading emoji/symbols)
+const INGREDIENTS_HEADER = /^(?:[\u{1F300}-\u{1F9FF}\s]*)?.?ingredients?(\s*[:.]|$)/iu;
+const INSTRUCTIONS_HEADER = /^(?:[\u{1F300}-\u{1F9FF}\s]*)?.?(?:instructions?|directions?|steps?|method)(\s*[:.]|$)/iu;
+const SERVINGS_PATTERNS = [
+  /servings?:\s*(\d+)(?:\s*[–\-—]\s*(\d+))?/gi,
+  /serves?\s+(\d+)(?:\s*[–\-—]\s*(\d+))?/gi,
+  /(\d+)\s*servings?/gi,
+  /makes?\s+(\d+)(?:\s*[–\-—]\s*(\d+))?/gi,
+];
+// Lines that start with these (case-insensitive) are treated as instructions, not ingredients
+const INSTRUCTION_STARTERS = /^(add|stir|mix|heat|preheat|combine|pour|bake|cook|place|transfer|remove|let|cool|serve|season|chop|cut|slice|dice|whisk|beat|fold|bring|boil|simmer|fry|sauté|brown|drain|reserve|set\s+aside|spread|top|sprinkle|drizzle|garnish|divide|plate|enjoy|prep|prepare|blend|crush|mince|peel|grate|trim|pat\s+dry)/i;
+
 /**
- * Parse raw text (e.g. from OCR of handwritten recipe) into structured recipe format.
- * Expects text with optional sections: title, Ingredients, Instructions.
+ * Strip leading emoji/symbols and trim; return clean title for name.
+ */
+function cleanTitle(line) {
+  if (!line || typeof line !== 'string') return '';
+  const trimmed = line.trim();
+  const withoutEmoji = trimmed.replace(/^[\u{1F300}-\u{1F9FF}\s#*\-–—]+/gu, '').trim();
+  return withoutEmoji || trimmed;
+}
+
+function stripBullet(line) {
+  return line
+    .replace(/^\s*[•\-\*]\s*/, '')
+    .replace(/^\s*\d+[\.\)]\s*/, '')
+    .replace(/^\s*[\u{2022}\u{2023}\u{25E6}]\s*/u, '')
+    .trim();
+}
+
+/** Extract servings by scanning entire text. */
+function extractServingsFromText(fullText) {
+  if (!fullText || typeof fullText !== 'string') return 4;
+  const text = fullText.toLowerCase();
+  for (const re of SERVINGS_PATTERNS) {
+    re.lastIndex = 0;
+    const m = re.exec(text);
+    if (m) {
+      const a = parseInt(m[1], 10);
+      const b = m[2] ? parseInt(m[2], 10) : a;
+      return Math.max(1, Math.round((a + b) / 2));
+    }
+  }
+  return 4;
+}
+
+/** Extract total time in minutes by scanning entire text. */
+function extractTimeFromText(fullText) {
+  if (!fullText || typeof fullText !== 'string') return 0;
+  const str = fullText.toLowerCase();
+  const totalMatch = str.match(/total\s+time:\s*(\d+)(?:\s*[–\-—]\s*(\d+))?\s*(?:minute|min)s?/i);
+  if (totalMatch) {
+    const a = parseInt(totalMatch[1], 10);
+    const b = totalMatch[2] ? parseInt(totalMatch[2], 10) : a;
+    return Math.round((a + b) / 2);
+  }
+  const rangeMatch = str.match(/(\d+)\s*[–\-—]\s*(\d+)\s*(?:minute|min)s?/);
+  if (rangeMatch) {
+    const a = parseInt(rangeMatch[1], 10);
+    const b = parseInt(rangeMatch[2], 10);
+    return Math.round((a + b) / 2);
+  }
+  let total = 0;
+  const hrMatch = str.match(/(\d+)\s*(?:hr|hour)s?/);
+  if (hrMatch) total += parseInt(hrMatch[1], 10) * 60;
+  const minMatch = str.match(/(\d+)\s*(?:minute|min)s?(?!\s*total)/);
+  if (minMatch) total += parseInt(minMatch[1], 10);
+  return total;
+}
+
+/** Return true if the line looks like an instruction rather than an ingredient. */
+function looksLikeInstruction(line) {
+  const t = stripBullet(line).trim();
+  if (t.length > 120) return true;
+  if (INSTRUCTION_STARTERS.test(t)) return true;
+  if (/^[A-Z][^.]*\.\s*/.test(t) || t.includes(' until ') || t.includes(' for about ')) return true;
+  return false;
+}
+
+/** Return true if the line is likely an ingredient. */
+function isLikelyIngredientLine(line, parsed) {
+  if (!line || line.length > 120) return false;
+  if (looksLikeInstruction(line)) return false;
+  if (!parsed || !parsed.name) return false;
+  if (parsed.name.length > 70) return false;
+  if (/^\d+\.\s+/.test(line.trim())) return false;
+  return true;
+}
+
+/**
+ * Parse raw text of any format into a structured recipe.
+ * Scans the whole text for servings and time. If "Ingredients"/"Instructions" sections exist, uses them.
+ * Otherwise classifies each line: lines that parse as ingredients (and don't look like instructions)
+ * go to ingredients; the rest go to instructions. Works with pasted blogs, notes, messages, etc.
  */
 function parseRecipeFromText(rawText) {
   if (!rawText || typeof rawText !== 'string') {
     throw new Error('No text provided');
   }
 
-  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (lines.length === 0) throw new Error('No content to parse');
+  const fullText = rawText;
+  const trimmedLines = fullText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (trimmedLines.length === 0) throw new Error('No content to parse');
 
-  const name = lines[0].length <= 80 ? lines[0] : 'Imported Recipe';
+  const servings = extractServingsFromText(fullText);
+  const totalTimeMinutes = extractTimeFromText(fullText);
 
-  // Find section boundaries (case-insensitive)
-  const ingIdx = lines.findIndex((l) => /^ingredients?(\s*[:.]|$)/i.test(l) || /^ing\.?\s*$/i.test(l));
-  const instrIdx = lines.findIndex((l) =>
-    /^instructions?(\s*[:.]|$)/i.test(l) || /^directions?(\s*[:.]|$)/i.test(l) ||
-    /^steps?(\s*[:.]|$)/i.test(l) || /^method(\s*[:.]|$)/i.test(l)
-  );
+  let name = trimmedLines[0].length <= 100 ? cleanTitle(trimmedLines[0]) : 'Imported Recipe';
+  if (!name) name = trimmedLines[0].length <= 100 ? trimmedLines[0] : 'Imported Recipe';
+  let description = name;
+
+  const ingIdx = trimmedLines.findIndex((l) => INGREDIENTS_HEADER.test(l) || /^ing\.?\s*$/i.test(l));
+  const instrIdx = trimmedLines.findIndex((l) => INSTRUCTIONS_HEADER.test(l));
 
   let ingredientLines = [];
   let instructionLines = [];
 
   if (ingIdx >= 0 && instrIdx >= 0 && ingIdx < instrIdx) {
-    ingredientLines = lines.slice(ingIdx + 1, instrIdx).filter((l) => l.length > 1);
-    instructionLines = lines.slice(instrIdx + 1).filter((l) => l.length > 1);
+    const slice = trimmedLines.slice(ingIdx + 1, instrIdx);
+    ingredientLines = slice.filter((l) => {
+      if (l.length <= 1) return false;
+      // Skip subsection headers (e.g. "Pasta & Protein", "Vegetables") – usually title case, no numbers
+      if (/^[A-Z][a-z].*[A-Za-z]$/.test(l) && !/\d/.test(l) && !/^[•\-\*]/.test(l) && l.length < 50) return false;
+      return true;
+    }).map(stripBullet).filter(Boolean);
+    instructionLines = trimmedLines.slice(instrIdx + 1);
   } else if (ingIdx >= 0) {
-    ingredientLines = lines.slice(ingIdx + 1).filter((l) => l.length > 1);
-    const nextSection = lines.findIndex((l, i) => i > ingIdx && /^(instructions?|directions?|steps?|method)/i.test(l));
-    if (nextSection > ingIdx) {
-      ingredientLines = lines.slice(ingIdx + 1, nextSection).filter((l) => l.length > 1);
-      instructionLines = lines.slice(nextSection + 1).filter((l) => l.length > 1);
-    }
+    const nextSection = trimmedLines.findIndex((l, i) => i > ingIdx && INSTRUCTIONS_HEADER.test(l));
+    const end = nextSection > ingIdx ? nextSection : trimmedLines.length;
+    const slice = trimmedLines.slice(ingIdx + 1, end);
+    ingredientLines = slice.filter((l) => l.length > 1).map(stripBullet).filter(Boolean);
+    if (nextSection > ingIdx) instructionLines = trimmedLines.slice(nextSection + 1);
   } else if (instrIdx >= 0) {
-    instructionLines = lines.slice(instrIdx + 1).filter((l) => l.length > 1);
+    instructionLines = trimmedLines.slice(instrIdx + 1);
   }
 
-  // If no clear sections, heuristic: lines starting with numbers or bullets are often ingredients
-  if (ingredientLines.length === 0 && instructionLines.length === 0) {
-    const bulletOrNum = /^[\d\-•*]\s*\.?\s*/;
-    const possibleIng = lines.filter((l) => bulletOrNum.test(l) || /^\d+\s*[\.\)]\s*/.test(l));
-    const rest = lines.filter((l) => !bulletOrNum.test(l) && !/^\d+\s*[\.\)]\s*/.test(l));
-    if (possibleIng.length >= 2) {
-      ingredientLines = possibleIng.map((l) => l.replace(bulletOrNum, '').replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean);
-      instructionLines = rest.slice(1).filter((l) => l.length > 2);
-    } else {
-      instructionLines = lines.slice(1).filter((l) => l.length > 2);
+  // No clear sections: scan content and classify each line (any-text mode)
+  if (ingredientLines.length === 0 || instructionLines.length === 0) {
+    const contentStart = Math.min(
+      ingIdx >= 0 ? ingIdx + 1 : 999,
+      instrIdx >= 0 ? instrIdx + 1 : 999,
+      2
+    );
+    const contentLines = trimmedLines.slice(contentStart);
+    let inIngredientBlock = false;
+    let ingredientBlockEnd = -1;
+    for (let i = 0; i < contentLines.length; i++) {
+      const line = contentLines[i];
+      const stripped = stripBullet(line);
+      if (stripped.length < 2) continue;
+      const parsed = parseIngredientString(stripped);
+      const likelyIng = isLikelyIngredientLine(stripped, parsed);
+      if (likelyIng) {
+        inIngredientBlock = true;
+        ingredientBlockEnd = i;
+      } else {
+        if (inIngredientBlock) {
+          for (let j = 0; j <= ingredientBlockEnd; j++) {
+            const sl = stripBullet(contentLines[j]);
+            if (sl.length >= 2) ingredientLines.push(sl);
+          }
+          for (let j = ingredientBlockEnd + 1; j < contentLines.length; j++) {
+            const sl = contentLines[j].trim();
+            if (sl.length >= 2 && !INGREDIENTS_HEADER.test(sl) && !INSTRUCTIONS_HEADER.test(sl)) {
+              instructionLines.push(sl);
+            }
+          }
+          break;
+        } else {
+          if (!INGREDIENTS_HEADER.test(stripped) && !INSTRUCTIONS_HEADER.test(stripped)) {
+            instructionLines.push(stripped);
+          }
+        }
+      }
+    }
+    if (ingredientLines.length === 0 && ingredientBlockEnd >= 0) {
+      for (let j = 0; j <= ingredientBlockEnd; j++) {
+        const sl = stripBullet(contentLines[j]);
+        if (sl.length >= 2) ingredientLines.push(sl);
+      }
+    }
+    if (ingredientLines.length === 0) {
+      for (let i = 0; i < contentLines.length; i++) {
+        const line = contentLines[i];
+        const stripped = stripBullet(line);
+        if (stripped.length < 2) continue;
+        if (INGREDIENTS_HEADER.test(stripped) || INSTRUCTIONS_HEADER.test(stripped)) continue;
+        const parsed = parseIngredientString(stripped);
+        if (isLikelyIngredientLine(stripped, parsed)) ingredientLines.push(stripped);
+        else instructionLines.push(stripped);
+      }
     }
   }
 
-  // Parse ingredients
+  if (trimmedLines.length >= 2 && description === name) {
+    const second = trimmedLines[1];
+    if (second.length > 3 && second.length <= 150 &&
+        !INGREDIENTS_HEADER.test(second) && !INSTRUCTIONS_HEADER.test(second) &&
+        !/^\d+\s*(?:min|serving)/i.test(second) && !/^⸻+$/.test(second)) {
+      description = second;
+    }
+  }
+
+  // Filter ingredient lines: skip lines that look like category headers (short, no digits, no bullet)
+  ingredientLines = ingredientLines.filter((l) => {
+    if (l.length < 3) return false;
+    if (/^[A-Z][a-z].*[A-Za-z]$/.test(l) && !/\d/.test(l) && l.length < 40) return false;
+    return true;
+  });
+
+  // Parse ingredients into { name, quantity, unit, suggestedCategory, uncertain }
   const ingredients = [];
   for (const line of ingredientLines) {
     const parsed = parseIngredientString(line);
@@ -602,7 +761,7 @@ function parseRecipeFromText(rawText) {
     for (const line of ingredientLines) {
       if (line.length > 2) {
         ingredients.push({
-          name: line.replace(/^[\d\-•*]\s*\.?\s*/, '').trim(),
+          name: stripBullet(line),
           quantity: 1,
           unit: 'piece',
           suggestedCategory: 'Other',
@@ -612,19 +771,41 @@ function parseRecipeFromText(rawText) {
     }
   }
 
-  const instructions =
-    instructionLines.length > 0
-      ? instructionLines.map((l) => l.replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean)
-      : ['See original recipe for instructions.'];
+  const rawInstructions = instructionLines.filter((l) => {
+    const t = l.trim();
+    return t.length > 0 && !INGREDIENTS_HEADER.test(t) && !INSTRUCTIONS_HEADER.test(t);
+  });
+
+  const instructions = [];
+  let currentStep = [];
+  const flushStep = () => {
+    const text = currentStep.join('\n').replace(/\n+/g, '\n').trim();
+    if (text) instructions.push(text);
+    currentStep = [];
+  };
+  for (const line of rawInstructions) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const isNewStep = /^\d+[\.\)]\s+/.test(trimmed);
+    if (isNewStep && currentStep.length > 0) {
+      flushStep();
+    }
+    currentStep.push(isNewStep ? trimmed.replace(/^\d+[\.\)]\s+/, '') : trimmed);
+  }
+  flushStep();
+
+  const prepTime = totalTimeMinutes > 0 ? Math.floor(totalTimeMinutes / 2) : 15;
+  const cookTime = totalTimeMinutes > 0 ? totalTimeMinutes - prepTime : 30;
 
   return {
     name,
-    description: name,
+    description,
     ingredients,
-    instructions,
-    prepTime: 15,
-    cookTime: 30,
-    servings: 4,
+    instructions: instructions.length > 0 ? instructions : ['See original recipe for instructions.'],
+    prepTime,
+    cookTime,
+    totalTime: totalTimeMinutes || prepTime + cookTime,
+    servings,
     tags: [],
   };
 }

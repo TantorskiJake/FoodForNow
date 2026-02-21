@@ -31,6 +31,7 @@ import AddIcon from '@mui/icons-material/Add';
 import TimerIcon from '@mui/icons-material/Timer';
 import LinkIcon from '@mui/icons-material/Link';
 import ImageIcon from '@mui/icons-material/Image';
+import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import SortIcon from '@mui/icons-material/Sort';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -87,6 +88,10 @@ const Recipes = () => {
   const [importImageFile, setImportImageFile] = useState(null);
   const [parsingImage, setParsingImage] = useState(false);
   const [importImageError, setImportImageError] = useState('');
+  const [openImportText, setOpenImportText] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [parsingText, setParsingText] = useState(false);
+  const [importTextError, setImportTextError] = useState('');
   const [openCategoryReview, setOpenCategoryReview] = useState(false);
   const [pendingRecipeData, setPendingRecipeData] = useState(null);
   const [categoryOverrides, setCategoryOverrides] = useState({});
@@ -424,6 +429,32 @@ const Recipes = () => {
       );
     } finally {
       setParsingImage(false);
+    }
+  };
+
+  const handleImportFromText = async () => {
+    const text = importText?.trim();
+    if (!text) {
+      setImportTextError('Please paste recipe text');
+      return;
+    }
+
+    try {
+      setParsingText(true);
+      setImportTextError('');
+      const response = await api.post('/recipes/parse-text', { text });
+      const recipeData = response.data;
+
+      setOpenImportText(false);
+      setImportText('');
+
+      await processImportedRecipeData(recipeData);
+    } catch (err) {
+      setImportTextError(
+        err.response?.data?.error || 'Failed to parse recipe. Make sure the text includes a title, ingredients, and instructions.'
+      );
+    } finally {
+      setParsingText(false);
     }
   };
 
@@ -840,6 +871,17 @@ const Recipes = () => {
               >
                 <ImageIcon sx={{ mr: 1.5, fontSize: 20 }} />
                 From handwritten recipe card
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setAnchorImportMenu(null);
+                  setImportText('');
+                  setImportTextError('');
+                  setOpenImportText(true);
+                }}
+              >
+                <ContentPasteIcon sx={{ mr: 1.5, fontSize: 20 }} />
+                Paste recipe text
               </MenuItem>
             </MenuList>
           </Menu>
@@ -1278,7 +1320,13 @@ const Recipes = () => {
                       freeSolo={!ingredient.ingredient}
                       getOptionLabel={(option) => (option && (typeof option === 'string' ? option : option.name)) || ''}
                       isOptionEqualToValue={(option, value) => {
-                        if (typeof option === 'string' || typeof value === 'string') return (option || '').trim() === (value || '').trim();
+                        if (option == null && value == null) return true;
+                        if (option == null || value == null) return false;
+                        if (typeof option === 'string' || typeof value === 'string') {
+                          const optionStr = typeof option === 'string' ? option : (option?.name ?? '');
+                          const valueStr = typeof value === 'string' ? value : (value?.name ?? '');
+                          return (optionStr || '').trim() === (valueStr || '').trim();
+                        }
                         return option._id === value?._id;
                       }}
                       filterOptions={(options, state) => {
@@ -1591,6 +1639,57 @@ const Recipes = () => {
             startIcon={parsingImage ? <InlineLoaderIcon size={20} /> : <ImageIcon />}
           >
             {parsingImage ? 'Reading...' : 'Import recipe'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={openImportText}
+        onClose={() => !parsingText && (setOpenImportText(false), setImportText(''), setImportTextError(''))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Paste recipe text</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Paste a recipe you copied from a blog, note, or message. Include a title, ingredients, and instructions so we can parse it.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={10}
+            maxRows={20}
+            label="Recipe text"
+            placeholder="Paste your recipe here..."
+            value={importText}
+            onChange={(e) => {
+              setImportText(e.target.value);
+              setImportTextError('');
+            }}
+            error={!!importTextError}
+            helperText={importTextError}
+            disabled={parsingText}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setOpenImportText(false);
+              setImportText('');
+              setImportTextError('');
+            }}
+            disabled={parsingText}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleImportFromText}
+            disabled={parsingText || !importText?.trim()}
+            startIcon={parsingText ? <InlineLoaderIcon size={20} /> : <ContentPasteIcon />}
+          >
+            {parsingText ? 'Parsing...' : 'Import recipe'}
           </Button>
         </DialogActions>
       </Dialog>
