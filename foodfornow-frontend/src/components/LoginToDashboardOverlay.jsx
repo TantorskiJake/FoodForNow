@@ -3,10 +3,15 @@ import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
+const EASE_OUT = [0.22, 1, 0.36, 1];
+const CIRCLE_DURATION = 0.55;
+const FADE_DURATION = 0.5;
+const FADE_START = 0.55; // hold full green, then fade as dashboard loads in
+
 /**
  * Full-screen overlay shown when navigating from login to dashboard.
- * Circle reveal in brand green expands from center, then fades out
- * while the dashboard entrance runs underneath.
+ * Circle reveal in brand green expands from center, holds briefly,
+ * then fades out as the dashboard slides in.
  */
 export default function LoginToDashboardOverlay() {
   const { pathname } = useLocation();
@@ -25,7 +30,11 @@ export default function LoginToDashboardOverlay() {
       initial={{ opacity: 1 }}
       animate={{
         opacity: [1, 1, 0],
-        transition: { duration: 0.4, times: [0, 0.7, 1] },
+        transition: {
+          duration: FADE_DURATION,
+          times: [0, FADE_START, 1],
+          ease: EASE_OUT,
+        },
       }}
       onAnimationComplete={() => setHidden(true)}
       style={{
@@ -41,7 +50,7 @@ export default function LoginToDashboardOverlay() {
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 2.5 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: CIRCLE_DURATION, ease: EASE_OUT }}
         style={{
           width: '100vmax',
           height: '100vmax',

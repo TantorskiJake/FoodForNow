@@ -1539,9 +1539,12 @@ const Dashboard = () => {
 
   return (
     <motion.div
-      initial={justLoggedIn && !prefersReducedMotion ? { opacity: 0, y: 28 } : false}
+      initial={justLoggedIn && !prefersReducedMotion ? { opacity: 0, y: 36 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
+      transition={{
+        duration: prefersReducedMotion ? 0 : 0.6,
+        ease: [0.22, 1, 0.36, 1],
+      }}
       onAnimationComplete={() => { if (justLoggedIn) clearJustLoggedIn(); }}
     >
       <Container

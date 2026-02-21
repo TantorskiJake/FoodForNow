@@ -20,6 +20,12 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const LOGIN_PHASE = { FORM: 'form', SUCCESS: 'success', EXITING: 'exiting' };
 
+// Smooth ease-out so the "loading in" feels deliberate, not rushed
+const EASE_OUT = [0.22, 1, 0.36, 1];
+const SUCCESS_HOLD_MS = 700;
+const EXIT_DURATION = 0.5;
+const SUCCESS_ICON_DURATION = 0.45;
+
 const Login = () => {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -43,7 +49,7 @@ const Login = () => {
   // After success UI, move to exit phase
   useEffect(() => {
     if (loginPhase !== LOGIN_PHASE.SUCCESS) return;
-    const t = setTimeout(() => setLoginPhase(LOGIN_PHASE.EXITING), 500);
+    const t = setTimeout(() => setLoginPhase(LOGIN_PHASE.EXITING), SUCCESS_HOLD_MS);
     return () => clearTimeout(t);
   }, [loginPhase]);
 
@@ -143,10 +149,10 @@ const Login = () => {
       <motion.div
         animate={{
           opacity: loginPhase === LOGIN_PHASE.EXITING ? 0 : 1,
-          scale: loginPhase === LOGIN_PHASE.EXITING ? 0.96 : 1,
-          filter: loginPhase === LOGIN_PHASE.EXITING ? 'blur(8px)' : 'blur(0px)',
+          scale: loginPhase === LOGIN_PHASE.EXITING ? 0.97 : 1,
+          filter: loginPhase === LOGIN_PHASE.EXITING ? 'blur(6px)' : 'blur(0px)',
         }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: EXIT_DURATION, ease: EASE_OUT }}
         onAnimationComplete={() => {
           if (loginPhase === LOGIN_PHASE.EXITING) {
             setJustLoggedIn(true);
@@ -166,9 +172,9 @@ const Login = () => {
             >
               {loginPhase === LOGIN_PHASE.SUCCESS || loginPhase === LOGIN_PHASE.EXITING ? (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  initial={{ opacity: 0, scale: 0.88 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: SUCCESS_ICON_DURATION, ease: EASE_OUT }}
                   style={{ textAlign: 'center' }}
                 >
                   <CheckCircleIcon
