@@ -7,6 +7,7 @@ import api from '../services/api';
 const Scan = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session');
+  const submitToken = searchParams.get('token');
   const videoRef = useRef(null);
   const codeReaderRef = useRef(null);
   const [error, setError] = useState(null);
@@ -14,7 +15,7 @@ const Scan = () => {
   const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
-    if (!sessionId || !videoRef.current) return;
+    if (!sessionId || !submitToken || !videoRef.current) return;
 
     codeReaderRef.current = new BrowserMultiFormatReader();
     let active = true;
@@ -38,6 +39,7 @@ const Scan = () => {
                 codeReaderRef.current?.reset();
                 await api.post(`/scan-session/${sessionId}`, {
                   barcode: result.getText(),
+                  token: submitToken,
                 });
                 setSuccess(true);
               } catch (e) {
@@ -61,9 +63,9 @@ const Scan = () => {
         codeReaderRef.current?.reset();
       } catch {}
     };
-  }, [sessionId, scanned]);
+  }, [sessionId, submitToken, scanned]);
 
-  if (!sessionId) {
+  if (!sessionId || !submitToken) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
         <Alert severity="error">Invalid scan link. Please scan the QR code from the app.</Alert>

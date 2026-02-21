@@ -9,14 +9,26 @@ const MealPlan = require('../models/mealPlan');
 const { isAlwaysAvailableIngredient } = require('../constants/ingredients');
 const { toStandard, fromStandard } = require('../services/unitConversionService');
 
+function sortByIngredientCategoryAndName(items) {
+  return items.slice().sort((a, b) => {
+    const catA = (a.ingredient?.category || '').toLowerCase();
+    const catB = (b.ingredient?.category || '').toLowerCase();
+    if (catA !== catB) return catA.localeCompare(catB);
+
+    const nameA = (a.ingredient?.name || '').toLowerCase();
+    const nameB = (b.ingredient?.name || '').toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+}
+
 // Get shopping list
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const items = await ShoppingListItem.find({ user: req.userId })
       .populate('ingredient')
-      .populate('recipe')
-      .sort({ 'ingredient.category': 1, 'ingredient.name': 1 });
-    res.json(items);
+      .populate('recipe');
+
+    res.json(sortByIngredientCategoryAndName(items));
   } catch (err) {
     console.error('Error fetching shopping list:', err);
     res.status(500).json({ message: 'Error fetching shopping list' });
@@ -210,17 +222,19 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       };
     });
 
+    const sortedResponse = sortByIngredientCategoryAndName(responseWithPantryQuantities);
+
     // Check for shopping list-related achievements
     try {
       const AchievementService = require('../services/achievementService');
-      const achievements = await AchievementService.checkShoppingListAchievements(req.userId, responseWithPantryQuantities);
+      const achievements = await AchievementService.checkShoppingListAchievements(req.userId, sortedResponse);
       
       // Add achievement data to response if any were unlocked
       if (achievements && achievements.length > 0) {
         const newlyCompleted = achievements.filter(a => a.newlyCompleted);
         if (newlyCompleted.length > 0) {
           res.json({
-            shoppingList: responseWithPantryQuantities,
+            shoppingList: sortedResponse,
             achievements: newlyCompleted.map(a => ({
               name: a.config.name,
               description: a.config.description,
@@ -234,7 +248,7 @@ router.post('/update-from-meal-plan', authMiddleware, async (req, res) => {
       console.error('Error checking achievements:', achievementError);
     }
 
-    res.json(responseWithPantryQuantities);
+    res.json(sortedResponse);
   } catch (error) {
     console.error('Error updating shopping list:', error);
     res.status(500).json({ error: 'Failed to update shopping list' });

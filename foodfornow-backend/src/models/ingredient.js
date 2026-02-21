@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeIngredientName } = require('../utils/ingredientNormalization');
 
 /** Capitalize first letter of each word for consistent display and sorting */
 function capitalizeWords(str) {
@@ -29,6 +30,11 @@ const ingredientSchema = new mongoose.Schema({
     required: true,
     enum: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other']
   },
+  normalizedName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
   // Optional description providing additional context
   description: {
     type: String,
@@ -45,22 +51,36 @@ const ingredientSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Normalize name to title case (first letter of each word capitalized) on save
-ingredientSchema.pre('save', function (next) {
-  if (this.name) {
+// Normalize name to title case (first letter of each word capitalized) before validation
+ingredientSchema.pre('validate', function (next) {
+  if (this.name && this.isModified('name')) {
     this.name = capitalizeWords(this.name);
+  }
+  if (this.name && (this.isModified('name') || !this.normalizedName)) {
+    this.normalizedName = normalizeIngredientName(this.name);
   }
   next();
 });
 
 ingredientSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate();
-  if (update && update.name) {
+  if (!update) return next();
+
+  const ensureNormalizedName = (value) => {
+    if (!value) return;
+    if (!update.$set) update.$set = {};
+    update.$set.normalizedName = normalizeIngredientName(value);
+  };
+
+  if (update.name) {
     update.name = capitalizeWords(update.name);
+    ensureNormalizedName(update.name);
   }
-  if (update && update.$set && update.$set.name) {
+  if (update.$set && update.$set.name) {
     update.$set.name = capitalizeWords(update.$set.name);
+    ensureNormalizedName(update.$set.name);
   }
+
   next();
 });
 
@@ -73,6 +93,9 @@ ingredientSchema.index(
     collation: { locale: 'en', strength: 2 }, // Case-insensitive comparison
   }
 );
+
+// Secondary index for normalized lookups to avoid O(n) scans
+ingredientSchema.index({ user: 1, normalizedName: 1 });
 
 // Create and export the Ingredient model
 const Ingredient = mongoose.model('Ingredient', ingredientSchema);

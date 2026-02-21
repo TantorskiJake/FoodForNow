@@ -4,27 +4,14 @@
  * to avoid duplicates like "swordfish filets" vs "1 inch thick swordfish filets".
  */
 
+const { normalizeIngredientName } = require('../utils/ingredientNormalization');
+
 /**
- * Normalize ingredient name for similarity matching:
- * - Lowercase, trim, collapse spaces
- * - Remove common size/format phrases (e.g. "1 inch thick", "diced", "minced")
+ * Normalize ingredient name for similarity matching. Legacy name retained to
+ * avoid breaking existing imports/tests.
  */
 function normalizeNameForMatching(name) {
-  if (!name || typeof name !== 'string') return '';
-  let s = name
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ');
-  // Remove optional size/thickness/format prefixes (e.g. "1 inch thick", "2 cm", "large", "diced")
-  s = s
-    .replace(/\d+\s*(inch|in\.?|inches)\s*thick\s*/gi, ' ')
-    .replace(/\d+\s*(cm|mm)\s*(thick)?\s*/gi, ' ')
-    .replace(/\b(large|medium|small)\s+(sized?\s+)?/gi, ' ')
-    .replace(/\b(diced|minced|chopped|sliced|grated|julienned|whole|halved)\s+/gi, ' ')
-    .replace(/\b(fresh|frozen|dried|canned|raw|cooked)\s+/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return s;
+  return normalizeIngredientName(name);
 }
 
 /**
@@ -34,15 +21,31 @@ function normalizeNameForMatching(name) {
  * Returns the ingredient document or null.
  */
 async function findSimilarIngredient(Ingredient, userId, name) {
-  const normalizedInput = normalizeNameForMatching(name);
+  const normalizedInput = normalizeIngredientName(name);
   if (!normalizedInput) return null;
 
-  const userIngredients = await Ingredient.find({ user: userId }).select('name');
-  for (const ing of userIngredients) {
-    const normalizedExisting = normalizeNameForMatching(ing.name);
+  const indexedMatch = await Ingredient.findOne({
+    user: userId,
+    normalizedName: normalizedInput,
+  });
+  if (indexedMatch) {
+    return indexedMatch;
+  }
+
+  // Fallback for legacy ingredients created before normalizedName existed.
+  const legacyIngredients = await Ingredient.find({
+    user: userId,
+    normalizedName: { $exists: false },
+  }).select('_id name');
+
+  for (const ing of legacyIngredients) {
+    const normalizedExisting = normalizeIngredientName(ing.name);
     if (!normalizedExisting) continue;
-    if (normalizedInput === normalizedExisting) return ing;
-    if (normalizedExisting.includes(normalizedInput) || normalizedInput.includes(normalizedExisting)) {
+    if (normalizedInput === normalizedExisting || normalizedExisting.includes(normalizedInput) || normalizedInput.includes(normalizedExisting)) {
+      await Ingredient.updateOne(
+        { _id: ing._id },
+        { normalizedName: normalizedExisting }
+      );
       return ing;
     }
   }

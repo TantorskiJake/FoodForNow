@@ -29,7 +29,7 @@ const BarcodeScanner = ({ open, onDetected, onClose }) => {
   const [error, setError] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
+  const [session, setSession] = useState(null);
   const [scanUrl, setScanUrl] = useState('');
   const [baseUrlOverride, setBaseUrlOverride] = useState('');
   const [manualBarcode, setManualBarcode] = useState('');
@@ -38,14 +38,18 @@ const BarcodeScanner = ({ open, onDetected, onClose }) => {
   useEffect(() => {
     if (!open || mode !== 'phone') return;
     setError(null);
-    setSessionId(null);
+    setSession(null);
     setScanUrl('');
     let cancelled = false;
     (async () => {
       try {
         const { data } = await api.post('/scan-session');
         if (cancelled) return;
-        setSessionId(data.sessionId);
+        setSession({
+          id: data.sessionId,
+          token: data.submitToken,
+          expiresAt: data.expiresIn ? Date.now() + data.expiresIn * 1000 : null,
+        });
       } catch (e) {
         if (!cancelled) setError(e.response?.data?.error || 'Failed to create scan session');
       }
@@ -55,17 +59,18 @@ const BarcodeScanner = ({ open, onDetected, onClose }) => {
 
   // Build scan URL when we have session (depends on baseUrlOverride)
   useEffect(() => {
-    if (!sessionId) return;
+    if (!session?.id || !session?.token) return;
     const base = getBaseUrl(baseUrlOverride);
-    setScanUrl(`${base}/scan?session=${sessionId}`);
-  }, [sessionId, baseUrlOverride]);
+    const query = new URLSearchParams({ session: session.id, token: session.token }).toString();
+    setScanUrl(`${base}/scan?${query}`);
+  }, [session, baseUrlOverride]);
 
   // Poll for barcode when session exists
   useEffect(() => {
-    if (!open || !sessionId || mode !== 'phone') return;
+    if (!open || !session?.id || mode !== 'phone') return;
     const poll = async () => {
       try {
-        const { data } = await api.get(`/scan-session/${sessionId}`);
+        const { data } = await api.get(`/scan-session/${session.id}`);
         if (data.barcode) {
           onDetected(data.barcode);
           onClose();
@@ -74,7 +79,7 @@ const BarcodeScanner = ({ open, onDetected, onClose }) => {
     };
     pollRef.current = setInterval(poll, 1500);
     return () => clearInterval(pollRef.current);
-  }, [open, sessionId, mode, onDetected, onClose]);
+  }, [open, session, mode, onDetected, onClose]);
 
   // Camera mode
   useEffect(() => {

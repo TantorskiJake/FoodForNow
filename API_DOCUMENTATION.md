@@ -1420,14 +1420,18 @@ Look up product metadata by UPC/EAN barcode via the Open Food Facts proxy. Requi
 
 ### POST `/api/scan-session`
 
-Create a 5-minute session to pair a logged-in desktop browser with a phone scanner.
+Create a 5-minute session to pair a logged-in desktop browser with a phone scanner. The session is bound to the authenticated user and returns a signed token that must be presented from the phone when submitting a barcode.
 
 **Success Response (200):**
 ```json
-{ "sessionId": "4c7ab1f9fa1e44c3a4cd1f89a6d26335" }
+{
+  "sessionId": "4c7ab1f9fa1e44c3a4cd1f89a6d26335",
+  "submitToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 300
+}
 ```
 
-Use the session ID to generate `https://app.example.com/scan?session=<id>` or rely on the frontend QR code.
+Use the session ID and token to generate `https://app.example.com/scan?session=<id>&token=<submitToken>` or rely on the frontend QR code generator in the app. `expiresIn` is expressed in seconds.
 
 ---
 
@@ -1443,17 +1447,21 @@ Poll for barcode submissions tied to a session. Requires authentication.
 When the phone posts, `barcode` becomes a numeric string (e.g., `"3017620422003"`).
 
 **Error Responses:**
+- `403`: Authenticated user does not own the session
 - `404`: Session expired or invalid
 
 ---
 
 ### POST `/api/scan-session/:id`
 
-Called from the mobile `/scan` page (no auth) to send a decoded barcode back to the desktop.
+Called from the mobile `/scan` page (no auth) to send a decoded barcode back to the desktop. The phone must include the signed token issued alongside the session ID.
 
 **Request Body:**
 ```json
-{ "barcode": "3017620422003" }
+{
+  "barcode": "3017620422003",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
 ```
 
 **Success Response (200):**
@@ -1463,6 +1471,8 @@ Called from the mobile `/scan` page (no auth) to send a decoded barcode back to 
 
 **Error Responses:**
 - `400`: Missing/invalid barcode
+- `401`: Missing or expired scan token
+- `403`: Token/session mismatch
 - `404`: Session expired or invalid
 
 ---

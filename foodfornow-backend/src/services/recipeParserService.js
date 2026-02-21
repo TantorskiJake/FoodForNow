@@ -10,6 +10,19 @@ const getRecipeData = require('@dimfu/recipe-scraper').default;
 const { parseIngredient } = require('parse-ingredient');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { assertUrlAllowedForFetch } = require('../utils/urlSafety');
+
+const PROXY_ENDPOINT_TEMPLATE = (process.env.RECIPE_FETCH_PROXY_URL || '').trim();
+const PROXY_REQUIRED = parseBoolean(process.env.RECIPE_FETCH_PROXY_REQUIRED);
+const PROXY_SOURCE_URL_HEADER = 'X-Recipe-Source-Url';
+const PROXY_SOURCE_HOST_HEADER = 'X-Recipe-Source-Host';
+let proxyTemplateErrorLogged = false;
+
+function parseBoolean(value) {
+  if (value == null) return false;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
 
 // Map parse-ingredient unit IDs to our valid units
 const UNIT_MAP = {
@@ -90,6 +103,41 @@ const CATEGORY_KEYWORDS = {
     'water', 'juice', 'wine', 'beer', 'coffee', 'tea', 'soda', 'lemonade',
   ],
 };
+
+function appendProxyQuery(template, targetUrl) {
+  const proxyUrl = new URL(template);
+  proxyUrl.searchParams.set('url', targetUrl);
+  return proxyUrl.toString();
+}
+
+function buildProxyFetchTarget(originalUrl) {
+  if (!PROXY_ENDPOINT_TEMPLATE) {
+    return { url: originalUrl, headers: {}, viaProxy: false };
+  }
+
+  try {
+    const encodedTarget = encodeURIComponent(originalUrl);
+    const finalUrl = PROXY_ENDPOINT_TEMPLATE.includes('{{URL}}')
+      ? PROXY_ENDPOINT_TEMPLATE.replace(/{{URL}}/g, encodedTarget)
+      : appendProxyQuery(PROXY_ENDPOINT_TEMPLATE, originalUrl);
+
+    const sourceHost = new URL(originalUrl).host;
+    return {
+      url: finalUrl,
+      headers: {
+        [PROXY_SOURCE_URL_HEADER]: originalUrl,
+        [PROXY_SOURCE_HOST_HEADER]: sourceHost,
+      },
+      viaProxy: true,
+    };
+  } catch (err) {
+    if (!proxyTemplateErrorLogged) {
+      console.error('Invalid RECIPE_FETCH_PROXY_URL value:', err.message || err);
+      proxyTemplateErrorLogged = true;
+    }
+    return { url: originalUrl, headers: {}, viaProxy: false };
+  }
+}
 
 /**
  * Infer ingredient category from name (for auto-created ingredients from URL import)
@@ -190,24 +238,21 @@ const BROWSER_HEADERS_FIREFOX = {
   'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
 };
 
-/** Reject URLs that could lead to SSRF (localhost, private IPs). Call before any fetch. */
-function assertUrlAllowedForFetch(urlString) {
-  try {
-    const u = new URL(urlString);
-    const host = (u.hostname || '').toLowerCase();
-    if (!host || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('127.')) throw new Error('URL not allowed');
-    if (host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('169.254.') || host.endsWith('.local') || host === '0.0.0.0') throw new Error('URL not allowed');
-  } catch (e) {
-    if (e.message === 'URL not allowed') throw e;
-    throw new Error('Invalid URL');
-  }
-}
-
 /**
  * Fetch HTML with browser-like headers. Retries with alternate User-Agent on 403.
  */
 async function fetchRecipeHtml(url) {
-  assertUrlAllowedForFetch(url);
+  await assertUrlAllowedForFetch(url);
+  if (PROXY_REQUIRED && !PROXY_ENDPOINT_TEMPLATE) {
+    throw new Error('Recipe import proxy is required but RECIPE_FETCH_PROXY_URL is not configured.');
+  }
+
+  const targetOrigin = new URL(url).origin;
+  const proxyTarget = buildProxyFetchTarget(url);
+  if (PROXY_REQUIRED && !proxyTarget.viaProxy) {
+    throw new Error('Recipe import proxy is required but the configured proxy URL is invalid.');
+  }
+
   const baseHeaders = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
@@ -220,14 +265,15 @@ async function fetchRecipeHtml(url) {
     'Sec-Fetch-User': '?1',
   };
   const opts = { responseType: 'text', timeout: 15000 };
+  const { url: fetchUrl, headers: proxyHeaders } = proxyTarget;
   const headerSets = [
-    { ...baseHeaders, 'User-Agent': BROWSER_HEADERS_CHROME['User-Agent'] },
-    { ...baseHeaders, 'User-Agent': BROWSER_HEADERS_FIREFOX['User-Agent'], 'Referer': new URL(url).origin + '/' },
+    { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_CHROME['User-Agent'] },
+    { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_FIREFOX['User-Agent'], 'Referer': `${targetOrigin}/` },
   ];
   let lastErr;
   for (const headers of headerSets) {
     try {
-      const { data } = await axios.get(url, { ...opts, headers });
+      const { data } = await axios.get(fetchUrl, { ...opts, headers });
       return data;
     } catch (err) {
       lastErr = err;
@@ -316,7 +362,7 @@ async function parseRecipeFromUrlFallback(url) {
  * @returns {Promise<Object>} Parsed recipe data
  */
 async function parseRecipeFromUrl(url) {
-  assertUrlAllowedForFetch(url);
+  await assertUrlAllowedForFetch(url);
   let data = null;
 
   // Try fallback first: it uses browser-like headers and retries with alternate User-Agent on 403.
@@ -328,6 +374,9 @@ async function parseRecipeFromUrl(url) {
   }
 
   if (!data) {
+    if (PROXY_REQUIRED) {
+      throw new Error('Recipe import proxy is required; this URL could not be parsed via the proxy worker.');
+    }
     try {
       data = await getRecipeData(url);
     } catch (err) {

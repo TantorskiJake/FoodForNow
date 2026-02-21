@@ -120,6 +120,10 @@ Detailed docs live in **[docs/](docs/)**:
    ```env
    MONGO_URI=your_mongodb_connection_string
    JWT_SECRET=your_secure_jwt_secret_key
+   # Optional: override the signing secret for phone scan handoffs
+   SCAN_SESSION_TOKEN_SECRET=separate_secret_for_scan_tokens
+   # Optional: adjust how long phone tokens remain valid (seconds, defaults to 300)
+   SCAN_SESSION_TOKEN_TTL_SECONDS=300
    PORT=3001
    CORS_ORIGIN=http://localhost:5173
    ```
