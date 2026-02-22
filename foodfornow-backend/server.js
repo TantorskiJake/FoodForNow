@@ -150,12 +150,10 @@ process.on('uncaughtException', (err) => {
  */
 const startServer = async () => {
   try {
-    // Get MongoDB connection string from environment variables
-    const MONGODB_URI = process.env.MONGO_URI;
-    
-    // Validate that MongoDB URI is provided
-    if (!MONGODB_URI) {
-      throw new Error('MONGO_URI environment variable is required');
+    // Use MONGO_URI from env, or fall back to local MongoDB for development
+    const MONGODB_URI = process.env.MONGO_URI || "mongodb://localhost:27017/foodfornow";
+    if (!process.env.MONGO_URI) {
+      console.log("MONGO_URI not set — using local MongoDB (mongodb://localhost:27017/foodfornow)");
     }
 
     // Connect to MongoDB with timeout configurations
@@ -165,6 +163,15 @@ const startServer = async () => {
     });
     console.log("MongoDB connected successfully");
 
+    // Drop old MealPlan unique index so multiple meals per slot are allowed (one-time migration)
+    try {
+      const MealPlan = require("./src/models/mealPlan");
+      await MealPlan.collection.dropIndex("user_1_weekStart_1_day_1_meal_1").catch(() => {});
+      await MealPlan.syncIndexes();
+    } catch (indexErr) {
+      console.warn("MealPlan index sync (non-fatal):", indexErr.message);
+    }
+
     // Start Express server on configured port
     const PORT = process.env.PORT || 3001;
     app.listen(PORT, () => {
@@ -172,6 +179,10 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error("Failed to start server:", error);
+    if (error.code === "ECONNREFUSED" || (error.message && error.message.includes("ECONNREFUSED"))) {
+      console.error("\nTip: If using MongoDB Atlas, check internet/VPN/firewall and that DNS can resolve SRV records.");
+      console.error("For local dev without Atlas, ensure MongoDB is running locally and do not set MONGO_URI (or set MONGO_URI=mongodb://localhost:27017/foodfornow).");
+    }
     process.exit(1); // Exit process on startup failure
   }
 };

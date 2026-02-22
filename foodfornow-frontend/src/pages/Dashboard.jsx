@@ -28,6 +28,7 @@ import {
   Popover,
   ToggleButton,
   ToggleButtonGroup,
+  InputAdornment,
 } from '@mui/material';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -50,11 +51,28 @@ import api from '../services/api';
 import { toast } from 'react-hot-toast';
 import MealPlanGrid from '../components/MealPlanGrid';
 import EmptyState from '../components/EmptyState';
+import CreateRecipeDialog from '../components/CreateRecipeDialog';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
 import useProgressiveLoader from '../hooks/useProgressiveLoader';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useNavigate } from 'react-router-dom';
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEK_STARTS_ON_KEY = 'foodfornow_dashboard_week_starts_on';
+
+function getStartOfWeek(date, weekStartsOn) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const daysBack = (day - weekStartsOn + 7) % 7;
+  d.setDate(d.getDate() - daysBack);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getOrderedDayNames(weekStartsOn) {
+  return [...DAY_NAMES.slice(weekStartsOn), ...DAY_NAMES.slice(0, weekStartsOn)];
+}
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -75,11 +93,23 @@ const Dashboard = () => {
     restaurant: { name: '', url: '', address: '', notes: '' },
   });
   const [resetWeekDialog, setResetWeekDialog] = useState(false);
+  const [createRecipeDialogOpen, setCreateRecipeDialogOpen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
   const [selectedWeekStart, setSelectedWeekStart] = useState('');
   const [mealActionLoading, setMealActionLoading] = useState(false);
   const [calendarAnchorEl, setCalendarAnchorEl] = useState(null);
+  const [weekStartsOn, setWeekStartsOn] = useState(() => {
+    try {
+      const v = localStorage.getItem(WEEK_STARTS_ON_KEY);
+      const n = parseInt(v, 10);
+      if (Number.isInteger(n) && n >= 0 && n <= 6) return n;
+    } catch (_) { /* ignore */ }
+    return 1; // Monday
+  });
+
+  const orderedDayNames = getOrderedDayNames(weekStartsOn);
+  const weekStartDayName = orderedDayNames[0];
 
   const { authenticated, user, justLoggedIn, clearJustLoggedIn } = useAuth();
   const prefersReducedMotion = useReducedMotion();
@@ -112,14 +142,21 @@ const Dashboard = () => {
     api.invalidateCache((key) => fragments.some((fragment) => key.includes(fragment)));
   }, []);
 
-  // Initialize selected week to current week's Monday
+  // Initialize selected week; when "week starts on" changes, show same week with new start day
   useEffect(() => {
-    const today = new Date();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - today.getDay() + 1);
-    monday.setHours(0, 0, 0, 0);
-    setSelectedWeekStart(monday.toISOString().split('T')[0]);
-  }, []);
+    setSelectedWeekStart((prev) => {
+      const ref = prev ? new Date(prev) : new Date();
+      return getStartOfWeek(ref, weekStartsOn).toISOString().split('T')[0];
+    });
+  }, [weekStartsOn]);
+
+  const handleWeekStartsOnChange = (e) => {
+    const value = Number(e.target.value);
+    setWeekStartsOn(value);
+    try {
+      localStorage.setItem(WEEK_STARTS_ON_KEY, String(value));
+    } catch (_) { /* ignore */ }
+  };
 
   // Auto-expand Needed Ingredients only when user scrolls to the absolute bottom of the page
   const wasAtBottomRef = useRef(false);
@@ -550,6 +587,38 @@ const Dashboard = () => {
     }
   };
 
+  const handleAddRestaurantToSlot = async (day, mealType, restaurant) => {
+    if (!restaurant?.name) return;
+    try {
+      setMealActionLoading(true);
+      const response = await api.post('/mealplan', {
+        weekStart: selectedWeekStart,
+        day,
+        meal: mealType,
+        eatingOut: true,
+        restaurant: {
+          name: restaurant.name,
+          url: restaurant.url || undefined,
+          address: restaurant.address || undefined,
+          notes: restaurant.notes || undefined
+        }
+      });
+      const mealItem = response.data.mealPlanItem || response.data;
+      setMealPlan(prev => [...prev, mealItem]);
+      invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchIngredients({ forceRefresh: true });
+      setError('');
+      toast.success(`Added ${restaurant.name} to ${day} ${mealType}`);
+    } catch (err) {
+      console.error('Error adding restaurant to slot:', err);
+      const errMsg = err.response?.data?.error || 'Failed to add meal. Please try again.';
+      setError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setMealActionLoading(false);
+    }
+  };
+
   const handleMealPlanUpdate = async (updatedMeal) => {
     try {
       // Update the local meal plan state with the updated meal
@@ -724,7 +793,7 @@ const Dashboard = () => {
                 >
                   <CalendarTodayIcon color="primary" />
                   <Typography variant="h6">
-                    Week of Monday, {selectedWeekStart ? (() => {
+                    Week of {weekStartDayName}, {selectedWeekStart ? (() => {
                       const [year, month, day] = selectedWeekStart.split('-').map(Number);
                       const date = new Date(year, month - 1, day);
                       return date.toLocaleDateString('en-US', { 
@@ -735,6 +804,19 @@ const Dashboard = () => {
                     })() : ''}
                   </Typography>
                 </Box>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel id="week-starts-on-label">Week starts</InputLabel>
+                  <Select
+                    labelId="week-starts-on-label"
+                    value={weekStartsOn}
+                    onChange={handleWeekStartsOnChange}
+                    label="Week starts"
+                  >
+                    {DAY_NAMES.map((name, index) => (
+                      <MenuItem key={name} value={index}>{name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
                 <Box display="flex" alignItems="center" gap={1} ml="auto">
                   <Button
                     variant="outlined"
@@ -820,11 +902,7 @@ const Dashboard = () => {
                       }
                     }}
                     onClick={() => {
-                      const today = new Date();
-                      const monday = new Date(today);
-                      monday.setDate(today.getDate() - today.getDay() + 1);
-                      monday.setHours(0, 0, 0, 0);
-                      setSelectedWeekStart(monday.toISOString().split('T')[0]);
+                      setSelectedWeekStart(getStartOfWeek(new Date(), weekStartsOn).toISOString().split('T')[0]);
                     }}
                   >
                     This Week
@@ -848,12 +926,8 @@ const Dashboard = () => {
               value={selectedWeekStart ? dayjs(selectedWeekStart) : null}
               onChange={(newValue) => {
                 if (newValue) {
-                  const selectedDate = newValue.toDate();
-                  const dayOfWeek = selectedDate.getDay();
-                  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                  selectedDate.setDate(selectedDate.getDate() - daysToMonday);
-                  selectedDate.setHours(0, 0, 0, 0);
-                  setSelectedWeekStart(selectedDate.toISOString().split('T')[0]);
+                  const start = getStartOfWeek(newValue.toDate(), weekStartsOn);
+                  setSelectedWeekStart(start.toISOString().split('T')[0]);
                   setCalendarAnchorEl(null);
                 }
               }}
@@ -909,12 +983,14 @@ const Dashboard = () => {
                 </Box>
               </Box>
               <MealPlanGrid
+                days={orderedDayNames}
                 mealPlan={mealPlan}
                 onAddMeal={handleOpenMealDialog}
                 onEditMeal={handleEditMeal}
                 onDeleteMeal={handleDeleteMeal}
                 onMealPlanUpdate={handleMealPlanUpdate}
                 onAddRecipeToSlot={handleAddRecipeToSlot}
+                onAddRestaurantToSlot={handleAddRestaurantToSlot}
               />
             </CardContent>
           </Card>
@@ -1269,7 +1345,7 @@ const Dashboard = () => {
                   renderValue={(v) => v || 'Select day'}
                   sx={{ '& .MuiSelect-select': { py: 1.5 } }}
                 >
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                  {orderedDayNames.map((day) => (
                     <MenuItem key={day} value={day}>
                       {day}
                     </MenuItem>
@@ -1375,6 +1451,28 @@ const Dashboard = () => {
                     label="Recipe"
                     placeholder="Type to search recipes..."
                     required={!mealFormData.recipeId}
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {params.InputProps.endAdornment}
+                          <InputAdornment position="end">
+                            <Tooltip title="Create a new recipe">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCreateRecipeDialogOpen(true);
+                                }}
+                                aria-label="Create recipe"
+                              >
+                                <AddIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </InputAdornment>
+                        </>
+                      ),
+                    }}
                   />
                 )}
               />
@@ -1467,6 +1565,17 @@ const Dashboard = () => {
           )}
         </DialogActions>
       </Dialog>
+
+      <CreateRecipeDialog
+        open={createRecipeDialogOpen}
+        onClose={() => setCreateRecipeDialogOpen(false)}
+        onSuccess={(recipe) => {
+          setRecipes((prev) => [...prev, recipe]);
+          api.invalidateCache((key) => key.includes('/recipes'));
+          setMealFormData((prev) => ({ ...prev, recipeId: recipe._id }));
+          setCreateRecipeDialogOpen(false);
+        }}
+      />
 
       {/* Help Dialog */}
       <Dialog open={helpDialogOpen} onClose={() => setHelpDialogOpen(false)} maxWidth="sm" fullWidth>

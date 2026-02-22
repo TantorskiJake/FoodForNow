@@ -39,7 +39,7 @@ import api from '../services/api';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import PageLoader from '../components/PageLoader';
 import InlineLoaderIcon from '../components/InlineLoaderIcon';
@@ -109,7 +109,30 @@ const Recipes = () => {
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+
+  // Open create-recipe dialog when arriving from dashboard (plus button) — same as clicking "Add Recipe"
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') return;
+    setSearchParams({}, { replace: true });
+    const openCreate = async () => {
+      await fetchIngredients();
+      setEditingRecipe(null);
+      setFormData({
+        name: '',
+        description: '',
+        ingredients: [{ ingredient: '', quantity: '', unit: '' }],
+        instructions: [''],
+        prepTime: '',
+        cookTime: '',
+        servings: '',
+        tags: '',
+      });
+      setOpenDialog(true);
+    };
+    openCreate();
+  }, [searchParams, setSearchParams]);
 
   const runTask = useCallback(
     async (task, options = {}) => {

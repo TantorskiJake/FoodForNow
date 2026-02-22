@@ -59,18 +59,6 @@ router.post('/', authMiddleware, async (req, res) => {
       }
     }
 
-    // Check if a meal already exists for this day and time
-    const existingMeal = await MealPlan.findOne({
-      user: req.userId,
-      weekStart: new Date(weekStart),
-      day,
-      meal
-    });
-
-    if (existingMeal) {
-      return res.status(400).json({ error: 'A meal already exists for this day and time' });
-    }
-
     const mealPlanItem = new MealPlan({
       user: req.userId,
       weekStart: new Date(weekStart),
@@ -122,7 +110,7 @@ router.post('/', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error adding meal to plan:', error);
     if (error.code === 11000) {
-      res.status(400).json({ error: 'A meal already exists for this day and time' });
+      res.status(400).json({ error: 'Could not add meal (duplicate). Restart the server to update database indexes for multiple meals per slot.' });
     } else {
       res.status(500).json({ error: 'Failed to add meal to plan' });
     }

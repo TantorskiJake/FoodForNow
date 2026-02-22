@@ -25,6 +25,7 @@ import {
   Alert,
   Tooltip
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
@@ -34,13 +35,17 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import api from '../services/api';
 import { useAchievements } from '../context/AchievementContext';
 
-const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMealPlanUpdate, onAddRecipeToSlot }) => {
+const DEFAULT_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, onEditMeal, onMealPlanUpdate, onAddRecipeToSlot, onAddRestaurantToSlot }) => {
   const navigate = useNavigate();
   const theme = useTheme();
   const { showAchievements } = useAchievements();
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedMeal, setSelectedMeal] = useState(null);
-  const [recipeToCopy, setRecipeToCopy] = useState(null);
+  const [itemsToCopy, setItemsToCopy] = useState([]);
+  const [copyChoiceAnchor, setCopyChoiceAnchor] = useState(null);
+  const [copyChoiceMeal, setCopyChoiceMeal] = useState(null);
   const [missingIngredientsDialog, setMissingIngredientsDialog] = useState(false);
   const [missingIngredients, setMissingIngredients] = useState([]);
   const [selectedMealForCooking, setSelectedMealForCooking] = useState(null);
@@ -49,7 +54,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
   const [snackbarSeverity, setSnackbarSeverity] = useState('error');
   const [uncookConfirmOpen, setUncookConfirmOpen] = useState(false);
   const [mealToUncook, setMealToUncook] = useState(null);
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const days = Array.isArray(daysProp) && daysProp.length === 7 ? daysProp : DEFAULT_DAYS;
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
 
   const handleMealClick = (meal, event) => {
@@ -197,31 +202,73 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
     setMealToUncook(null);
   };
 
-  const handleCopyRecipe = (meal, event) => {
-    event.stopPropagation();
-    if (meal?.recipe) {
-      setRecipeToCopy(meal.recipe);
+  const getMealsInSlot = (day, mealType) =>
+    mealPlan.filter(
+      (m) => m?.day?.toLowerCase() === day?.toLowerCase() && m?.meal === mealType
+    );
+
+  const mealToCopyItem = (meal) => {
+    if (meal?.eatingOut && meal?.restaurant?.name) {
+      return { type: 'restaurant', restaurant: meal.restaurant };
     }
+    if (meal?.recipe) {
+      return { type: 'recipe', recipe: meal.recipe };
+    }
+    return null;
+  };
+
+  const canCopyMeal = (meal) =>
+    (meal?.recipe && !meal?.eatingOut) || (meal?.eatingOut && meal?.restaurant?.name);
+
+  const handleCopyMeal = (meal, event) => {
+    event.stopPropagation();
+    const item = mealToCopyItem(meal);
+    if (!item) return;
+    const day = meal.day;
+    const mealType = meal.meal;
+    const inSlot = getMealsInSlot(day, mealType).filter(canCopyMeal);
+    if (inSlot.length <= 1) {
+      setItemsToCopy([item]);
+      return;
+    }
+    setCopyChoiceMeal(meal);
+    setCopyChoiceAnchor(event.currentTarget);
+  };
+
+  const handleCopyThisMeal = () => {
+    const item = mealToCopyItem(copyChoiceMeal);
+    if (item) setItemsToCopy([item]);
+    setCopyChoiceAnchor(null);
+    setCopyChoiceMeal(null);
+  };
+
+  const handleCopyAllMealsInSlot = () => {
+    if (!copyChoiceMeal) return;
+    const inSlot = getMealsInSlot(copyChoiceMeal.day, copyChoiceMeal.meal);
+    const items = inSlot.map(mealToCopyItem).filter(Boolean);
+    if (items.length > 0) setItemsToCopy(items);
+    setCopyChoiceAnchor(null);
+    setCopyChoiceMeal(null);
   };
 
   const handleCancelCopyMode = () => {
-    setRecipeToCopy(null);
+    setItemsToCopy([]);
   };
 
   // Escape key exits copy mode
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && recipeToCopy) {
+      if (e.key === 'Escape' && itemsToCopy.length > 0) {
         handleCancelCopyMode();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [recipeToCopy]);
+  }, [itemsToCopy.length]);
 
   // Click outside meal cards exits copy mode (capture phase to catch all clicks)
   useEffect(() => {
-    if (!recipeToCopy) return;
+    if (itemsToCopy.length === 0) return;
     const handleClickOutside = (e) => {
       if (!e.target.closest('[data-meal-card]') && !e.target.closest('[role="alert"]')) {
         handleCancelCopyMode();
@@ -229,23 +276,41 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
     };
     document.addEventListener('click', handleClickOutside, true);
     return () => document.removeEventListener('click', handleClickOutside, true);
-  }, [recipeToCopy]);
+  }, [itemsToCopy.length]);
 
-  const handleCardClick = (meal, day, mealType, event) => {
-    if (recipeToCopy) {
+  const pasteCopyItems = async (day, mealType) => {
+    for (const item of itemsToCopy) {
+      if (item.type === 'recipe' && item.recipe && onAddRecipeToSlot) {
+        await onAddRecipeToSlot(day, mealType, item.recipe, null);
+      } else if (item.type === 'restaurant' && item.restaurant && onAddRestaurantToSlot) {
+        await onAddRestaurantToSlot(day, mealType, item.restaurant);
+      }
+    }
+  };
+
+  const handleSlotClick = async (mealsInSlot, day, mealType, event) => {
+    if (itemsToCopy.length > 0) {
       event.stopPropagation();
-      if (!onAddRecipeToSlot) return;
-      // Skip if this slot already has the same recipe
-      if (meal?.recipe?._id === recipeToCopy._id) return;
-      onAddRecipeToSlot(day, mealType, recipeToCopy, meal?._id);
+      await pasteCopyItems(day, mealType);
       return;
     }
-    // Not in copy mode - normal click behavior
-    if (meal) {
-      handleMealClick(meal, event);
-    } else {
+    if (mealsInSlot.length === 0) {
       onAddMeal(day, mealType);
     }
+  };
+
+  const handleMealCardClick = async (meal, day, mealType, event) => {
+    event.stopPropagation();
+    if (itemsToCopy.length > 0) {
+      await pasteCopyItems(day, mealType);
+      return;
+    }
+    handleMealClick(meal, event);
+  };
+
+  const handleAddAnotherClick = (day, mealType, event) => {
+    event.stopPropagation();
+    onAddMeal(day, mealType);
   };
 
   const getMealName = (meal) => {
@@ -299,32 +364,31 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                 </Typography>
               </Grid>
 
-              {/* Meal slots for each day */}
+              {/* Meal slots for each day - multiple meals per slot supported */}
               {days.map((day) => {
-                const meal = mealPlan.find(
+                const mealsInSlot = mealPlan.filter(
                   (m) => m?.day?.toLowerCase() === day.toLowerCase() && m?.meal === mealType
                 );
-                const isCooked = meal?.cooked || false;
-                const isEatingOut = meal?.eatingOut || false;
-                const cardBg = meal
-                  ? (isCooked ? 'success.light' : 'success.dark')
-                  : theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100';
-                const cardHoverBg = meal
-                  ? (isCooked ? 'success.main' : 'success.main')
-                  : theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200';
-                
+                const slotEmpty = mealsInSlot.length === 0;
+                const cardBg = slotEmpty
+                  ? (theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100')
+                  : 'transparent';
+                const cardHoverBg = slotEmpty
+                  ? (theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200')
+                  : 'transparent';
+
                 return (
                   <Grid item xs={11/7} key={`${day}-${mealType}`} sx={{ p: 0 }}>
-                    <Card 
+                    <Card
                       data-meal-card
-                      sx={{ 
+                      sx={{
                         height: '100%',
-                        minHeight: 90,
+                        minHeight: 180,
                         bgcolor: cardBg,
                         '&:hover': {
                           bgcolor: cardHoverBg,
-                          cursor: 'pointer',
-                          ...(recipeToCopy && {
+                          cursor: slotEmpty || itemsToCopy.length > 0 ? 'pointer' : 'default',
+                          ...(itemsToCopy.length > 0 && {
                             border: '2px dashed',
                             borderColor: 'primary.main',
                             boxSizing: 'border-box'
@@ -332,143 +396,153 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
                         },
                         border: theme.palette.mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : 'none',
                         position: 'relative',
-                        overflow: 'visible',
+                        overflow: 'hidden',
                         m: 0
                       }}
-                      onClick={(e) => handleCardClick(meal, day, mealType, e)}
+                      onClick={(e) => handleSlotClick(mealsInSlot, day, mealType, e)}
                     >
-                      <CardContent sx={{ 
-                        p: 0.5,
+                      <CardContent sx={{
+                        p: slotEmpty ? 0.5 : 0,
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
                         position: 'relative',
-                        justifyContent: 'center',
-                        m: 0
+                        justifyContent: 'flex-start',
+                        m: 0,
+                        '&:last-child': { pb: slotEmpty ? 1 : 0 }
                       }}>
-                        {meal ? (
-                          <>
-                            {/* Cooking status indicator - positioned top-left */}
-                            <Box sx={{ 
-                              position: 'absolute',
-                              top: 2,
-                              left: 2,
-                              zIndex: 1
-                            }}>
-                              <Tooltip title={isCooked ? (isEatingOut ? 'Already marked' : 'Uncook (mark as not cooked)') : (isEatingOut ? 'Mark as eaten' : 'Mark as cooked')}>
-                                <span>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleToggleCooked(meal, e)}
-                                    sx={{
-                                      bgcolor: isCooked ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                                      color: 'white',
-                                      width: 20,
-                                      height: 20,
-                                      '&:hover': {
-                                        bgcolor: isCooked ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)',
-                                      },
-                                      p: 0
-                                    }}
-                                  >
-                                    {isCooked ? (
-                                      <CheckCircleIcon sx={{ fontSize: 14 }} />
-                                    ) : (
-                                      <RestaurantMenuIcon sx={{ fontSize: 14 }} />
-                                    )}
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                            </Box>
-
-                            <Typography 
-                              variant="body2" 
-                              sx={{
-                                wordBreak: 'break-word',
-                                overflow: 'hidden',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                lineHeight: 1.1,
-                                fontSize: getDynamicFontSize(getMealName(meal)),
-                                pt: 2,
-                                color: 'white',
-                                pl: 0.75, // theme.spacing(0.75) ~6px
-                                pr: 0.75, // theme.spacing(0.75) ~6px
-                                textAlign: 'center',
-                                minHeight: '32px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 500,
-                                m: 0
-                              }}
-                            >
-                              {getMealName(meal)}
-                            </Typography>
-                            
-                            <Box sx={{ 
-                              position: 'absolute', 
-                              top: 0, 
-                              right: 0,
-                              display: 'flex',
-                              gap: 0.25
-                            }}>
-                              {!meal.eatingOut && (
-                              <Tooltip title="Copy to other days">
-                                <span>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleCopyRecipe(meal, e)}
-                                    sx={{ 
-                                      p: 0.25,
-                                      color: 'white',
-                                      m: 0,
-                                      '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' }
-                                    }}
-                                  >
-                                    <ContentCopyIcon sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                              )}
-                              <Tooltip title="Delete meal">
-                                <span>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (meal._id) {
-                                        onDeleteMeal(meal._id);
-                                      }
-                                    }}
-                                    sx={{ 
-                                      p: 0.25,
-                                      color: 'white',
-                                      m: 0,
-                                      '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' }
-                                    }}
-                                  >
-                                    <DeleteIcon sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                            </Box>
-                          </>
-                        ) : (
-                          <Typography 
-                            variant="body2" 
-                            color="text.secondary" 
+                        {slotEmpty ? (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
                             align="center"
                             sx={{
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              height: '100%',
+                              flex: 1,
                               m: 0
                             }}
                           >
                             Click to add meal
                           </Typography>
+                        ) : (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 0,
+                              bgcolor: 'success.dark',
+                              borderRadius: 'inherit'
+                            }}
+                          >
+                            {mealsInSlot.map((meal, index) => {
+                              const isCooked = meal?.cooked || false;
+                              const isEatingOut = meal?.eatingOut || false;
+                              const mealCardBg = isCooked ? 'success.light' : 'success.dark';
+                              return (
+                                <Box
+                                  key={meal._id}
+                                  data-meal-card
+                                  onClick={(e) => handleMealCardClick(meal, day, mealType, e)}
+                                  sx={{
+                                    position: 'relative',
+                                    zIndex: index + 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    bgcolor: mealCardBg,
+                                    flex: '1 1 0',
+                                    minHeight: 44,
+                                    py: 0.5,
+                                    px: 1,
+                                    cursor: 'pointer',
+                                    borderBottom: index < mealsInSlot.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                                    '&:hover': { bgcolor: 'success.main' }
+                                  }}
+                                >
+                                  <Box sx={{ position: 'absolute', left: 0, top: 0, display: 'flex', alignItems: 'center', gap: 0, zIndex: 1 }}>
+                                    {index === 0 && (
+                                      <Tooltip title="Add another meal">
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => handleAddAnotherClick(day, mealType, e)}
+                                          sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                                        >
+                                          <AddIcon sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
+                                    <Tooltip title={isCooked ? (isEatingOut ? 'Already marked' : 'Uncook') : (isEatingOut ? 'Mark as eaten' : 'Mark as cooked')}>
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => handleToggleCooked(meal, e)}
+                                          sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                                        >
+                                          {isCooked ? (
+                                            <CheckCircleIcon sx={{ fontSize: 16 }} />
+                                          ) : (
+                                            <RestaurantMenuIcon sx={{ fontSize: 16 }} />
+                                          )}
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  </Box>
+                                  <Box sx={{ position: 'absolute', right: 0, top: 0, display: 'flex', alignItems: 'center', gap: 0, zIndex: 2 }}>
+                                    {canCopyMeal(meal) && (
+                                      <Tooltip title="Copy to other days">
+                                        <span>
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => handleCopyMeal(meal, e)}
+                                            sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                                          >
+                                            <ContentCopyIcon sx={{ fontSize: 16 }} />
+                                          </IconButton>
+                                        </span>
+                                      </Tooltip>
+                                    )}
+                                    <Tooltip title="Delete meal">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (meal._id) onDeleteMeal(meal._id);
+                                          }}
+                                          sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                                        >
+                                          <DeleteIcon sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  </Box>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      color: 'white',
+                                      fontWeight: 600,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      textAlign: 'center',
+                                      width: '100%',
+                                      fontSize: getDynamicFontSize(getMealName(meal)),
+                                      px: 0.5
+                                    }}
+                                  >
+                                    {getMealName(meal)}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </Box>
                         )}
                       </CardContent>
                     </Card>
@@ -556,7 +630,7 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
 
       {/* Copy mode snackbar */}
       <Snackbar
-        open={Boolean(recipeToCopy)}
+        open={itemsToCopy.length > 0}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         sx={{ mb: 6 }}
       >
@@ -570,9 +644,37 @@ const MealPlanGrid = ({ mealPlan = [], onAddMeal, onDeleteMeal, onEditMeal, onMe
             </Button>
           }
         >
-          Click a card to add &quot;{recipeToCopy?.name || 'recipe'}&quot; to that day. Press Esc to cancel.
+          {itemsToCopy.length === 1
+            ? `Click a card to add "${itemsToCopy[0].type === 'recipe' ? (itemsToCopy[0].recipe?.name || 'recipe') : (itemsToCopy[0].restaurant?.name || 'restaurant')}" to that day. Press Esc to cancel.`
+            : `Click a card to add ${itemsToCopy.length} meals to that day. Press Esc to cancel.`}
         </Alert>
       </Snackbar>
+
+      {/* Copy choice: this meal vs all meals in slot */}
+      <Menu
+        anchorEl={copyChoiceAnchor}
+        open={Boolean(copyChoiceAnchor)}
+        onClose={() => { setCopyChoiceAnchor(null); setCopyChoiceMeal(null); }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem onClick={handleCopyThisMeal}>
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Copy this meal only</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={handleCopyAllMealsInSlot}
+        >
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>
+            Copy all {getMealsInSlot(copyChoiceMeal?.day, copyChoiceMeal?.meal).filter(canCopyMeal).length} meals in this slot
+          </ListItemText>
+        </MenuItem>
+      </Menu>
 
       <Menu
         anchorEl={menuAnchor}

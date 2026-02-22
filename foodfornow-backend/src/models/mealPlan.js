@@ -81,15 +81,9 @@ mealPlanSchema.pre('save', function (next) {
   next();
 });
 
-// Drop any existing indexes to prevent conflicts
-// This ensures clean index management when schema changes
-mealPlanSchema.indexes().forEach(index => {
-  mealPlanSchema.index(index[0], { unique: false });
-});
-
-// Add the correct unique index to prevent duplicate meals
-// Ensures only one meal per day/meal type combination per user per week
-mealPlanSchema.index({ user: 1, weekStart: 1, day: 1, meal: 1 }, { unique: true });
+// Non-unique compound index for efficient queries (multiple meals per slot allowed).
+// If you previously had a unique index on these fields, run: db.mealplans.dropIndex('user_1_weekStart_1_day_1_meal_1')
+mealPlanSchema.index({ user: 1, weekStart: 1, day: 1, meal: 1 });
 
 // Export the MealPlan model
 module.exports = mongoose.model("MealPlan", mealPlanSchema);
