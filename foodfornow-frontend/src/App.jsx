@@ -1,10 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, AuthInitializer } from './context/AuthContext';
+import { motion } from 'framer-motion';
+import { AuthProvider, AuthInitializer, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AchievementProvider } from './context/AchievementContext';
+import { AUTH_TRANSITION } from './config/authTransitionConfig';
 import Navbar from './components/Navbar';
-import LoginToDashboardOverlay from './components/LoginToDashboardOverlay';
+import AuthTransitionOverlay from './components/AuthTransitionOverlay';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -84,13 +86,35 @@ class ErrorBoundary extends React.Component {
 }
 
 /**
- * AppRoutes - Renders routes and login-to-dashboard transition overlay.
+ * Wraps app content with the same exit transition as login form when logging out (blur + shrink).
+ */
+function AppContentWithExit({ children }) {
+  const { justLoggedOut } = useAuth();
+  const { easeOut, exitDuration, formExit } = AUTH_TRANSITION;
+  return (
+    <motion.div
+      animate={{
+        opacity: justLoggedOut ? 0 : 1,
+        scale: justLoggedOut ? formExit.scale : 1,
+        filter: justLoggedOut ? `blur(${formExit.blurPx}px)` : 'blur(0px)',
+      }}
+      transition={{ duration: exitDuration, ease: easeOut }}
+      style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * AppRoutes - Renders routes and unified auth transition overlay (login + logout).
  */
 function AppRoutes() {
   return (
     <AuthInitializer>
-      <Navbar />
-      <Routes>
+      <AppContentWithExit>
+        <Navbar />
+        <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -162,7 +186,8 @@ function AppRoutes() {
         <Route path="/scan" element={<Scan />} />
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>
-      <LoginToDashboardOverlay />
+      </AppContentWithExit>
+      <AuthTransitionOverlay />
       <Toaster position="bottom-right" />
     </AuthInitializer>
   );

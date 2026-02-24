@@ -20,6 +20,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
+import { AUTH_TRANSITION } from '../config/authTransitionConfig';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const REMEMBERED_LOGIN_KEY = 'foodfornow_remembered_login';
@@ -54,11 +55,13 @@ function clearRememberedCredentials() {
   } catch (_) {}
 }
 
-// Smooth ease-out so the "loading in" feels deliberate, not rushed
-const EASE_OUT = [0.22, 1, 0.36, 1];
-const SUCCESS_HOLD_MS = 700;
-const EXIT_DURATION = 0.5;
-const SUCCESS_ICON_DURATION = 0.45;
+const {
+  easeOut: EASE_OUT,
+  exitDuration: EXIT_DURATION,
+  successHoldMs: SUCCESS_HOLD_MS,
+  successIconDuration: SUCCESS_ICON_DURATION,
+  formExit,
+} = AUTH_TRANSITION;
 
 const Login = () => {
   const navigate = useNavigate();
@@ -226,8 +229,8 @@ const Login = () => {
       <motion.div
         animate={{
           opacity: loginPhase === LOGIN_PHASE.EXITING ? 0 : 1,
-          scale: loginPhase === LOGIN_PHASE.EXITING ? 0.97 : 1,
-          filter: loginPhase === LOGIN_PHASE.EXITING ? 'blur(6px)' : 'blur(0px)',
+          scale: loginPhase === LOGIN_PHASE.EXITING ? formExit.scale : 1,
+          filter: loginPhase === LOGIN_PHASE.EXITING ? `blur(${formExit.blurPx}px)` : 'blur(0px)',
         }}
         transition={{ duration: EXIT_DURATION, ease: EASE_OUT }}
         onAnimationComplete={() => {

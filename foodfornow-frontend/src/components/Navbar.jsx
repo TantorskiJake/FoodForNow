@@ -49,7 +49,7 @@ const Navbar = () => {
   const location = useLocation();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { authenticated, loading, logout, user } = useAuth();
+  const { authenticated, loading, logout, user, requestLogoutTransition } = useAuth();
 
   const handleMenu = (event) => {
     // Only open from real user clicks (not focus/keyboard or programmatic)
@@ -66,10 +66,14 @@ const Navbar = () => {
     setAnchorEl(null);
   }, [location.pathname]);
 
-  const handleLogout = async () => {
-    await api.post('/auth/logout');
-    logout();
-    navigate('/login');
+  const handleLogout = () => {
+    handleClose();
+    setDrawerOpen(false);
+    requestLogoutTransition(async () => {
+      await api.post('/auth/logout');
+      logout();
+      navigate('/login');
+    });
   };
 
   if (loading) {

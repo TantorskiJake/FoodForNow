@@ -33,6 +33,9 @@ export const AuthProvider = ({ children }) => {
   const userSetByLoginRef = useRef(false);
   // Flag for login-to-dashboard transition animation (set by Login, read and cleared by Dashboard)
   const [justLoggedIn, setJustLoggedInState] = useState(false);
+  // Logout transition: set when user requests logout; overlay runs circle animation then calls completion callback
+  const [justLoggedOut, setJustLoggedOutState] = useState(false);
+  const logoutCompletionCallbackRef = useRef(null);
 
   /**
    * Refresh Authentication State
@@ -98,6 +101,8 @@ export const AuthProvider = ({ children }) => {
     setAuthenticated(false);
     setLoading(false);
     setJustLoggedInState(false);
+    setJustLoggedOutState(false);
+    logoutCompletionCallbackRef.current = null;
   };
 
   /** Set flag so Dashboard can run entrance animation after login/register. */
@@ -105,6 +110,20 @@ export const AuthProvider = ({ children }) => {
 
   /** Clear flag after dashboard entrance animation completes (so refresh doesn't replay). */
   const clearJustLoggedIn = () => setJustLoggedInState(false);
+
+  /** Start logout transition; overlay runs, then calls callback (e.g. api logout + navigate). */
+  const requestLogoutTransition = (onComplete) => {
+    logoutCompletionCallbackRef.current = onComplete;
+    setJustLoggedOutState(true);
+  };
+
+  /** Called by AuthTransitionOverlay when logout circle animation completes. */
+  const finishLogoutTransition = () => {
+    const fn = logoutCompletionCallbackRef.current;
+    logoutCompletionCallbackRef.current = null;
+    setJustLoggedOutState(false);
+    if (typeof fn === 'function') fn();
+  };
 
   // Don't run refreshAuth here – AuthInitializer (inside Router) runs it only when not on login/register
   // so we avoid 401s for /auth/me and /auth/token when the user is on the login page.
@@ -122,6 +141,9 @@ export const AuthProvider = ({ children }) => {
       justLoggedIn,
       setJustLoggedIn,
       clearJustLoggedIn,
+      justLoggedOut,
+      requestLogoutTransition,
+      finishLogoutTransition,
     }}>
       {children}
     </AuthContext.Provider>
