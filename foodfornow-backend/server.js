@@ -55,11 +55,15 @@ const defaultOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
   : defaultOrigins;
+// In development, also allow Vite dev server on port 5173 from any host (e.g. --host network URLs)
+const isDev = process.env.NODE_ENV !== 'production';
+const devOriginPattern = /^https?:\/\/[^/]+:5173$/;
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (e.g. same-origin, Postman, curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (isDev && devOriginPattern.test(origin)) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
