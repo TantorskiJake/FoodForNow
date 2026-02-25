@@ -13,7 +13,6 @@ import {
   useTheme,
 } from '@mui/material';
 import AccountCircle from '@mui/icons-material/AccountCircle';
-import RestaurantIcon from '@mui/icons-material/Restaurant';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import KitchenIcon from '@mui/icons-material/Kitchen';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -80,7 +79,11 @@ const Navbar = () => {
     return (
       <AppBar position="sticky" sx={{ top: 0 }}>
         <Toolbar>
-          <RestaurantIcon sx={{ mr: 2 }} />
+          <img
+            src={FFNLogo}
+            alt="Food For Now"
+            style={{ height: 40, width: 'auto', marginRight: 16, display: 'block', objectFit: 'contain' }}
+          />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             FoodForNow
           </Typography>
@@ -98,17 +101,17 @@ const Navbar = () => {
   return (
     <AppBar position="sticky" sx={{ top: 0 }}>
       <Toolbar>
-        <img 
-          src={FFNLogo} 
-          alt="Food For Now Logo" 
-          style={{ 
-            maxHeight: isMobile ? 40 : 72, // Smaller logo on mobile
+        <img
+          src={FFNLogo}
+          alt="Food For Now Logo"
+          style={{
+            maxHeight: isMobile ? 40 : 72,
             width: 'auto',
-            marginRight: isMobile ? 8 : 24, // Less spacing on mobile
+            marginRight: isMobile ? 8 : 24,
             display: 'block',
             objectFit: 'contain',
-            verticalAlign: 'middle'
-          }} 
+            verticalAlign: 'middle',
+          }}
         />
         {isMobile ? (
           <>
