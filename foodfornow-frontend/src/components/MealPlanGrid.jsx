@@ -528,13 +528,14 @@ const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, 
                                     sx={{
                                       color: 'white',
                                       fontWeight: 600,
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap',
                                       textAlign: 'center',
                                       width: '100%',
                                       fontSize: getDynamicFontSize(getMealName(meal)),
-                                      px: 0.5
+                                      px: 0.5,
+                                      pl: 3,
+                                      pr: 3,
+                                      lineHeight: 1.25,
+                                      wordBreak: 'break-word'
                                     }}
                                   >
                                     {getMealName(meal)}
