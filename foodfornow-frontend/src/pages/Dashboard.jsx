@@ -114,7 +114,7 @@ const Dashboard = () => {
   const { authenticated, user, justLoggedIn, clearJustLoggedIn } = useAuth();
   const prefersReducedMotion = useReducedMotion();
   const { showAchievements } = useAchievements();
-  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+  const { startTask, markHydrated, showBusyBar, showSkeleton, appHasHydratedOnce } = useProgressiveLoader();
   const cancelledOptimisticIds = useRef(new Set());
   const MEALPLAN_CACHE_KEYS = ['/mealplan', '/mealplan/ingredients'];
   const PANTRY_CACHE_KEYS = ['/pantry', '/mealplan/ingredients'];
@@ -195,18 +195,21 @@ const Dashboard = () => {
   useEffect(() => {
     if (!authenticated || !selectedWeekStart) return;
 
-    const fetchAll = async () => {
-      await runTask(async () => {
-        await Promise.all([
-          fetchRecipes({ forceRefresh: true }),
-          fetchMealPlan({ forceRefresh: true }),
-          fetchIngredients({ forceRefresh: true })
-        ]);
-      }, { hydrate: true });
+    const load = async () => {
+      await Promise.all([
+        fetchRecipes({ forceRefresh: true }),
+        fetchMealPlan({ forceRefresh: true }),
+        fetchIngredients({ forceRefresh: true })
+      ]);
+      markHydrated();
     };
 
-    fetchAll();
-  }, [authenticated, selectedWeekStart, runTask]);
+    if (appHasHydratedOnce) {
+      load();
+    } else {
+      runTask(load, { hydrate: true });
+    }
+  }, [authenticated, selectedWeekStart, runTask, appHasHydratedOnce, markHydrated]);
 
   const fetchRecipes = async ({ forceRefresh = false } = {}) => {
     try {

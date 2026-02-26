@@ -110,7 +110,7 @@ const Recipes = () => {
   const { showAchievements } = useAchievements();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+  const { startTask, markHydrated, showBusyBar, showSkeleton, appHasHydratedOnce } = useProgressiveLoader();
 
   // Open create-recipe dialog when arriving from dashboard (plus button) — same as clicking "Add Recipe"
   useEffect(() => {
@@ -316,28 +316,31 @@ const Recipes = () => {
   useEffect(() => {
     if (!authenticated) return;
 
-    const fetchInitial = async () => {
+    const load = async () => {
       try {
-        await runTask(async () => {
-          await Promise.all([fetchRecipes({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
-        }, { hydrate: true });
+        await Promise.all([fetchRecipes({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
+        markHydrated();
       } catch (err) {
         setError('Failed to fetch data. Please try again.');
       }
     };
 
-    fetchInitial();
-  }, [authenticated, runTask]);
+    if (appHasHydratedOnce) {
+      load();
+    } else {
+      runTask(load, { hydrate: true });
+    }
+  }, [authenticated, runTask, appHasHydratedOnce, markHydrated]);
 
-  // Fetch shared recipes when tab or searchTerm changes
+  // Fetch when tab or searchTerm changes — silent (no loading bar) so tab switch feels instant
   useEffect(() => {
     if (!authenticated) return;
     if (tab === 'shared') {
-      runTask(() => fetchSharedRecipes({ forceRefresh: true }));
+      fetchSharedRecipes({ forceRefresh: true });
     } else if (tab === 'mine') {
-      runTask(() => fetchRecipes({ forceRefresh: true }));
+      fetchRecipes({ forceRefresh: true });
     }
-  }, [tab, searchTerm, authenticated, runTask]);
+  }, [tab, searchTerm, authenticated]);
 
   const openRecipeFormWithData = (recipeData) => {
     const mappedIngredients = recipeData.ingredients?.length

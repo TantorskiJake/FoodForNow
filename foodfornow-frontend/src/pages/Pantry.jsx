@@ -75,7 +75,7 @@ const Pantry = () => {
 
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
-  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+  const { startTask, markHydrated, showBusyBar, showSkeleton, appHasHydratedOnce } = useProgressiveLoader();
 
   const runTask = useCallback(
     async (task, options = {}) => {
@@ -113,14 +113,17 @@ const Pantry = () => {
   useEffect(() => {
     if (!authenticated) return;
 
-    const fetchAll = async () => {
-      await runTask(async () => {
-        await Promise.all([fetchPantryItems({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
-      }, { hydrate: true });
+    const load = async () => {
+      await Promise.all([fetchPantryItems({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
+      markHydrated();
     };
 
-    fetchAll();
-  }, [authenticated, runTask]);
+    if (appHasHydratedOnce) {
+      load();
+    } else {
+      runTask(load, { hydrate: true });
+    }
+  }, [authenticated, runTask, appHasHydratedOnce, markHydrated]);
 
   const fetchPantryItems = async ({ forceRefresh = false } = {}) => {
     try {

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AuthProvider, AuthInitializer, useAuth } from './context/AuthContext';
+import { HydrationProvider } from './context/HydrationContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AchievementProvider } from './context/AchievementContext';
 import { AUTH_TRANSITION } from './config/authTransitionConfig';
@@ -198,11 +199,13 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
-          <AchievementProvider>
-            <Router>
-              <AppRoutes />
-            </Router>
-          </AchievementProvider>
+          <HydrationProvider>
+            <AchievementProvider>
+              <Router>
+                <AppRoutes />
+              </Router>
+            </AchievementProvider>
+          </HydrationProvider>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>

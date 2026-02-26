@@ -91,7 +91,7 @@ const ShoppingList = () => {
 
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
   const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
-  const { startTask, markHydrated, showBusyBar, showSkeleton } = useProgressiveLoader();
+  const { startTask, markHydrated, showBusyBar, showSkeleton, appHasHydratedOnce } = useProgressiveLoader();
 
   const runTask = useCallback(
     async (task, options = {}) => {
@@ -128,13 +128,16 @@ const ShoppingList = () => {
 
   useEffect(() => {
     if (!authenticated) return;
-    const fetchAll = async () => {
-      await runTask(async () => {
-        await Promise.all([fetchShoppingList({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
-      }, { hydrate: true });
+    const load = async () => {
+      await Promise.all([fetchShoppingList({ forceRefresh: true }), fetchIngredients({ forceRefresh: true })]);
+      markHydrated();
     };
-    fetchAll();
-  }, [authenticated, runTask]);
+    if (appHasHydratedOnce) {
+      load();
+    } else {
+      runTask(load, { hydrate: true });
+    }
+  }, [authenticated, runTask, appHasHydratedOnce, markHydrated]);
 
   const fetchShoppingList = async ({ forceRefresh = false } = {}) => {
     try {
