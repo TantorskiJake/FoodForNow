@@ -48,6 +48,128 @@ import useProgressiveLoader from '../hooks/useProgressiveLoader';
 
 const capitalizeWords = (str) => str ? str.replace(/\b\w/g, (c) => c.toUpperCase()) : str;
 
+const VOLUME_TO_ML = {
+  ml: 1,
+  l: 1000,
+  cup: 236.59,
+  tbsp: 14.79,
+  tsp: 4.93,
+};
+
+const WEIGHT_TO_G = {
+  g: 1,
+  kg: 1000,
+  oz: 28.35,
+  lb: 453.59,
+};
+
+const VOLUME_UNITS = new Set(Object.keys(VOLUME_TO_ML));
+const WEIGHT_UNITS = new Set(Object.keys(WEIGHT_TO_G));
+const COUNTABLE_UNITS = new Set(['piece', 'pinch', 'box']);
+
+const formatQuantity = (value) => {
+  if (value == null || Number.isNaN(Number(value))) return '0';
+  const n = Number(value);
+  const rounded = Math.round((n + Number.EPSILON) * 100) / 100;
+  return String(rounded);
+};
+
+const getUnitFamily = (unit) => {
+  if (VOLUME_UNITS.has(unit)) return 'volume';
+  if (WEIGHT_UNITS.has(unit)) return 'weight';
+  if (COUNTABLE_UNITS.has(unit)) return 'countable';
+  return 'other';
+};
+
+const pickPreferredUnit = (units, family) => {
+  if (family === 'volume') {
+    if (units.has('tsp')) return 'tsp';
+    if (units.has('tbsp')) return 'tbsp';
+    if (units.has('cup')) return 'cup';
+    if (units.has('ml')) return 'ml';
+    if (units.has('l')) return 'l';
+    return Array.from(units)[0];
+  }
+  if (family === 'weight') {
+    if (units.has('g')) return 'g';
+    if (units.has('kg')) return 'kg';
+    if (units.has('oz')) return 'oz';
+    if (units.has('lb')) return 'lb';
+    return Array.from(units)[0];
+  }
+  return Array.from(units)[0];
+};
+
+const formatGroupedTotal = (items) => {
+  const usable = (items || []).filter((i) => i && typeof i.unit === 'string' && i.unit && Number.isFinite(Number(i.quantity)));
+  if (usable.length === 0) return '0';
+
+  const byFamily = new Map();
+  for (const item of usable) {
+    const family = getUnitFamily(item.unit);
+    if (!byFamily.has(family)) byFamily.set(family, []);
+    byFamily.get(family).push(item);
+  }
+
+  const formatFamily = (family, familyItems) => {
+    const units = new Set(familyItems.map((i) => i.unit));
+    const unit = pickPreferredUnit(units, family);
+
+    if (family === 'volume') {
+      const totalMl = familyItems.reduce((sum, i) => sum + Number(i.quantity) * (VOLUME_TO_ML[i.unit] ?? 0), 0);
+      const hasKitchenSpoons = units.has('tsp') || units.has('tbsp');
+      if (hasKitchenSpoons) {
+        const tspPerTbsp = (VOLUME_TO_ML.tbsp ?? 14.79) / (VOLUME_TO_ML.tsp ?? 4.93);
+        const totalTsp = totalMl / (VOLUME_TO_ML.tsp ?? 4.93);
+
+        let tbspCount = Math.floor((totalTsp + 1e-9) / tspPerTbsp);
+        let remainingTsp = totalTsp - tbspCount * tspPerTbsp;
+
+        if (remainingTsp > tspPerTbsp - 1e-6) {
+          tbspCount += 1;
+          remainingTsp = 0;
+        }
+
+        const remainingStr = formatQuantity(remainingTsp);
+        const remainingVal = Number(remainingStr);
+
+        if (tbspCount > 0 && remainingVal > 0) return `${tbspCount} tbsp + ${remainingStr} tsp`;
+        if (tbspCount > 0) return `${tbspCount} tbsp`;
+        return `${formatQuantity(totalTsp)} tsp`;
+      }
+
+      const qty = totalMl / (VOLUME_TO_ML[unit] ?? 1);
+      return `${formatQuantity(qty)} ${unit}`;
+    }
+    if (family === 'weight') {
+      const totalG = familyItems.reduce((sum, i) => sum + Number(i.quantity) * (WEIGHT_TO_G[i.unit] ?? 0), 0);
+      const qty = totalG / (WEIGHT_TO_G[unit] ?? 1);
+      return `${formatQuantity(qty)} ${unit}`;
+    }
+    if (family === 'countable') {
+      if (units.size === 1) {
+        const total = familyItems.reduce((sum, i) => sum + Number(i.quantity), 0);
+        return `${formatQuantity(total)} ${unit}`;
+      }
+      return Array.from(units)
+        .map((u) => `${formatQuantity(familyItems.filter((i) => i.unit === u).reduce((sum, i) => sum + Number(i.quantity), 0))} ${u}`)
+        .join(' + ');
+    }
+
+    return Array.from(units)
+      .map((u) => `${formatQuantity(familyItems.filter((i) => i.unit === u).reduce((sum, i) => sum + Number(i.quantity), 0))} ${u}`)
+      .join(' + ');
+  };
+
+  const parts = [];
+  for (const family of ['countable', 'volume', 'weight', 'other']) {
+    if (byFamily.has(family)) {
+      parts.push(formatFamily(family, byFamily.get(family)));
+    }
+  }
+  return parts.join(' + ');
+};
+
 const Pantry = () => {
   const navigate = useNavigate();
   const [pantryItems, setPantryItems] = useState([]);
@@ -690,7 +812,7 @@ const Pantry = () => {
                     </Box>
                     {items.length > 1 && (
                       <Chip
-                        label={`${items.length} units`}
+                        label={`${items.length} items`}
                         size="small"
                         color="primary"
                         variant="outlined"
@@ -802,7 +924,7 @@ const Pantry = () => {
                   }}>
                     <Box>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                        Total: {items.reduce((sum, item) => sum + item.quantity, 0)} units
+                        Total: {formatGroupedTotal(items)}
                       </Typography>
                     </Box>
                   </Box>
