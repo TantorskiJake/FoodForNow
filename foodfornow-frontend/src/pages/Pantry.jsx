@@ -83,11 +83,11 @@ const getUnitFamily = (unit) => {
 
 const pickPreferredUnit = (units, family) => {
   if (family === 'volume') {
-    if (units.has('tsp')) return 'tsp';
-    if (units.has('tbsp')) return 'tbsp';
     if (units.has('cup')) return 'cup';
-    if (units.has('ml')) return 'ml';
+    if (units.has('tbsp')) return 'tbsp';
+    if (units.has('tsp')) return 'tsp';
     if (units.has('l')) return 'l';
+    if (units.has('ml')) return 'ml';
     return Array.from(units)[0];
   }
   if (family === 'weight') {
@@ -117,27 +117,6 @@ const formatGroupedTotal = (items) => {
 
     if (family === 'volume') {
       const totalMl = familyItems.reduce((sum, i) => sum + Number(i.quantity) * (VOLUME_TO_ML[i.unit] ?? 0), 0);
-      const hasKitchenSpoons = units.has('tsp') || units.has('tbsp');
-      if (hasKitchenSpoons) {
-        const tspPerTbsp = (VOLUME_TO_ML.tbsp ?? 14.79) / (VOLUME_TO_ML.tsp ?? 4.93);
-        const totalTsp = totalMl / (VOLUME_TO_ML.tsp ?? 4.93);
-
-        let tbspCount = Math.floor((totalTsp + 1e-9) / tspPerTbsp);
-        let remainingTsp = totalTsp - tbspCount * tspPerTbsp;
-
-        if (remainingTsp > tspPerTbsp - 1e-6) {
-          tbspCount += 1;
-          remainingTsp = 0;
-        }
-
-        const remainingStr = formatQuantity(remainingTsp);
-        const remainingVal = Number(remainingStr);
-
-        if (tbspCount > 0 && remainingVal > 0) return `${tbspCount} tbsp + ${remainingStr} tsp`;
-        if (tbspCount > 0) return `${tbspCount} tbsp`;
-        return `${formatQuantity(totalTsp)} tsp`;
-      }
-
       const qty = totalMl / (VOLUME_TO_ML[unit] ?? 1);
       return `${formatQuantity(qty)} ${unit}`;
     }
