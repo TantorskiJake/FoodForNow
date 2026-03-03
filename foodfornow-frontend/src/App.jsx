@@ -23,6 +23,7 @@ import Achievements from './pages/Achievements';
 import { Toaster } from 'react-hot-toast';
 import Profile from './pages/Profile';
 import Scan from './pages/Scan';
+import HowToUse from './pages/HowToUse';
 
 /**
  * Error Boundary Component
@@ -181,6 +182,14 @@ function AppRoutes() {
           element={
             <PrivateRoute>
               <Achievements />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/how-to-use"
+          element={
+            <PrivateRoute>
+              <HowToUse />
             </PrivateRoute>
           }
         />

@@ -20,6 +20,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import EditIcon from '@mui/icons-material/Edit';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -145,6 +146,10 @@ const Navbar = () => {
                     <ListItemIcon><EmojiEventsIcon /></ListItemIcon>
                     <ListItemText primary="Achievements" />
                   </ListItem>
+                  <ListItem button onClick={() => navigate('/how-to-use')} selected={location.pathname === '/how-to-use'}>
+                    <ListItemIcon><HelpOutlineIcon /></ListItemIcon>
+                    <ListItemText primary="How to use" />
+                  </ListItem>
                   <ListItem button onClick={handleLogout}>
                     <ListItemIcon><AccountCircle /></ListItemIcon>
                     <ListItemText primary="Logout" />
@@ -232,6 +237,10 @@ const Navbar = () => {
               <MenuItem onClick={() => { handleClose(); navigate('/achievements'); }}>
                 <ListItemIcon sx={{ minWidth: 36 }}><EmojiEventsIcon fontSize="small" /></ListItemIcon>
                 Achievements
+              </MenuItem>
+              <MenuItem onClick={() => { handleClose(); navigate('/how-to-use'); }}>
+                <ListItemIcon sx={{ minWidth: 36 }}><HelpOutlineIcon fontSize="small" /></ListItemIcon>
+                How to use
               </MenuItem>
               <MenuItem onClick={handleLogout}>
                 <ListItemIcon sx={{ minWidth: 36 }}><LogoutIcon fontSize="small" /></ListItemIcon>
