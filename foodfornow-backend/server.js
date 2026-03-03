@@ -30,6 +30,9 @@ const achievementsRoutes = require("./src/routes/achievements");
 // Create Express application instance
 // CSRF: We rely on SameSite cookie attribute (see auth routes cookieOptions) plus CORS allowlist for API requests.
 const app = express();
+// Behind Render/other proxies every client shares the proxy IP unless we trust it,
+// which would make rate limiting treat all traffic as one user.
+app.set('trust proxy', 1);
 
 /**
  * Request Logging Middleware
