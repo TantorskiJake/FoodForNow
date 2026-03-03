@@ -77,6 +77,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loginPhase, setLoginPhase] = useState(LOGIN_PHASE.FORM);
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   // Redirect to dashboard if already signed in (and not in transition)
   useEffect(() => {
@@ -179,7 +180,6 @@ const Login = () => {
     }
   };
 
-  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const isDark = theme.palette.mode === 'dark';
 
   const bgSx = {
