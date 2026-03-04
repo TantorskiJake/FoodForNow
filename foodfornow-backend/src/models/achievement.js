@@ -69,6 +69,8 @@ const achievementSchema = new mongoose.Schema({
 
 // Compound index to ensure unique achievements per user
 achievementSchema.index({ userId: 1, achievementId: 1 }, { unique: true });
+// Optimizes recent completed-achievements feed queries per user.
+achievementSchema.index({ userId: 1, completed: 1, completedAt: -1 });
 
 // Export the Achievement model
 module.exports = mongoose.model("Achievement", achievementSchema); 

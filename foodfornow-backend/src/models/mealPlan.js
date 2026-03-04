@@ -84,6 +84,8 @@ mealPlanSchema.pre('save', function (next) {
 // Non-unique compound index for efficient queries (multiple meals per slot allowed).
 // If you previously had a unique index on these fields, run: db.mealplans.dropIndex('user_1_weekStart_1_day_1_meal_1')
 mealPlanSchema.index({ user: 1, weekStart: 1, day: 1, meal: 1 });
+// Supports cooked-meal history queries used by achievement progress checks.
+mealPlanSchema.index({ user: 1, cooked: 1, createdAt: 1 });
 
 // Export the MealPlan model
 module.exports = mongoose.model("MealPlan", mealPlanSchema);

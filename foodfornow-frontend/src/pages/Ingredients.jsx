@@ -35,6 +35,7 @@ import { getCategoryColor } from '../utils/categoryColors';
 import BarcodeScanner from '../components/BarcodeScanner';
 import { lookupBarcode, extractBarcode } from '../services/barcodeLookup';
 import { toast } from 'react-hot-toast';
+import { getApiErrorMessage } from '../utils/apiError';
 
 const toTitleCase = (str) => {
   if (!str) return '';
@@ -175,7 +176,7 @@ const Ingredients = () => {
         });
       } else {
         console.error('Error saving ingredient:', error);
-        toast.error(error.response?.data?.message || 'Failed to save ingredient.');
+        toast.error(getApiErrorMessage(error, 'Failed to save ingredient.'));
       }
     }
   };
@@ -197,7 +198,7 @@ const Ingredients = () => {
       await fetchIngredients();
       toast.success(`Added "${pending.name}" as a new ingredient.`);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add ingredient.');
+      toast.error(getApiErrorMessage(err, 'Failed to add ingredient.'));
     }
   };
 
@@ -219,7 +220,7 @@ const Ingredients = () => {
     } catch (error) {
       console.error('Error deleting ingredient:', error);
       setIngredients(previousIngredients);
-      const msg = error.response?.data?.message || error.response?.data?.error || 'Failed to delete ingredient. Please try again.';
+      const msg = getApiErrorMessage(error, 'Failed to delete ingredient. Please try again.');
       toast.error(msg);
     } finally {
       setDeleting(false);
@@ -278,7 +279,7 @@ const Ingredients = () => {
       // Fallback: product not in Open Food Facts - create placeholder
       const msg = err.response?.status === 404
         ? 'Product not in database - creating placeholder'
-        : err.response?.data?.error || err?.message || 'Lookup failed - creating placeholder';
+        : getApiErrorMessage(err, 'Lookup failed - creating placeholder');
       toast.error(msg);
       try {
         const response = await api.post('/ingredients', {

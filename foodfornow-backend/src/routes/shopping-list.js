@@ -8,6 +8,7 @@ const Ingredient = require('../models/ingredient');
 const MealPlan = require('../models/mealPlan');
 const { isAlwaysAvailableIngredient } = require('../constants/ingredients');
 const { toStandard, fromStandard } = require('../services/unitConversionService');
+const { errorPayload } = require('../utils/httpErrors');
 
 function sortByIngredientCategoryAndName(items) {
   return items.slice().sort((a, b) => {
@@ -31,7 +32,7 @@ router.get('/', authMiddleware, async (req, res) => {
     res.json(sortByIngredientCategoryAndName(items));
   } catch (err) {
     console.error('Error fetching shopping list:', err);
-    res.status(500).json({ message: 'Error fetching shopping list' });
+    res.status(500).json(errorPayload('Error fetching shopping list'));
   }
 });
 
@@ -255,7 +256,7 @@ router.put('/:id/toggle', authMiddleware, async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json(errorPayload('Item not found'));
     }
 
     item.completed = !item.completed;
@@ -288,7 +289,7 @@ router.put('/:id/toggle', authMiddleware, async (req, res) => {
     res.json(item);
   } catch (err) {
     console.error('Error toggling item:', err);
-    res.status(500).json({ message: 'Error toggling item' });
+    res.status(500).json(errorPayload('Error toggling item'));
   }
 });
 
@@ -336,7 +337,7 @@ router.delete('/clear-completed', authMiddleware, async (req, res) => {
     res.json({ message: 'Completed items cleared' });
   } catch (err) {
     console.error('Error clearing completed items:', err);
-    res.status(500).json({ message: 'Error clearing completed items' });
+    res.status(500).json(errorPayload('Error clearing completed items'));
   }
 });
 
@@ -349,13 +350,13 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json(errorPayload('Item not found'));
     }
 
     res.json({ message: 'Item removed from shopping list' });
   } catch (err) {
     console.error('Error removing item:', err);
-    res.status(500).json({ message: 'Error removing item' });
+    res.status(500).json(errorPayload('Error removing item'));
   }
 });
 
@@ -368,7 +369,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
       { new: true }
     );
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json(errorPayload('Item not found'));
     }
 
     // Check for shopping list-related achievements
@@ -398,7 +399,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
     res.json(item);
   } catch (err) {
     console.error('Error updating shopping list item:', err);
-    res.status(500).json({ message: 'Error updating shopping list item' });
+    res.status(500).json(errorPayload('Error updating shopping list item'));
   }
 });
 

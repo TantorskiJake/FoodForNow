@@ -51,6 +51,7 @@ import { lookupBarcode, extractBarcode } from '../services/barcodeLookup';
 import { useNavigate } from 'react-router-dom';
 import PageLoader from '../components/PageLoader';
 import useProgressiveLoader from '../hooks/useProgressiveLoader';
+import { getApiErrorMessage } from '../utils/apiError';
 
 const capitalizeWords = (str) => {
   if (!str || typeof str !== 'string') return str;
@@ -467,7 +468,7 @@ const ShoppingList = () => {
       console.error('Barcode lookup failed:', err?.response?.status, err?.response?.data, err?.message);
       const msg = err.response?.status === 404
         ? 'Product not in database'
-        : err.response?.data?.error || err?.message || 'Lookup failed';
+        : getApiErrorMessage(err, 'Lookup failed');
       toast.error(msg);
       setScanNotFoundData({
         barcode: code,
@@ -533,12 +534,12 @@ const ShoppingList = () => {
             await fetchShoppingList({ forceRefresh: true });
             toast.success('Added to shopping list');
           } catch (addErr) {
-            toast.error(addErr.response?.data?.error || 'Failed to add to shopping list');
+            toast.error(getApiErrorMessage(addErr, 'Failed to add to shopping list'));
           }
           return;
         }
       }
-      toast.error(createErr.response?.data?.error || 'Could not add item');
+      toast.error(getApiErrorMessage(createErr, 'Could not add item'));
     }
   };
 
@@ -590,7 +591,7 @@ const ShoppingList = () => {
         });
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to add item');
+      toast.error(getApiErrorMessage(err, 'Failed to add item'));
     }
   };
 
@@ -611,7 +612,7 @@ const ShoppingList = () => {
       setNewIngredientToComplete(null);
       toast.success('Ingredient details updated');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to update ingredient');
+      toast.error(getApiErrorMessage(err, 'Failed to update ingredient'));
     }
   };
 

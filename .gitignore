@@ -44,6 +44,22 @@ jspm_packages/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
+!.env.*.example
+
+# Secrets and credentials (never commit)
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+credentials.json
+secrets.yml
+secrets.yaml
+secrets.json
+secrets.env
 
 # Output and build
 dist/
