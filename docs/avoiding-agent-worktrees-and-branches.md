@@ -2,6 +2,14 @@
 
 This project is set up so you don’t get extra “straight line” refs (worktrees) or `cursor/*` branches cluttering your repo. Here’s what creates them and how to avoid it.
 
+## Goal: only main in source control
+
+- **What you want**: Only the `main` branch (and any branches you create yourself) should show in Source Control. No Codex worktrees, no `cursor/*` branches, no other workflows or branches created by automations.
+- **Making automations use main**: Codex automations run in separate worktrees by design, so they don't edit your main folder directly. To have "all changes on main" you have two options:
+  1. **Disable automations for this repo** – In Codex, turn off or remove automations that target FoodForNow. Then only your manual work (and Cursor in "current branch" mode) touches the repo, and everything stays on main.
+  2. **Keep automations but clean up** – If you keep automations, they will keep creating worktrees. Run the cleanup below whenever you want Source Control to show only main again.
+- **Project instructions for agents**: The repo has an `AGENTS.md` and a Cursor rule (`.cursor/rules/no-worktrees-or-agent-branches.mdc`) that tell agents to work on main and not create worktrees or agent branches. That affects Cursor and any automation that reads those files.
+
 ## What was creating them
 
 1. **Codex (desktop app)** – When you open FoodForNow from Codex’s project picker (linked repo), it creates a **new git worktree** each time (e.g. under `~/.codex/worktrees/...`). Those show up in Cursor’s source control as a separate “branch” (straight line) at a commit like `26b35080`.

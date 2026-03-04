@@ -277,29 +277,34 @@ npm run start        # Start production server
 - `DELETE /shopping-list/:id` - Remove list item
 - `POST /shopping-list/update-from-meal-plan` - Auto-update from meal plan
 
-## 🤝 Contributing
+## 🔀 Development workflow
 
-We welcome contributions! Please follow these steps:
+Work on the **`develop`** branch, then merge into **`main`** via a Pull Request when you're ready to release.
+
+1. **Switch to develop**
+   ```bash
+   git checkout develop
+   ```
+2. **Do your work** – edit, test locally with `npm run dev`, commit on `develop`.
+3. **Push develop**
+   ```bash
+   git push origin develop
+   ```
+4. **Open a Pull Request** on GitHub: **base branch `main`** ← **compare branch `develop`**. Add a short description, then merge when ready.
+5. **Deploy** – Merging into `main` triggers the build and deploys to production.
+
+After merging, either keep working on `develop` (it will be behind main until you merge or pull main into develop), or run:
+   ```bash
+   git checkout develop && git merge main
+   ```
+   to bring `develop` up to date with `main`.
+
+### Contributing (external contributors)
 
 1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Test thoroughly**
-   ```bash
-   npm run dev  # Test both frontend and backend
-   ```
-5. **Commit your changes**
-   ```bash
-   git commit -m 'Add amazing feature'
-   ```
-6. **Push to your branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. **Open a Pull Request**
+2. **Create a feature branch** from `develop`: `git checkout -b feature/amazing-feature`
+3. **Make your changes**, test with `npm run dev`, commit, and push your branch
+4. **Open a Pull Request** into `develop` (not `main`)
 
 ### Development Guidelines
 
