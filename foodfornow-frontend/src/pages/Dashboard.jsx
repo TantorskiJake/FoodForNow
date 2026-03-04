@@ -782,32 +782,40 @@ const Dashboard = () => {
         {/* Week Selector */}
         <Grid item xs={12}>
           <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+            <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+              <Box
+                display="flex"
+                flexDirection={isMobile ? 'column' : 'row'}
+                alignItems={isMobile ? 'stretch' : 'center'}
+                gap={2}
+                flexWrap="wrap"
+              >
                 <Box
                   display="flex"
                   alignItems="center"
                   gap={1}
+                  flexWrap="wrap"
                   onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
                   sx={{
                     cursor: 'pointer',
                     '&:hover': { opacity: 0.85 },
+                    flex: isMobile ? undefined : '0 1 auto',
                   }}
                 >
                   <CalendarTodayIcon color="primary" />
-                  <Typography variant="h6">
+                  <Typography variant="h6" sx={{ fontSize: isMobile ? '1rem' : undefined }}>
                     Week of {weekStartDayName}, {selectedWeekStart ? (() => {
                       const [year, month, day] = selectedWeekStart.split('-').map(Number);
                       const date = new Date(year, month - 1, day);
-                      return date.toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                      return date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: isMobile ? 'short' : 'long',
+                        day: 'numeric'
                       });
                     })() : ''}
                   </Typography>
                 </Box>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
+                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 120 }}>
                   <InputLabel id="week-starts-on-label">Week starts</InputLabel>
                   <Select
                     labelId="week-starts-on-label"
@@ -820,80 +828,96 @@ const Dashboard = () => {
                     ))}
                   </Select>
                 </FormControl>
-                <Box display="flex" alignItems="center" gap={1} ml="auto">
+                <Box
+                  display="flex"
+                  flexDirection={isMobile ? 'column' : 'row'}
+                  alignItems="stretch"
+                  gap={1}
+                  ml={isMobile ? 0 : 'auto'}
+                  width={isMobile ? '100%' : undefined}
+                >
+                  <Box display="flex" gap={1} flexWrap="wrap">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        flex: isMobile ? 1 : undefined,
+                        minWidth: isMobile ? 0 : undefined,
+                        backgroundColor: theme.palette.primary.main,
+                        color: 'white',
+                        borderColor: theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: theme.palette.primary.dark,
+                          borderColor: theme.palette.primary.dark,
+                          color: 'white'
+                        }
+                      }}
+                      onClick={() => {
+                        const currentDate = new Date(selectedWeekStart);
+                        currentDate.setDate(currentDate.getDate() - 7);
+                        setSelectedWeekStart(currentDate.toISOString().split('T')[0]);
+                      }}
+                    >
+                      {isMobile ? 'Prev' : 'Previous Week'}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        flex: isMobile ? 1 : undefined,
+                        minWidth: isMobile ? 0 : undefined,
+                        justifyContent: 'flex-start',
+                        textTransform: 'none',
+                        backgroundColor: theme.palette.primary.main,
+                        color: 'white',
+                        borderColor: theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: theme.palette.primary.dark,
+                          borderColor: theme.palette.primary.dark,
+                          color: 'white'
+                        }
+                      }}
+                      onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
+                      startIcon={!isMobile ? <CalendarTodayIcon sx={{ fontSize: 16 }} /> : null}
+                    >
+                      {selectedWeekStart ? (() => {
+                        const [year, month, day] = selectedWeekStart.split('-').map(Number);
+                        const date = new Date(year, month - 1, day);
+                        return date.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        });
+                      })() : 'Pick date'}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        flex: isMobile ? 1 : undefined,
+                        minWidth: isMobile ? 0 : undefined,
+                        backgroundColor: theme.palette.primary.main,
+                        color: 'white',
+                        borderColor: theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: theme.palette.primary.dark,
+                          borderColor: theme.palette.primary.dark,
+                          color: 'white'
+                        }
+                      }}
+                      onClick={() => {
+                        const currentDate = new Date(selectedWeekStart);
+                        currentDate.setDate(currentDate.getDate() + 7);
+                        setSelectedWeekStart(currentDate.toISOString().split('T')[0]);
+                      }}
+                    >
+                      {isMobile ? 'Next' : 'Next Week'}
+                    </Button>
+                  </Box>
                   <Button
                     variant="outlined"
                     size="small"
-                    sx={{
-                      backgroundColor: theme.palette.primary.main,
-                      color: 'white',
-                      borderColor: theme.palette.primary.main,
-                      '&:hover': {
-                        backgroundColor: theme.palette.primary.dark,
-                        borderColor: theme.palette.primary.dark,
-                        color: 'white'
-                      }
-                    }}
-                    onClick={() => {
-                      const currentDate = new Date(selectedWeekStart);
-                      currentDate.setDate(currentDate.getDate() - 7);
-                      setSelectedWeekStart(currentDate.toISOString().split('T')[0]);
-                    }}
-                  >
-                    Previous Week
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    sx={{
-                      justifyContent: 'flex-start',
-                      textTransform: 'none',
-                      backgroundColor: theme.palette.primary.main,
-                      color: 'white',
-                      borderColor: theme.palette.primary.main,
-                      '&:hover': {
-                        backgroundColor: theme.palette.primary.dark,
-                        borderColor: theme.palette.primary.dark,
-                        color: 'white'
-                      }
-                    }}
-                    onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
-                    startIcon={<CalendarTodayIcon sx={{ fontSize: 16 }} />}
-                  >
-                    {selectedWeekStart ? (() => {
-                      const [year, month, day] = selectedWeekStart.split('-').map(Number);
-                      const date = new Date(year, month - 1, day);
-                      return date.toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric',
-                        year: 'numeric'
-                      });
-                    })() : 'Select Date'}
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    sx={{
-                      backgroundColor: theme.palette.primary.main,
-                      color: 'white',
-                      borderColor: theme.palette.primary.main,
-                      '&:hover': {
-                        backgroundColor: theme.palette.primary.dark,
-                        borderColor: theme.palette.primary.dark,
-                        color: 'white'
-                      }
-                    }}
-                    onClick={() => {
-                      const currentDate = new Date(selectedWeekStart);
-                      currentDate.setDate(currentDate.getDate() + 7);
-                      setSelectedWeekStart(currentDate.toISOString().split('T')[0]);
-                    }}
-                  >
-                    Next Week
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
+                    fullWidth={isMobile}
                     sx={{
                       backgroundColor: theme.palette.primary.main,
                       color: 'white',
@@ -954,12 +978,19 @@ const Dashboard = () => {
 
         <Grid item xs={12}>
           <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6" gutterBottom>
+            <CardContent sx={{ '&:last-child': { pb: isMobile ? 2 : 3 } }}>
+              <Box
+                display="flex"
+                flexDirection={isMobile ? 'column' : 'row'}
+                justifyContent="space-between"
+                alignItems={isMobile ? 'stretch' : 'center'}
+                gap={2}
+                mb={2}
+              >
+                <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
                   Meal Plan
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   <Tooltip title="Fill your week with random recipes from your collection">
                     <span>
                       <Button
@@ -969,8 +1000,9 @@ const Dashboard = () => {
                         onClick={handlePopulateWeek}
                         disabled={disableGlobalActions || mealActionLoading || recipes.length === 0}
                         size="small"
+                        fullWidth={isMobile}
                       >
-                        Populate Week
+                        {isMobile ? 'Populate Week' : 'Populate Week'}
                       </Button>
                     </span>
                   </Tooltip>
@@ -980,6 +1012,7 @@ const Dashboard = () => {
                     onClick={handleOpenResetWeekDialog}
                     disabled={disableGlobalActions || mealActionLoading || mealPlan.length === 0}
                     size="small"
+                    fullWidth={isMobile}
                   >
                     Reset Week
                   </Button>
@@ -1004,18 +1037,20 @@ const Dashboard = () => {
             <CardContent>
               <Box
                 display="flex"
+                flexDirection={isMobile ? 'column' : 'row'}
                 justifyContent="space-between"
-                alignItems="center"
+                alignItems={isMobile ? 'stretch' : 'center'}
+                gap={isMobile ? 1.5 : 0}
                 mb={ingredientsExpanded ? 3 : 0}
                 sx={{ cursor: 'pointer' }}
                 onClick={handleIngredientsToggle}
               >
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, fontSize: isMobile ? '1rem' : undefined }}>
                     Needed Ingredients
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {ingredients.length > 0 
+                    {ingredients.length > 0
                       ? `${ingredients.length} ingredient${ingredients.length !== 1 ? 's' : ''} needed`
                       : 'No ingredients needed'
                     }
@@ -1026,7 +1061,14 @@ const Dashboard = () => {
                     <ExpandMoreIcon fontSize="small" />
                   )}
                 </Box>
-                <Box onClick={(e) => e.stopPropagation()} display="flex" alignItems="center" gap={0.5}>
+                <Box
+                  onClick={(e) => e.stopPropagation()}
+                  display="flex"
+                  alignItems="center"
+                  gap={0.5}
+                  flexDirection={isMobile ? 'row' : undefined}
+                  flexWrap="wrap"
+                >
                   <Tooltip title="Refresh needed ingredients with latest pantry data">
                     <span>
                       <IconButton
@@ -1042,7 +1084,7 @@ const Dashboard = () => {
                     </span>
                   </Tooltip>
                   <Tooltip title="Add ingredients you need that aren't in your pantry">
-                    <span>
+                    <span style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? 0 : undefined }}>
                       <Button
                         variant="contained"
                         color="primary"
@@ -1050,14 +1092,15 @@ const Dashboard = () => {
                         onClick={handleAddAllToShoppingList}
                         disabled={disableGlobalActions || mealActionLoading || ingredients.length === 0}
                         size="small"
-                        sx={{ 
+                        fullWidth={isMobile}
+                        sx={{
                           borderRadius: 2,
                           textTransform: 'none',
                           fontWeight: 600,
-                          px: 3
+                          px: isMobile ? 2 : 3
                         }}
                       >
-                        Add All to Shopping List
+                        {isMobile ? 'Add All to List' : 'Add All to Shopping List'}
                       </Button>
                     </span>
                   </Tooltip>

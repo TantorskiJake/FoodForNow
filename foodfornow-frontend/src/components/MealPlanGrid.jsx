@@ -12,6 +12,7 @@ import {
   ListItemIcon,
   ListItemText,
   useTheme,
+  useMediaQuery,
   Chip,
   Dialog,
   DialogTitle,
@@ -40,6 +41,7 @@ const DEFAULT_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'S
 const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, onEditMeal, onMealPlanUpdate, onAddRecipeToSlot, onAddRestaurantToSlot }) => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { showAchievements } = useAchievements();
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedMeal, setSelectedMeal] = useState(null);
@@ -336,224 +338,248 @@ const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, 
     return '0.85rem';
   };
 
+  const renderSlotCard = (day, mealType, options = {}) => {
+    const { mobile = false } = options;
+    const mealsInSlot = mealPlan.filter(
+      (m) => m?.day?.toLowerCase() === day.toLowerCase() && m?.meal === mealType
+    );
+    const slotEmpty = mealsInSlot.length === 0;
+    const cardBg = slotEmpty
+      ? (theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100')
+      : 'transparent';
+    const cardHoverBg = slotEmpty
+      ? (theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200')
+      : 'transparent';
+
+    return (
+      <Card
+        data-meal-card
+        sx={{
+          height: '100%',
+          minHeight: mobile ? 72 : 180,
+          bgcolor: cardBg,
+          '&:hover': {
+            bgcolor: cardHoverBg,
+            cursor: slotEmpty || itemsToCopy.length > 0 ? 'pointer' : 'default',
+            ...(itemsToCopy.length > 0 && {
+              border: '2px dashed',
+              borderColor: 'primary.main',
+              boxSizing: 'border-box'
+            })
+          },
+          border: theme.palette.mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : 'none',
+          position: 'relative',
+          overflow: 'hidden',
+          m: 0
+        }}
+        onClick={(e) => handleSlotClick(mealsInSlot, day, mealType, e)}
+      >
+        <CardContent sx={{
+          p: slotEmpty ? 0.5 : 0,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          justifyContent: 'flex-start',
+          m: 0,
+          '&:last-child': { pb: slotEmpty ? 1 : 0 }
+        }}>
+          {slotEmpty ? (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              align="center"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flex: 1,
+                m: 0,
+                fontSize: mobile ? '0.875rem' : undefined
+              }}
+            >
+              Click to add meal
+            </Typography>
+          ) : (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0,
+                bgcolor: 'success.dark',
+                borderRadius: 'inherit'
+              }}
+            >
+              {mealsInSlot.map((meal, index) => {
+                const isCooked = meal?.cooked || false;
+                const isEatingOut = meal?.eatingOut || false;
+                const mealCardBg = isCooked ? 'success.light' : 'success.dark';
+                return (
+                  <Box
+                    key={meal._id}
+                    data-meal-card
+                    onClick={(e) => handleMealCardClick(meal, day, mealType, e)}
+                    sx={{
+                      position: 'relative',
+                      zIndex: index + 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: mealCardBg,
+                      flex: '1 1 0',
+                      minHeight: mobile ? 40 : 44,
+                      py: 0.5,
+                      px: 1,
+                      cursor: 'pointer',
+                      borderBottom: index < mealsInSlot.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                      '&:hover': { bgcolor: 'success.main' }
+                    }}
+                  >
+                    <Box sx={{ position: 'absolute', left: 0, top: 0, display: 'flex', alignItems: 'center', gap: 0, zIndex: 1 }}>
+                      {index === 0 && (
+                        <Tooltip title="Add another meal">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleAddAnotherClick(day, mealType, e)}
+                            sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                          >
+                            <AddIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title={isCooked ? (isEatingOut ? 'Already marked' : 'Uncook') : (isEatingOut ? 'Mark as eaten' : 'Mark as cooked')}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleToggleCooked(meal, e)}
+                            sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                          >
+                            {isCooked ? (
+                              <CheckCircleIcon sx={{ fontSize: 16 }} />
+                            ) : (
+                              <RestaurantMenuIcon sx={{ fontSize: 16 }} />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                    <Box sx={{ position: 'absolute', right: 0, top: 0, display: 'flex', alignItems: 'center', gap: 0, zIndex: 2 }}>
+                      {canCopyMeal(meal) && (
+                        <Tooltip title="Copy to other days">
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleCopyMeal(meal, e)}
+                              sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                            >
+                              <ContentCopyIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                      <Tooltip title="Delete meal">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (meal._id) onDeleteMeal(meal._id);
+                            }}
+                            sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                          >
+                            <DeleteIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: 'white',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        width: '100%',
+                        fontSize: getDynamicFontSize(getMealName(meal)),
+                        px: 0.5,
+                        pl: 3,
+                        pr: 3,
+                        lineHeight: 1.25,
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {getMealName(meal)}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
-    <Box sx={{ mt: 2 }}>
-      <Grid container spacing={1.5}>
-        {/* Header row with days */}
-        <Grid item xs={12}>
-          <Grid container spacing={1}>
-            <Grid item xs={1} /> {/* Spacer for meal type labels */}
-            {days.map((day) => (
-              <Grid item xs={11/7} key={day}>
-                <Typography variant="subtitle1" align="center" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1 }}>
-                  {day}
-                </Typography>
+    <>
+      {isMobile ? (
+        <Box sx={{ mt: 2 }}>
+          {days.map((day) => (
+            <Box key={day} sx={{ mb: 2.5 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, px: 0.5 }}>
+                {day}
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {mealTypes.map((mealType) => (
+                  <Box key={`${day}-${mealType}`}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, px: 0.5 }}>
+                      {mealType}
+                    </Typography>
+                    {renderSlotCard(day, mealType, { mobile: true })}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Box sx={{ mt: 2 }}>
+          <Grid container spacing={1.5}>
+            <Grid item xs={12}>
+              <Grid container spacing={1}>
+                <Grid item xs={1} />
+                {days.map((day) => (
+                  <Grid item xs={11/7} key={day}>
+                    <Typography variant="subtitle1" align="center" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1 }}>
+                      {day}
+                    </Typography>
+                  </Grid>
+                ))}
+              </Grid>
+            </Grid>
+            {mealTypes.map((mealType) => (
+              <Grid item xs={12} key={mealType}>
+                <Grid container spacing={1}>
+                  <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', p: 0, minWidth: 0 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1 }}>
+                      {mealType}
+                    </Typography>
+                  </Grid>
+                  {days.map((day) => (
+                    <Grid item xs={11/7} key={`${day}-${mealType}`} sx={{ p: 0 }}>
+                      {renderSlotCard(day, mealType)}
+                    </Grid>
+                  ))}
+                </Grid>
               </Grid>
             ))}
           </Grid>
-        </Grid>
-
-        {/* Meal rows */}
-        {mealTypes.map((mealType) => (
-          <Grid item xs={12} key={mealType}>
-            <Grid container spacing={1}>
-              {/* Meal type label */}
-              <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', p: 0, minWidth: 0 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', m: 0, p: 0, lineHeight: 1.1 }}>
-                  {mealType}
-                </Typography>
-              </Grid>
-
-              {/* Meal slots for each day - multiple meals per slot supported */}
-              {days.map((day) => {
-                const mealsInSlot = mealPlan.filter(
-                  (m) => m?.day?.toLowerCase() === day.toLowerCase() && m?.meal === mealType
-                );
-                const slotEmpty = mealsInSlot.length === 0;
-                const cardBg = slotEmpty
-                  ? (theme.palette.mode === 'dark' ? 'background.paper' : 'grey.100')
-                  : 'transparent';
-                const cardHoverBg = slotEmpty
-                  ? (theme.palette.mode === 'dark' ? 'action.hover' : 'grey.200')
-                  : 'transparent';
-
-                return (
-                  <Grid item xs={11/7} key={`${day}-${mealType}`} sx={{ p: 0 }}>
-                    <Card
-                      data-meal-card
-                      sx={{
-                        height: '100%',
-                        minHeight: 180,
-                        bgcolor: cardBg,
-                        '&:hover': {
-                          bgcolor: cardHoverBg,
-                          cursor: slotEmpty || itemsToCopy.length > 0 ? 'pointer' : 'default',
-                          ...(itemsToCopy.length > 0 && {
-                            border: '2px dashed',
-                            borderColor: 'primary.main',
-                            boxSizing: 'border-box'
-                          })
-                        },
-                        border: theme.palette.mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : 'none',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        m: 0
-                      }}
-                      onClick={(e) => handleSlotClick(mealsInSlot, day, mealType, e)}
-                    >
-                      <CardContent sx={{
-                        p: slotEmpty ? 0.5 : 0,
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        position: 'relative',
-                        justifyContent: 'flex-start',
-                        m: 0,
-                        '&:last-child': { pb: slotEmpty ? 1 : 0 }
-                      }}>
-                        {slotEmpty ? (
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            align="center"
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flex: 1,
-                              m: 0
-                            }}
-                          >
-                            Click to add meal
-                          </Typography>
-                        ) : (
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 0,
-                              bgcolor: 'success.dark',
-                              borderRadius: 'inherit'
-                            }}
-                          >
-                            {mealsInSlot.map((meal, index) => {
-                              const isCooked = meal?.cooked || false;
-                              const isEatingOut = meal?.eatingOut || false;
-                              const mealCardBg = isCooked ? 'success.light' : 'success.dark';
-                              return (
-                                <Box
-                                  key={meal._id}
-                                  data-meal-card
-                                  onClick={(e) => handleMealCardClick(meal, day, mealType, e)}
-                                  sx={{
-                                    position: 'relative',
-                                    zIndex: index + 1,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    bgcolor: mealCardBg,
-                                    flex: '1 1 0',
-                                    minHeight: 44,
-                                    py: 0.5,
-                                    px: 1,
-                                    cursor: 'pointer',
-                                    borderBottom: index < mealsInSlot.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
-                                    '&:hover': { bgcolor: 'success.main' }
-                                  }}
-                                >
-                                  <Box sx={{ position: 'absolute', left: 0, top: 0, display: 'flex', alignItems: 'center', gap: 0, zIndex: 1 }}>
-                                    {index === 0 && (
-                                      <Tooltip title="Add another meal">
-                                        <IconButton
-                                          size="small"
-                                          onClick={(e) => handleAddAnotherClick(day, mealType, e)}
-                                          sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                                        >
-                                          <AddIcon sx={{ fontSize: 16 }} />
-                                        </IconButton>
-                                      </Tooltip>
-                                    )}
-                                    <Tooltip title={isCooked ? (isEatingOut ? 'Already marked' : 'Uncook') : (isEatingOut ? 'Mark as eaten' : 'Mark as cooked')}>
-                                      <span>
-                                        <IconButton
-                                          size="small"
-                                          onClick={(e) => handleToggleCooked(meal, e)}
-                                          sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                                        >
-                                          {isCooked ? (
-                                            <CheckCircleIcon sx={{ fontSize: 16 }} />
-                                          ) : (
-                                            <RestaurantMenuIcon sx={{ fontSize: 16 }} />
-                                          )}
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-                                  </Box>
-                                  <Box sx={{ position: 'absolute', right: 0, top: 0, display: 'flex', alignItems: 'center', gap: 0, zIndex: 2 }}>
-                                    {canCopyMeal(meal) && (
-                                      <Tooltip title="Copy to other days">
-                                        <span>
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => handleCopyMeal(meal, e)}
-                                            sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                                          >
-                                            <ContentCopyIcon sx={{ fontSize: 16 }} />
-                                          </IconButton>
-                                        </span>
-                                      </Tooltip>
-                                    )}
-                                    <Tooltip title="Delete meal">
-                                      <span>
-                                        <IconButton
-                                          size="small"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (meal._id) onDeleteMeal(meal._id);
-                                          }}
-                                          sx={{ color: 'white', width: 24, height: 24, p: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                                        >
-                                          <DeleteIcon sx={{ fontSize: 16 }} />
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-                                  </Box>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      color: 'white',
-                                      fontWeight: 600,
-                                      textAlign: 'center',
-                                      width: '100%',
-                                      fontSize: getDynamicFontSize(getMealName(meal)),
-                                      px: 0.5,
-                                      pl: 3,
-                                      pr: 3,
-                                      lineHeight: 1.25,
-                                      wordBreak: 'break-word'
-                                    }}
-                                  >
-                                    {getMealName(meal)}
-                                  </Typography>
-                                </Box>
-                              );
-                            })}
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </Grid>
-        ))}
-      </Grid>
+        </Box>
+      )}
 
       {/* Missing Ingredients Dialog */}
       <Dialog 
@@ -705,7 +731,7 @@ const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, 
           </MenuItem>
         )}
       </Menu>
-    </Box>
+    </>
   );
 };
 
