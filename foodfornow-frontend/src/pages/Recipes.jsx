@@ -105,7 +105,6 @@ const Recipes = () => {
   const [sharedRecipes, setSharedRecipes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
-  const [categoryFilter, setCategoryFilter] = useState('');
   const { authenticated } = useAuth();
   const { showAchievements } = useAchievements();
   const navigate = useNavigate();
@@ -219,20 +218,12 @@ const Recipes = () => {
     }
   });
 
-  // Get unique categories for filtering
-  const categories = [...new Set(recipes.map(recipe => recipe.category).filter(Boolean))];
-
-  // Filter and sort recipes based on search term, category filter, and sort setting
+  // Filter and sort recipes based on search term and sort setting
   const filteredRecipes = recipes
     .filter(recipe => {
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = recipe.name.toLowerCase().includes(searchLower) ||
-                           recipe.description?.toLowerCase().includes(searchLower) ||
-                           recipe.category?.toLowerCase().includes(searchLower);
-      
-      const matchesCategory = !categoryFilter || recipe.category === categoryFilter;
-      
-      return matchesSearch && matchesCategory;
+      return recipe.name.toLowerCase().includes(searchLower) ||
+             recipe.description?.toLowerCase().includes(searchLower);
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -254,8 +245,7 @@ const Recipes = () => {
     .filter(recipe => {
       const searchLower = searchTerm.toLowerCase();
       return recipe.name.toLowerCase().includes(searchLower) ||
-             recipe.description?.toLowerCase().includes(searchLower) ||
-             recipe.category?.toLowerCase().includes(searchLower);
+             recipe.description?.toLowerCase().includes(searchLower);
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -841,21 +831,6 @@ const Recipes = () => {
               <MenuItem value="name-desc">Name (Z-A)</MenuItem>
               <MenuItem value="cookTime">Cook Time (Fast-Slow)</MenuItem>
               <MenuItem value="difficulty">Difficulty (Easy-Hard)</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Category</InputLabel>
-            <Select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              label="Category"
-            >
-              <MenuItem value="">All Categories</MenuItem>
-              {categories.map((category) => (
-                <MenuItem key={category} value={category}>
-                  {category}
-                </MenuItem>
-              ))}
             </Select>
           </FormControl>
           <Button
