@@ -7,6 +7,37 @@ const { toStandard, fromStandard, getStandardUnit } = require('../services/unitC
 
 const router = express.Router();
 
+function buildMissingShoppingListBulkOps(userId, missingIngredients) {
+  const quantitiesByIngredientUnit = new Map();
+
+  for (const missing of missingIngredients) {
+    const ingredientId = missing?.ingredient?._id?.toString?.();
+    const unit = missing?.unit;
+    const quantity = Number(missing?.quantity || 0);
+    if (!ingredientId || !unit || quantity <= 0) continue;
+
+    const key = `${ingredientId}:${unit}`;
+    const existingQuantity = quantitiesByIngredientUnit.get(key) || 0;
+    quantitiesByIngredientUnit.set(key, existingQuantity + quantity);
+  }
+
+  return Array.from(quantitiesByIngredientUnit.entries()).map(([key, quantity]) => {
+    const [ingredientId, unit] = key.split(':');
+    return {
+      updateOne: {
+        filter: {
+          user: userId,
+          ingredient: ingredientId,
+          unit,
+          completed: false
+        },
+        update: { $inc: { quantity } },
+        upsert: true
+      }
+    };
+  });
+}
+
 // Get meal plan for a specific week
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -365,31 +396,9 @@ router.patch('/:id/cook', authMiddleware, async (req, res) => {
     // Add missing ingredients to shopping list if requested
     if (missingIngredients.length > 0 && addMissingToShoppingList) {
       const ShoppingListItem = require('../models/shopping-list-item');
-      
-      for (const missing of missingIngredients) {
-        // Check if this ingredient already exists in the shopping list
-        const existingItem = await ShoppingListItem.findOne({
-          user: req.userId,
-          ingredient: missing.ingredient._id,
-          unit: missing.unit,
-          completed: false
-        });
-        
-        if (existingItem) {
-          // Update existing item by adding the missing quantity
-          existingItem.quantity += missing.quantity;
-          await existingItem.save();
-        } else {
-          // Create new shopping list item
-          const shoppingListItem = new ShoppingListItem({
-            user: req.userId,
-            ingredient: missing.ingredient._id,
-            quantity: missing.quantity,
-            unit: missing.unit,
-            completed: false
-          });
-          await shoppingListItem.save();
-        }
+      const bulkOps = buildMissingShoppingListBulkOps(req.userId, missingIngredients);
+      if (bulkOps.length > 0) {
+        await ShoppingListItem.bulkWrite(bulkOps, { ordered: false });
       }
       
       // Don't mark as cooked if there were missing ingredients
@@ -737,4 +746,5 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;
+module.exports.buildMissingShoppingListBulkOps = buildMissingShoppingListBulkOps;

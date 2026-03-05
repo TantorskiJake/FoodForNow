@@ -15,6 +15,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require('cookie-parser');
+const { errorPayload } = require('./src/utils/httpErrors');
 
 // Import API route modules
 const authRoutes = require("./src/routes/auth");
@@ -90,7 +91,7 @@ const authRateMax = process.env.AUTH_RATE_LIMIT_MAX
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: authRateMax,
-  message: { error: 'Too many attempts, please try again later.' },
+  message: errorPayload('Too many attempts, please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -129,7 +130,7 @@ app.get("/", (req, res) => {
  */
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: "Something went wrong!" });
+  res.status(500).json(errorPayload('Something went wrong!'));
 });
 
 /**

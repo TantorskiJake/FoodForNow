@@ -9,3 +9,7 @@ Instructions for AI agents and automations (e.g. Codex, Cursor) working in this 
 - **Commits**: When making changes, commit (or stage for commit) on the current branch in the primary repo path, not in a separate worktree.
 
 Normal workflow: the user works on `develop`, then opens a PR to merge into `main` when ready to release.
+
+## On-demand automations
+
+Prompt-based automations (migrated from Codex) live in [`.cursor/automations/`](.cursor/automations/). Each file has a **Prompt** section; run one by asking the user to invoke it (e.g. “Run the API contract drift check”) or by following the prompt when the user requests that task. See [.cursor/automations/README.md](.cursor/automations/README.md) for the list.

@@ -54,6 +54,8 @@ shoppingListItemSchema.index({ user: 1, ingredient: 1 });
 
 // Compound index for "incomplete items" queries (common read pattern)
 shoppingListItemSchema.index({ user: 1, completed: 1 });
+// Supports upsert/update lookups during "add missing ingredients" cook flow.
+shoppingListItemSchema.index({ user: 1, completed: 1, ingredient: 1, unit: 1 });
 
 // Create and export the ShoppingListItem model
 const ShoppingListItem = mongoose.model('ShoppingListItem', shoppingListItemSchema);

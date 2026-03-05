@@ -23,6 +23,7 @@ import PasswordField from '../components/PasswordField';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useAchievements } from '../context/AchievementContext';
+import { evaluatePasswordStrength, meetsBackendPasswordPolicy } from '../utils/passwordPolicy';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -48,15 +49,7 @@ const Register = () => {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      const pwd = passwordInput;
-      const newStrength = {
-        length: pwd.length >= 8,
-        uppercase: /[A-Z]/.test(pwd),
-        lowercase: /[a-z]/.test(pwd),
-        number: /[0-9]/.test(pwd),
-        special: /[^A-Za-z0-9]/.test(pwd),
-      };
-      setPasswordStrength(newStrength);
+      setPasswordStrength(evaluatePasswordStrength(passwordInput));
     }, 300);
 
     return () => clearTimeout(timeout);
@@ -82,9 +75,8 @@ const Register = () => {
       return;
     }
 
-    const strengthCount = Object.values(passwordStrength).filter(Boolean).length;
-    if (strengthCount < 3) {
-      setError('Password does not meet minimum requirements');
+    if (!meetsBackendPasswordPolicy(formData.password)) {
+      setError('Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character');
       return;
     }
 

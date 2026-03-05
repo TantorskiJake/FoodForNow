@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const MealPlan = require('./mealPlan');
 const Achievement = require('./achievement');
+const ShoppingListItem = require('./shopping-list-item');
 
 function hasIndex(indexes, key, optionsMatcher = () => true) {
   return indexes.some(([candidateKey, candidateOptions]) => {
@@ -28,3 +29,10 @@ test('Achievement schema includes recent completed index', () => {
   );
 });
 
+test('ShoppingListItem schema includes missing-item upsert index', () => {
+  const indexes = ShoppingListItem.schema.indexes();
+  assert.equal(
+    hasIndex(indexes, { user: 1, completed: 1, ingredient: 1, unit: 1 }),
+    true
+  );
+});
