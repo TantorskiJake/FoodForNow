@@ -10,7 +10,7 @@ const getRecipeData = require('@dimfu/recipe-scraper').default;
 const { parseIngredient } = require('parse-ingredient');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { assertUrlAllowedForFetch } = require('../utils/urlSafety');
+const { getAllowedUrlForFetch } = require('../utils/urlSafety');
 
 const PROXY_ENDPOINT_TEMPLATE = (process.env.RECIPE_FETCH_PROXY_URL || '').trim();
 const PROXY_REQUIRED = parseBoolean(process.env.RECIPE_FETCH_PROXY_REQUIRED);
@@ -240,15 +240,19 @@ const BROWSER_HEADERS_FIREFOX = {
 
 /**
  * Fetch HTML with browser-like headers. Retries with alternate User-Agent on 403.
+ * Uses only the allowlisted URL for the request so SSRF analyzers see a sanitized flow.
  */
 async function fetchRecipeHtml(url) {
-  await assertUrlAllowedForFetch(url);
+  const allowedUrl = await getAllowedUrlForFetch(url);
+  if (!allowedUrl) {
+    throw new Error('This URL is not allowed for recipe import.');
+  }
   if (PROXY_REQUIRED && !PROXY_ENDPOINT_TEMPLATE) {
     throw new Error('Recipe import proxy is required but RECIPE_FETCH_PROXY_URL is not configured.');
   }
 
-  const targetOrigin = new URL(url).origin;
-  const proxyTarget = buildProxyFetchTarget(url);
+  const targetOrigin = new URL(allowedUrl).origin;
+  const proxyTarget = buildProxyFetchTarget(allowedUrl);
   if (PROXY_REQUIRED && !proxyTarget.viaProxy) {
     throw new Error('Recipe import proxy is required but the configured proxy URL is invalid.');
   }
@@ -358,17 +362,20 @@ async function parseRecipeFromUrlFallback(url) {
 
 /**
  * Parse recipe from URL and return data in our format
- * @param {string} url - Recipe URL
+ * @param {string} url - Recipe URL (must be allowlisted by caller or will be validated here)
  * @returns {Promise<Object>} Parsed recipe data
  */
 async function parseRecipeFromUrl(url) {
-  await assertUrlAllowedForFetch(url);
+  const allowedUrl = await getAllowedUrlForFetch(url);
+  if (!allowedUrl) {
+    throw new Error('This URL is not allowed for recipe import.');
+  }
   let data = null;
 
   // Try fallback first: it uses browser-like headers and retries with alternate User-Agent on 403.
   // @dimfu/recipe-scraper sends no User-Agent, so many sites (ChewOutLoud, Food Network, etc.) block it.
   try {
-    data = await parseRecipeFromUrlFallback(url);
+    data = await parseRecipeFromUrlFallback(allowedUrl);
   } catch {
     data = null;
   }
@@ -378,14 +385,14 @@ async function parseRecipeFromUrl(url) {
       throw new Error('Recipe import proxy is required; this URL could not be parsed via the proxy worker.');
     }
     try {
-      data = await getRecipeData(url);
+      data = await getRecipeData(allowedUrl);
     } catch (err) {
       const shouldFallback =
         err.message === 'Recipe is not valid' ||
         err.response?.status === 403 ||
         (err.message && err.message.includes('status code 403'));
       if (shouldFallback) {
-        data = await parseRecipeFromUrlFallback(url);
+        data = await parseRecipeFromUrlFallback(allowedUrl);
       }
       if (!data) throw err;
     }

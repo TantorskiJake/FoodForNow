@@ -13,8 +13,12 @@ const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'pi
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const rawQuery = req.query != null && typeof req.query === 'object' ? req.query : {};
-    const search = typeof rawQuery.search === 'string' ? rawQuery.search : '';
+    const search =
+      req.query != null &&
+      typeof req.query === 'object' &&
+      typeof req.query.search === 'string'
+        ? String(req.query.search)
+        : '';
 
     let query = { createdBy: req.userId };
     
