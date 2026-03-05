@@ -69,6 +69,8 @@ const Recipes = () => {
   });
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
   const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
+  /** Safe for use as array index: integer in [0, length). Prevents prototype pollution (CWE-1321). */
+  const isSafeArrayIndex = (i, length) => Number.isInteger(i) && i >= 0 && i < length;
   const theme = useTheme();
 
   // Inline create ingredient state
@@ -1373,7 +1375,9 @@ const Recipes = () => {
                       onChange={(e) => {
                         const newIngredients = [...formData.ingredients];
                         const val = e?.target?.value;
-                        newIngredients[index].quantity = typeof val === 'string' ? val : String(val ?? '');
+                        if (isSafeArrayIndex(index, newIngredients.length)) {
+                          newIngredients[index].quantity = typeof val === 'string' ? val : String(val ?? '');
+                        }
                         setFormData({ ...formData, ingredients: newIngredients });
                       }}
                       required
@@ -1386,7 +1390,9 @@ const Recipes = () => {
                         onChange={(e) => {
                           const newIngredients = [...formData.ingredients];
                           const v = e?.target?.value;
-                          newIngredients[index].unit = validUnits.includes(v) ? v : (ingredient.unit || '');
+                          if (isSafeArrayIndex(index, newIngredients.length)) {
+                            newIngredients[index].unit = validUnits.includes(v) ? v : (ingredient.unit || '');
+                          }
                           setFormData({ ...formData, ingredients: newIngredients });
                         }}
                         required

@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
@@ -6,8 +7,25 @@ const User = require("../models/user");
 const RefreshToken = require("../models/refreshToken");
 const PasswordResetToken = require("../models/passwordResetToken");
 const auth = require('../middleware/auth');
+const { errorPayload } = require('../utils/httpErrors');
 
 const router = express.Router();
+
+// Stricter rate limits for login/signup to prevent brute force (applied in addition to global auth limiter)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX, 10) || 5,
+  message: errorPayload('Too many login attempts. Please try again later.'),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const signupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.SIGNUP_RATE_LIMIT_MAX, 10) || 10,
+  message: errorPayload('Too many signup attempts. Please try again later.'),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * Authentication Routes
@@ -77,7 +95,7 @@ const cookieOptions = {
  * Creates a new user account with hashed password and returns authentication tokens.
  * Validates input, checks for existing users, and enforces password strength.
  */
-router.post('/register', async (req, res) => {
+router.post('/register', signupLimiter, async (req, res) => {
   try {
     const { name, email, password } = req.body || {};
 
@@ -196,7 +214,7 @@ router.post('/register', async (req, res) => {
  * Validates user credentials and returns authentication tokens.
  * Compares password hash and generates new tokens for the session.
  */
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {

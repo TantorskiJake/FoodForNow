@@ -29,7 +29,6 @@ const scanSessionRoutes = require("./src/routes/scan-session");
 const achievementsRoutes = require("./src/routes/achievements");
 
 // Create Express application instance
-// CSRF: We rely on SameSite cookie attribute (see auth routes cookieOptions) plus CORS allowlist for API requests.
 const app = express();
 // Behind Render/other proxies every client shares the proxy IP unless we trust it,
 // which would make rate limiting treat all traffic as one user.
@@ -82,6 +81,37 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies up to 10MB
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-encoded bodies
 app.use(cookieParser()); // Parse cookies from requests
+
+// CSRF protection (double-submit cookie): apply to state-changing /api requests; GET/HEAD/OPTIONS ignored
+const { doubleCsrf } = require('csrf-csrf');
+const csrfSecret = process.env.CSRF_SECRET || (process.env.NODE_ENV === 'production' ? null : 'dev-csrf-secret');
+if (process.env.NODE_ENV === 'production' && !csrfSecret) {
+  console.warn('CSRF_SECRET not set in production — CSRF protection disabled');
+}
+const csrfOptions = csrfSecret ? {
+  getSecret: () => csrfSecret,
+  getSessionIdentifier: (req) => req.ip || 'default',
+  cookieName: 'csrf-token',
+  cookieOptions: {
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  },
+  getCsrfTokenFromRequest: (req) => req.headers['x-csrf-token'],
+} : null;
+const { generateCsrfToken, doubleCsrfProtection } = csrfOptions ? doubleCsrf(csrfOptions) : { generateCsrfToken: null, doubleCsrfProtection: (req, res, next) => next() };
+
+// Expose CSRF token for SPAs (must be before doubleCsrfProtection so this route is not protected)
+app.get('/api/csrf-token', (req, res) => {
+  if (generateCsrfToken) {
+    const token = generateCsrfToken(req, res);
+    return res.json({ csrfToken: token });
+  }
+  res.json({ csrfToken: '' });
+});
+
+// Protect state-changing /api routes (GET/HEAD/OPTIONS are ignored by default)
+app.use('/api', doubleCsrfProtection);
 
 // Rate limit auth routes to mitigate brute-force (e.g. login)
 const rateLimit = require('express-rate-limit');

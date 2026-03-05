@@ -10,15 +10,25 @@ const router = express.Router();
 
 const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
 
+const SEARCH_MAX_LENGTH = 200;
+
+/**
+ * Validate and sanitize search query: ensure string, max length, escape regex metacharacters
+ * so it is safe to use in MongoDB $regex (avoids ReDoS and injection).
+ */
+function sanitizeSearchQuery(value) {
+  if (value == null) return '';
+  const s = typeof value === 'string' ? value : String(value);
+  const trimmed = s.trim().slice(0, SEARCH_MAX_LENGTH);
+  return trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const search =
-      req.query != null &&
-      typeof req.query === 'object' &&
-      typeof req.query.search === 'string'
-        ? String(req.query.search)
-        : '';
+    const search = sanitizeSearchQuery(
+      req.query != null && typeof req.query === 'object' ? req.query.search : undefined
+    );
 
     let query = { createdBy: req.userId };
     
@@ -48,8 +58,8 @@ router.post('/parse-url', authMiddleware, async (req, res) => {
     }
 
     const trimmed = url.trim();
-    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-      return res.status(400).json({ error: 'Please provide a valid URL starting with http:// or https://' });
+    if (!trimmed.startsWith('https://')) {
+      return res.status(400).json({ error: 'Only HTTPS URLs are allowed for recipe import.' });
     }
     const urlToFetch = await getAllowedUrlForFetch(trimmed);
     if (!urlToFetch) {
@@ -131,7 +141,9 @@ router.get('/popular', authMiddleware, async (req, res) => {
 // excluding recipes with a name the user already has (case-insensitive)
 router.get('/shared', authMiddleware, async (req, res) => {
   try {
-    const { search = '' } = req.query;
+    const search = sanitizeSearchQuery(
+      req.query != null && typeof req.query === 'object' ? req.query.search : undefined
+    );
     // Fetch user recipe names
     const userRecipes = await Recipe.find({ createdBy: req.userId }).select('name');
     const userNames = userRecipes.map(r => r.name.toLowerCase());

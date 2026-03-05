@@ -27,6 +27,18 @@ const api = axios.create({
   withCredentials: true, // Send cookies with requests for authentication
 });
 
+// CSRF token for state-changing requests (double-submit cookie pattern)
+let csrfTokenPromise = null;
+async function ensureCsrfToken() {
+  if (csrfTokenPromise) return csrfTokenPromise;
+  csrfTokenPromise = api.get('/csrf-token').then((res) => {
+    const token = res.data?.csrfToken ?? '';
+    return token;
+  });
+  const token = await csrfTokenPromise;
+  return token;
+}
+
 /**
  * Lightweight in-memory cache for GET requests so that we can keep the UI
  * responsive even when multiple components ask for the same data at once.
@@ -107,7 +119,7 @@ api.clearCache = () => {
  * Automatically sets Content-Type header for requests that send data.
  * Only applies Content-Type for POST, PUT, and PATCH requests.
  */
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
   const method = config.method ? config.method.toLowerCase() : '';
   
   // Set Content-Type for requests that send data
@@ -119,6 +131,16 @@ api.interceptors.request.use((config) => {
   } else if (config.headers) {
     // Remove Content-Type for GET requests to avoid CORS preflight
     delete config.headers['Content-Type'];
+  }
+
+  // Attach CSRF token for state-changing requests
+  if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    try {
+      const token = await ensureCsrfToken();
+      if (token) config.headers['x-csrf-token'] = token;
+    } catch (_) {
+      // Proceed without token if endpoint unavailable (e.g. backend not running)
+    }
   }
   return config;
 });

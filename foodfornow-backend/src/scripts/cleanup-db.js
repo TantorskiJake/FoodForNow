@@ -16,7 +16,11 @@ const MealPlan = require('../models/mealPlan');
  * WARNING: This will permanently delete all user data!
  * Only use this script in development environments.
  * 
- * Usage: node src/scripts/cleanup-db.js
+ * Required environment variables:
+ *   MONGO_URI - MongoDB connection string (e.g. mongodb://localhost:27017/foodfornow)
+ *   SYSTEM_USER_PASSWORD - Password for the system user (created if missing)
+ * 
+ * Usage: MONGO_URI=... SYSTEM_USER_PASSWORD=... node src/scripts/cleanup-db.js
  */
 
 /**
@@ -29,16 +33,20 @@ const MealPlan = require('../models/mealPlan');
  */
 async function cleanupDatabase() {
   try {
-    // Connect to local MongoDB instance
-    await mongoose.connect('mongodb://localhost:27017/foodfornow');
+    // Connect using MONGO_URI from environment (no hardcoded connection string)
+    const mongoUri = process.env.MONGO_URI;
+    if (!mongoUri || typeof mongoUri !== 'string' || !mongoUri.trim()) {
+      throw new Error('MONGO_URI environment variable is required. Set it in .env or when running the script.');
+    }
+    await mongoose.connect(mongoUri.trim());
     console.log('Connected to MongoDB');
 
-    // Find or create the system user (password from env; required in production)
+    // Find or create the system user (password from env; required)
     const systemPassword = process.env.SYSTEM_USER_PASSWORD;
-    if (process.env.NODE_ENV === 'production' && !systemPassword) {
-      throw new Error('SYSTEM_USER_PASSWORD is required in production');
+    if (!systemPassword || typeof systemPassword !== 'string' || !systemPassword.trim()) {
+      throw new Error('SYSTEM_USER_PASSWORD environment variable is required. Set it in .env or when running the script.');
     }
-    const passwordToUse = systemPassword || 'SystemUser123!';
+    const passwordToUse = systemPassword.trim();
     let systemUser = await User.findOne({ email: 'system@foodfornow.com' });
     if (!systemUser) {
       console.log('System user not found, creating...');

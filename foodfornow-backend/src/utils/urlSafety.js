@@ -257,7 +257,7 @@ async function resolveHostAddresses(hostname) {
 async function isUrlAllowedForFetch(urlString) {
   try {
     const url = new URL(urlString);
-    if (!['http:', 'https:'].includes(url.protocol)) {
+    if (url.protocol !== 'https:') {
       return false;
     }
     const hostname = url.hostname;
@@ -276,12 +276,13 @@ async function isUrlAllowedForFetch(urlString) {
 
 /**
  * Returns a normalized URL string only if it is allowed for fetch (SSRF-safe).
+ * Only https: is allowed; internal/private IPs and localhost are blocked.
  * Returns the parsed URL's href so the value passed to axios/fetch is not raw request input.
  */
 async function getAllowedUrlForFetch(urlString) {
   try {
     const url = new URL(urlString);
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    if (url.protocol !== 'https:') return null;
     const hostname = url.hostname;
     if (!hostname || isHostnameBlocked(hostname)) return null;
     const addresses = await resolveHostAddresses(hostname);
