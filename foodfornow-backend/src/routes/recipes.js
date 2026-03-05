@@ -4,7 +4,7 @@ const Recipe = require('../models/recipe');
 const Ingredient = require('../models/ingredient');
 const { parseRecipeFromUrl, parseRecipeFromText, buildRawRecipeFormat } = require('../services/recipeParserService');
 const { resolveRecipeIngredient } = require('../services/ingredientResolutionService');
-const { isUrlAllowedForFetch } = require('../utils/urlSafety');
+const { getAllowedUrlForFetch } = require('../utils/urlSafety');
 
 const router = express.Router();
 
@@ -13,8 +13,9 @@ const VALID_UNITS = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'pi
 // Get all recipes for user
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const search = req.query && typeof req.query.search === 'string' ? req.query.search : '';
-    
+    const rawQuery = req.query != null && typeof req.query === 'object' ? req.query : {};
+    const search = typeof rawQuery.search === 'string' ? rawQuery.search : '';
+
     let query = { createdBy: req.userId };
     
     if (search) {
@@ -46,11 +47,12 @@ router.post('/parse-url', authMiddleware, async (req, res) => {
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
       return res.status(400).json({ error: 'Please provide a valid URL starting with http:// or https://' });
     }
-    if (!(await isUrlAllowedForFetch(trimmed))) {
+    const urlToFetch = await getAllowedUrlForFetch(trimmed);
+    if (!urlToFetch) {
       return res.status(400).json({ error: 'This URL is not allowed for recipe import.' });
     }
 
-    const parsed = await parseRecipeFromUrl(trimmed);
+    const parsed = await parseRecipeFromUrl(urlToFetch);
     const recipeData = buildRawRecipeFormat(parsed, VALID_UNITS);
     res.json(recipeData);
   } catch (err) {

@@ -274,6 +274,25 @@ async function isUrlAllowedForFetch(urlString) {
   }
 }
 
+/**
+ * Returns a normalized URL string only if it is allowed for fetch (SSRF-safe).
+ * Returns the parsed URL's href so the value passed to axios/fetch is not raw request input.
+ */
+async function getAllowedUrlForFetch(urlString) {
+  try {
+    const url = new URL(urlString);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    const hostname = url.hostname;
+    if (!hostname || isHostnameBlocked(hostname)) return null;
+    const addresses = await resolveHostAddresses(hostname);
+    if (!addresses.length) return null;
+    if (!addresses.every((address) => !isIpBlocked(address))) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 async function assertUrlAllowedForFetch(urlString) {
   const allowed = await isUrlAllowedForFetch(urlString);
   if (!allowed) {
@@ -283,5 +302,6 @@ async function assertUrlAllowedForFetch(urlString) {
 
 module.exports = {
   assertUrlAllowedForFetch,
+  getAllowedUrlForFetch,
   isUrlAllowedForFetch,
 };
