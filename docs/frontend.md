@@ -538,12 +538,14 @@ Shopping list management page.
 - Full CRUD with inline checkboxes and quantity/unit display
 - Auto Update action pulls missing meal-plan ingredients; Add Item dialog supports manual additions
 - Clear menu differentiates “Clear Completed” vs “Clear All”
-- Barcode scanner integration mirrors pantry behavior, auto-creating ingredients when needed
+- Barcode scanner integration mirrors pantry behavior and opens a "Product not found" fallback dialog when lookup misses
 - Empty state CTA cards for first-time use
+- Group cards aggregate duplicate ingredients and show converted totals via `formatGroupedTotal`
 
 **State Management:**
 - Maintains filters, sort order, search term, barcode scanner visibility, and add dialog state
-- Calls `/shopping-list` APIs and surfaces achievements returned from server
+- Calls `/shopping-list` APIs and surfaces achievements returned from server (`response.data.achievements`)
+- Uses `api.cachedGet('/shopping-list')` and invalidates cache after write operations
 
 ### Scan (`src/pages/Scan.jsx`)
 
@@ -566,9 +568,9 @@ Ingredient management page.
 **Features:**
 - Ingredient listing
 - Search and filter
-- Category management
-- Default unit settings
-- Pagination
+- Category management and inline editing
+- Similar-name conflict handling (`409` + `existingIngredient`) with "Use existing" / "Add anyway" dialog
+- Barcode scanner fallback that can create placeholder names such as `Product (barcode: ...)`
 
 ### Achievements (`src/pages/Achievements.jsx`)
 
@@ -603,14 +605,14 @@ Centralized API communication layer.
 - Request/response interceptors
 - Authentication token handling
 - Error handling
-- Base URL configuration
+- In-memory GET caching (`cachedGet`, `prefetch`, `invalidateCache`, `clearCache`)
+- Base URL configuration with same-origin fallback
 
 **Configuration:**
 ```jsx
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   withCredentials: true,
-  timeout: 10000,
 });
 ```
 
@@ -673,6 +675,21 @@ Helper functions shared by Pantry and Shopping List flows.
 **Usage Considerations:**
 - Throwing errors are surfaced to the UI; callers fall back to manual ingredient selection when lookup fails
 - Depends on the backend proxy so no API keys are needed client-side
+
+### API Error Utility (`src/utils/apiError.js`)
+
+Normalizes backend error payload differences.
+
+**Exports:**
+- `getApiErrorMessage(error, fallback?)`
+
+**Behavior:**
+- Returns `error.response.data.error` when available
+- Falls back to `error.response.data.message`
+- Falls back to `error.message`
+- Finally uses the provided fallback (default: `"Request failed"`)
+
+This is used heavily in `Ingredients.jsx` and `ShoppingList.jsx` because some backend routes emit `error`, while others emit `message` (or both).
 
 ## Utilities
 
@@ -866,23 +883,15 @@ class ErrorBoundary extends React.Component {
 
 ### API Error Handling
 
-Consistent error handling for API calls:
+Prefer using `getApiErrorMessage` for user-facing toasts:
 
 ```jsx
+import { getApiErrorMessage } from '../utils/apiError';
+
 try {
-  const response = await api.get('/endpoint');
-  return response.data;
+  await api.post('/ingredients', payload);
 } catch (error) {
-  if (error.response?.status === 401) {
-    // Handle authentication error
-    logout();
-  } else if (error.response?.status === 404) {
-    // Handle not found
-    showError('Resource not found');
-  } else {
-    // Handle general error
-    showError('Something went wrong');
-  }
+  toast.error(getApiErrorMessage(error, 'Failed to save ingredient.'));
 }
 ```
 
