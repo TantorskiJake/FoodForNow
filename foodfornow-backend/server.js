@@ -110,8 +110,17 @@ app.get('/api/csrf-token', (req, res) => {
   res.json({ csrfToken: '' });
 });
 
+// In development, cross-origin requests (e.g. VITE_API_URL=http://localhost:3001/api) don't send
+// sameSite=lax cookies, so CSRF validation would always fail. Allow requests from allowed origins.
+function csrfProtection(req, res, next) {
+  if (isDev && req.get('origin') && allowedOrigins.includes(req.get('origin'))) {
+    return next();
+  }
+  return doubleCsrfProtection(req, res, next);
+}
+
 // Protect state-changing /api routes (GET/HEAD/OPTIONS are ignored by default)
-app.use('/api', doubleCsrfProtection);
+app.use('/api', csrfProtection);
 
 // Rate limit auth routes to mitigate brute-force (e.g. login)
 const rateLimit = require('express-rate-limit');
