@@ -25,13 +25,14 @@ JWT tokens are automatically handled via HTTP-only cookies. The token contains:
 
 ### Error Responses
 
-All endpoints return consistent error responses:
+Most route-level errors now use a shared helper (`errorPayload`) that returns both
+`error` and `message` keys with the same value. Some older routes still return only
+an `error` key, so frontend callers should read `error` first, then fall back to `message`.
 
 ```json
 {
-  "success": false,
-  "message": "Error description",
-  "error": "Detailed error information (development only)"
+  "error": "Error description",
+  "message": "Error description"
 }
 ```
 
@@ -942,34 +943,27 @@ Add multiple items to pantry from shopping list.
 
 ### GET `/api/shopping-list`
 
-Get the user's shopping list.
-
-**Query Parameters:**
-- `completed` (boolean): Filter by completion status
-- `priority` (string): Filter by priority (low, medium, high)
-- `category` (string): Filter by category
+Get the authenticated user's shopping list. Results are sorted by ingredient category,
+then ingredient name.
 
 **Success Response (200):**
 ```json
-{
-  "success": true,
-  "shoppingList": [
-    {
-      "id": "507f1f77bcf86cd799439011",
-      "ingredient": {
-        "id": "507f1f77bcf86cd799439012",
-        "name": "Milk",
-        "category": "dairy"
-      },
-      "quantity": 1,
-      "unit": "l",
-      "isCompleted": false,
-      "priority": "high",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "updatedAt": "2024-01-01T00:00:00.000Z"
-    }
-  ]
-}
+[
+  {
+    "_id": "507f1f77bcf86cd799439011",
+    "ingredient": {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "Milk",
+      "category": "Dairy"
+    },
+    "recipe": "507f1f77bcf86cd799439099",
+    "quantity": 1,
+    "unit": "l",
+    "completed": false,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+]
 ```
 
 ---
@@ -983,68 +977,102 @@ Add an item to the shopping list.
 {
   "ingredient": "507f1f77bcf86cd799439012",
   "quantity": 1,
-  "unit": "l",
-  "priority": "high"
+  "unit": "l"
 }
 ```
 
 **Validation Rules:**
 - `ingredient`: Required, valid ingredient ID
 - `quantity`: Required, positive number
-- `unit`: Required, valid unit
-- `priority`: Optional, enum: ['low', 'medium', 'high']
+- `unit`: Required, enum: `g|kg|oz|lb|ml|l|cup|tbsp|tsp|piece|pinch|box`
 
-**Success Response (201):**
+**Success Response (201) - normal:**
 ```json
 {
-  "success": true,
-  "message": "Item added to shopping list successfully",
-  "shoppingListItem": {
-    "id": "507f1f77bcf86cd799439011",
+  "_id": "507f1f77bcf86cd799439011",
+  "ingredient": {
+    "_id": "507f1f77bcf86cd799439012",
+    "name": "Milk",
+    "category": "Dairy"
+  },
+  "quantity": 1,
+  "unit": "l",
+  "completed": false,
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+**Success Response (201) - when achievements unlock:**
+```json
+{
+  "item": {
+    "_id": "507f1f77bcf86cd799439011",
     "ingredient": {...},
     "quantity": 1,
     "unit": "l",
-    "isCompleted": false,
-    "priority": "high",
+    "completed": false,
     "createdAt": "2024-01-01T00:00:00.000Z",
     "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
+  },
+  "achievements": [
+    { "name": "First Shop", "description": "Added your first shopping item", "icon": "..." }
+  ]
+}
+```
+
+**Error Responses:**
+- `400`: Missing required fields, invalid unit, or invalid ingredient ID
+- `500`: Failed to add item
+
+---
+
+### PATCH `/api/shopping-list/:id`
+
+Update fields of a shopping list item.
+
+**Request Body:** Any mutable item fields (`completed`, `quantity`, `unit`, etc.).
+
+**Success Response (200):**
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "completed": true
+}
+```
+
+**Alternate Success Response (200) with achievements:**
+```json
+{
+  "item": { "_id": "507f1f77bcf86cd799439011", "completed": true },
+  "achievements": [{ "name": "...", "description": "...", "icon": "..." }]
 }
 ```
 
 ---
 
-### PUT `/api/shopping-list/:id`
+### PUT `/api/shopping-list/:id/toggle`
 
-Update a shopping list item.
-
-**Request Body:** (Same as POST, all fields optional)
+Toggle an item's `completed` flag.
 
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Shopping list item updated successfully",
-  "shoppingListItem": {...}
+  "_id": "507f1f77bcf86cd799439011",
+  "completed": true,
+  "updatedAt": "2024-01-01T00:00:00.000Z"
 }
 ```
 
----
-
-### PATCH `/api/shopping-list/:id/toggle`
-
-Toggle completion status of shopping list item.
-
-**Success Response (200):**
+**Alternate Success Response (200) with achievements:**
 ```json
 {
-  "success": true,
-  "message": "Item completion status updated",
-  "shoppingListItem": {
-    "id": "507f1f77bcf86cd799439011",
-    "isCompleted": true,
+  "item": {
+    "_id": "507f1f77bcf86cd799439011",
+    "completed": true,
     "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
+  },
+  "achievements": [{ "name": "...", "description": "...", "icon": "..." }]
 }
 ```
 
@@ -1057,8 +1085,7 @@ Remove an item from the shopping list.
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Item removed from shopping list successfully"
+  "message": "Item removed from shopping list"
 }
 ```
 
@@ -1068,37 +1095,64 @@ Remove an item from the shopping list.
 
 Automatically update shopping list based on meal plan.
 
-**Request Body:**
+No request body required.
+
+Build shopping list items from uncooked meal plans by:
+1. expanding recipe ingredients,
+2. skipping always-available staples,
+3. converting pantry quantities to recipe units,
+4. replacing the user's existing shopping list with remaining needs.
+
+**Success Response (200) - normal:**
+```json
+[
+  {
+    "_id": "507f1f77bcf86cd799439011",
+    "ingredient": { "_id": "507f1f77bcf86cd799439012", "name": "Milk", "category": "Dairy" },
+    "quantity": 1,
+    "unit": "l",
+    "completed": false,
+    "pantryQuantity": 0.25
+  }
+]
+```
+
+**Success Response (200) - with achievements:**
 ```json
 {
-  "startDate": "2024-01-15",
-  "endDate": "2024-01-21",
-  "clearExisting": false
+  "shoppingList": [...],
+  "achievements": [{ "name": "...", "description": "...", "icon": "..." }]
 }
 ```
 
-**Success Response (200):**
-```json
-{
-  "success": true,
-  "message": "Shopping list updated from meal plan",
-  "addedItems": 15,
-  "updatedItems": 3
-}
-```
+If there are no uncooked meal plans, the endpoint returns `[]`.
 
 ---
 
-### POST `/api/shopping-list/clear-completed`
+### DELETE `/api/shopping-list/clear-completed`
 
 Remove all completed items from shopping list.
 
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Completed items cleared successfully",
-  "removedItems": 5
+  "message": "Completed items cleared"
+}
+```
+
+If shopping-list achievements are unlocked while clearing, the response includes
+an `achievements` array alongside the message.
+
+---
+
+### DELETE `/api/shopping-list`
+
+Clear all shopping list items.
+
+**Success Response (200):**
+```json
+{
+  "message": "Shopping list cleared successfully"
 }
 ```
 
@@ -1108,73 +1162,120 @@ Remove all completed items from shopping list.
 
 ### GET `/api/ingredients`
 
-Get all ingredients.
+Get the authenticated user's ingredients.
 
 **Query Parameters:**
 - `search` (string): Search by name
-- `category` (string): Filter by category
-- `limit` (number): Number of ingredients to return
-- `page` (number): Page number for pagination
 
 **Success Response (200):**
 ```json
+[
+  {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "Tomatoes",
+    "category": "Produce",
+    "normalizedName": "tomatoes",
+    "description": "Optional note",
+    "user": "507f1f77bcf86cd799439010",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+]
+```
+
+---
+
+### GET `/api/ingredients/shared`
+
+Get ingredients created by other users, excluding names the current user already has
+(case-insensitive). Supports optional `search` query.
+
+**Success Response (200):** Array of ingredient objects (deduplicated by name).
+
+---
+
+### POST `/api/ingredients`
+
+Create a new ingredient for the authenticated user.
+
+**Request Body:**
+```json
 {
-  "success": true,
-  "ingredients": [
-    {
-      "id": "507f1f77bcf86cd799439011",
-      "name": "Tomatoes",
-      "category": "vegetables",
-      "defaultUnit": "kg",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "updatedAt": "2024-01-01T00:00:00.000Z"
-    }
-  ],
-  "pagination": {
-    "currentPage": 1,
-    "totalPages": 10,
-    "totalIngredients": 200,
-    "hasNext": true,
-    "hasPrev": false
+  "name": "New Ingredient",
+  "category": "Produce",
+  "description": "Optional",
+  "forceCreate": false
+}
+```
+
+**Validation Rules:**
+- `name`: Required
+- `category`: Required, valid category
+- `forceCreate`: Optional boolean, skip similar-name conflict check when `true`
+
+**Success Response (201):**
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "name": "New Ingredient",
+  "category": "Produce",
+  "normalizedName": "new ingredient",
+  "description": "Optional"
+}
+```
+
+**Conflict Response (409) when similar ingredient is found and `forceCreate` is not set:**
+```json
+{
+  "error": "An ingredient with a similar name already exists",
+  "message": "An ingredient with a similar name already exists",
+  "existingIngredient": {
+    "_id": "507f1f77bcf86cd799439099",
+    "name": "Tomato",
+    "category": "Produce"
   }
 }
 ```
 
 ---
 
-### POST `/api/ingredients`
+### POST `/api/ingredients/:id/duplicate`
 
-Create a new ingredient.
+Duplicate a shared ingredient into the current user's collection.
 
-**Request Body:**
+**Success Response (201):** The created ingredient document.
+
+**Error Responses:**
+- `404`: Ingredient not found
+- `409`: You already have this ingredient
+
+---
+
+### PUT `/api/ingredients/:id`
+
+Update one of the current user's ingredients.
+
+**Success Response (200):** Updated ingredient document.
+
+**Error Responses:**
+- `404`: Ingredient not found
+
+---
+
+### DELETE `/api/ingredients/:id`
+
+Delete one of the current user's ingredients.
+
+**Success Response (200):**
 ```json
 {
-  "name": "New Ingredient",
-  "category": "vegetables",
-  "defaultUnit": "kg"
+  "message": "Ingredient deleted"
 }
 ```
 
-**Validation Rules:**
-- `name`: Required, 1-50 characters, unique
-- `category`: Required, valid category
-- `defaultUnit`: Required, valid unit
-
-**Success Response (201):**
-```json
-{
-  "success": true,
-  "message": "Ingredient created successfully",
-  "ingredient": {
-    "id": "507f1f77bcf86cd799439011",
-    "name": "New Ingredient",
-    "category": "vegetables",
-    "defaultUnit": "kg",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
-}
-```
+**Error Responses:**
+- `400`: Ingredient is still referenced by one of the user's recipes
+- `404`: Ingredient not found
 
 ---
 
@@ -1331,18 +1432,21 @@ Get users ranked by achievement completion.
 
 ## Rate Limiting
 
-The API implements rate limiting to prevent abuse:
+The backend currently rate-limits authentication routes only:
 
-- **Authentication endpoints**: 5 requests per minute
-- **Other endpoints**: 100 requests per minute
-- **Bulk operations**: 10 requests per minute
+- Scope: `/api/auth/*`
+- Window: `15 minutes`
+- Max requests: `AUTH_RATE_LIMIT_MAX` env var, default `50` in production and `500` outside production
+- Message payload: `{ "error": "Too many attempts, please try again later." }`
 
-Rate limit headers are included in responses:
+Rate limit headers are included (`standardHeaders: true`), for example:
 ```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1640995200
+RateLimit-Limit: 50
+RateLimit-Remaining: 49
+RateLimit-Reset: 1640995200
 ```
+
+`server.js` also enables `trust proxy` so rate limits work correctly behind Render/reverse proxies.
 
 ## Pagination
 
