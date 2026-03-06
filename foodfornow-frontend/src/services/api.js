@@ -13,7 +13,7 @@ import axios from 'axios';
 // variable can be provided at build time. Fallback to `/api` so the
 // frontend can be served from the same host as the backend when behind a
 // reverse proxy.
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env?.VITE_API_URL || '/api';
 
 /**
  * Axios Instance Configuration
@@ -28,15 +28,29 @@ const api = axios.create({
 });
 
 // CSRF token for state-changing requests (double-submit cookie pattern)
+let csrfToken = null;
 let csrfTokenPromise = null;
 async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken;
   if (csrfTokenPromise) return csrfTokenPromise;
-  csrfTokenPromise = api.get('/csrf-token').then((res) => {
-    const token = res.data?.csrfToken ?? '';
-    return token;
-  });
-  const token = await csrfTokenPromise;
-  return token;
+  csrfTokenPromise = api
+    .get('/csrf-token')
+    .then((res) => {
+      csrfToken = res.data?.csrfToken ?? '';
+      return csrfToken;
+    })
+    .catch((error) => {
+      // Keep transient failures retryable; otherwise a rejected cached promise
+      // would make every future state-changing request skip CSRF forever.
+      csrfTokenPromise = null;
+      throw error;
+    });
+  return csrfTokenPromise;
+}
+
+function resetCsrfTokenState() {
+  csrfToken = null;
+  csrfTokenPromise = null;
 }
 
 /**
@@ -230,3 +244,7 @@ api.interceptors.response.use(
 
 // Export the configured axios instance
 export default api;
+export const __internal = {
+  ensureCsrfToken,
+  resetCsrfTokenState,
+};
