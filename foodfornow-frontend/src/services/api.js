@@ -171,13 +171,27 @@ let isRefreshing = false;
 let refreshSubscribers = [];
 
 /**
- * Execute Queued Requests
- * 
- * Called after successful token refresh to retry all queued requests.
+ * Execute queued requests after successful token refresh.
  */
 function onRefreshed() {
-  refreshSubscribers.forEach((callback) => callback());
+  refreshSubscribers.forEach(({ config, resolve, reject }) => {
+    config._retry = true;
+    api(config).then(resolve).catch(reject);
+  });
   refreshSubscribers = [];
+}
+
+/**
+ * Reject queued requests when token refresh fails.
+ */
+function onRefreshFailed(error) {
+  refreshSubscribers.forEach(({ reject }) => reject(error));
+  refreshSubscribers = [];
+}
+
+function resetRefreshState() {
+  isRefreshing = false;
+  onRefreshFailed(new Error('refresh state reset'));
 }
 
 /**
@@ -194,16 +208,21 @@ api.interceptors.response.use(
   // Error handler - handle authentication errors
   async (error) => {
     const { response, config } = error;
+    const url = config?.url || '';
+    const isRefreshRequest = url === '/auth/token' || url.endsWith('/auth/token');
     
+    // Never attempt to refresh in response to the refresh endpoint itself.
+    // Otherwise a 401 from /auth/token can deadlock the interceptor queue.
+    if (isRefreshRequest || config?._skipAuthRefresh) {
+      return Promise.reject(error);
+    }
+
     // Check if this is a 401 error and we haven't already retried
     if (response && response.status === 401 && !config._retry) {
       if (isRefreshing) {
         // If already refreshing, queue this request
         return new Promise((resolve, reject) => {
-          refreshSubscribers.push(() => {
-            config._retry = true;
-            api(config).then(resolve).catch(reject);
-          });
+          refreshSubscribers.push({ config, resolve, reject });
         });
       }
       
@@ -213,7 +232,7 @@ api.interceptors.response.use(
       
       try {
         // Attempt to refresh the access token
-        await api.post('/auth/token');
+        await api.post('/auth/token', undefined, { _skipAuthRefresh: true });
         isRefreshing = false;
         onRefreshed(); // Retry all queued requests
         
@@ -222,7 +241,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Token refresh failed - clear state and redirect to login
         isRefreshing = false;
-        refreshSubscribers = [];
+        onRefreshFailed(refreshError);
         
         // Only redirect if not already on a public auth page (avoids reload loop when
         // initial /auth/me returns 401 on login page)
@@ -247,4 +266,5 @@ export default api;
 export const __internal = {
   ensureCsrfToken,
   resetCsrfTokenState,
+  resetRefreshState,
 };
