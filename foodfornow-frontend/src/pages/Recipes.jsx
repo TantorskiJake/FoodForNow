@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Container,
   Grid,
@@ -18,6 +18,7 @@ import {
   MenuList,
   Select,
   FormControl,
+  FormHelperText,
   InputLabel,
   Paper,
   LinearProgress,
@@ -55,6 +56,15 @@ const Recipes = () => {
   const [recipes, setRecipes] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({
+    name: '',
+    description: false,
+    prepTime: '',
+    cookTime: '',
+    servings: '',
+    instructions: '',
+    ingredients: '',
+  });
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [formData, setFormData] = useState({
@@ -121,6 +131,7 @@ const Recipes = () => {
   const { showAchievements } = useAchievements();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const editFromUrlOpenedRef = useRef(false);
   const { startTask, markHydrated, showBusyBar, showSkeleton, appHasHydratedOnce } = useProgressiveLoader();
 
   // Open create-recipe dialog when arriving from dashboard (plus button) — same as clicking "Add Recipe"
@@ -144,6 +155,71 @@ const Recipes = () => {
     };
     openCreate();
   }, [searchParams, setSearchParams]);
+
+  // Open edit dialog when arriving from recipe detail (e.g. Dashboard → view recipe → Edit) — same form as Edit on recipe card
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId) return;
+    if (editFromUrlOpenedRef.current) return; // already opening or opened from this URL
+    editFromUrlOpenedRef.current = true;
+    setTab('mine'); // Ensure we're on My Recipes so the card is in the list
+    const openEdit = async () => {
+      try {
+        await fetchIngredients();
+        const response = await api.get(`/recipes/${editId}`);
+        const recipeData = response.data;
+        const mappedIngredients = recipeData.ingredients?.length
+          ? recipeData.ingredients.map((ing) => {
+              const id = ing.ingredient?._id ?? ing.ingredient;
+              const name = ing.name || ing.ingredient?.name;
+              if (id) {
+                return { ingredient: id, quantity: String(ing.quantity ?? ''), unit: ing.unit || 'piece' };
+              }
+              return {
+                ingredient: '',
+                ingredientName: name || '',
+                quantity: String(ing.quantity ?? ''),
+                unit: ing.unit || 'piece',
+                category: ing.category || 'Other',
+              };
+            })
+          : [{ ingredient: '', quantity: '', unit: '' }];
+        setFormData({
+          name: recipeData.name,
+          description: recipeData.description || recipeData.name,
+          ingredients: mappedIngredients,
+          instructions: recipeData.instructions?.length ? recipeData.instructions : [''],
+          prepTime: recipeData.prepTime ?? '',
+          cookTime: recipeData.cookTime ?? '',
+          servings: recipeData.servings ?? '',
+          tags: Array.isArray(recipeData.tags) ? recipeData.tags.join(', ') : '',
+        });
+        setEditingRecipe(recipeData);
+        setOpenDialog(true);
+        // Clear ?edit= from URL now that the dialog is open
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('edit');
+          return next;
+        }, { replace: true });
+      } catch (err) {
+        console.error('Error loading recipe for edit:', err);
+        setError(err.response?.data?.error || 'Failed to load recipe.');
+        editFromUrlOpenedRef.current = false;
+      }
+    };
+    openEdit();
+  }, [searchParams, setSearchParams]);
+
+  // When edit dialog is open, scroll the recipe card into view so it's visible behind the dialog
+  useEffect(() => {
+    if (!openDialog || !editingRecipe?._id) return;
+    const id = String(editingRecipe._id);
+    const timer = setTimeout(() => {
+      document.querySelector(`[data-recipe-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [openDialog, editingRecipe]);
 
   const runTask = useCallback(
     async (task, options = {}) => {
@@ -545,7 +621,12 @@ const Recipes = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingRecipe(null);
+    setError('');
+    editFromUrlOpenedRef.current = false;
+    setFieldErrors({ name: '', description: false, prepTime: '', cookTime: '', servings: '', instructions: '', ingredients: '' });
   };
+
+  const clearFieldErrors = () => setFieldErrors({ name: '', description: false, prepTime: '', cookTime: '', servings: '', instructions: '', ingredients: '' });
 
   const handleAddIngredient = () => {
     setFormData({
@@ -655,36 +736,32 @@ const Recipes = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate required fields
-    if (!formData.name?.trim()) {
-      setError('Recipe name is required');
-      return;
-    }
-    if (!formData.description?.trim()) {
-      setError('Recipe description is required');
-      return;
-    }
-    if (!formData.prepTime || formData.prepTime <= 0) {
-      setError('Prep time must be greater than 0');
-      return;
-    }
-    if (!formData.cookTime || formData.cookTime <= 0) {
-      setError('Cook time must be greater than 0');
-      return;
-    }
-    if (!formData.servings || formData.servings <= 0) {
-      setError('Servings must be greater than 0');
-      return;
-    }
-    if (!formData.instructions || formData.instructions.length === 0 || !formData.instructions[0]?.trim()) {
-      setError('At least one instruction is required');
-      return;
-    }
+    // Validate required fields and set inline errors
+    clearFieldErrors();
+    const nameErr = !formData.name?.trim() ? 'Please fill out this field!' : '';
+    const descriptionErr = !formData.description?.trim();
+    const prepErr = !formData.prepTime || Number(formData.prepTime) <= 0 ? 'Must be greater than 0' : '';
+    const cookErr = !formData.cookTime || Number(formData.cookTime) <= 0 ? 'Must be greater than 0' : '';
+    const servingsErr = !formData.servings || Number(formData.servings) <= 0 ? 'Must be greater than 0' : '';
+    const instructionsErr = !formData.instructions?.length || !formData.instructions[0]?.trim() ? 'At least one instruction is required' : '';
     const hasAtLeastOneIngredient = formData.ingredients?.some(
       (ing) => (ing.ingredient || (ing.ingredientName && ing.ingredientName.trim())) && ing.quantity && ing.unit
     );
-    if (!formData.ingredients || formData.ingredients.length === 0 || !hasAtLeastOneIngredient) {
-      setError('At least one ingredient is required');
+    const ingredientsErr = !formData.ingredients?.length || !hasAtLeastOneIngredient
+      ? 'Create that ingredient or choose from your collection.'
+      : '';
+
+    setFieldErrors({
+      name: nameErr,
+      description: descriptionErr,
+      prepTime: prepErr,
+      cookTime: cookErr,
+      servings: servingsErr,
+      instructions: instructionsErr,
+      ingredients: ingredientsErr,
+    });
+    if (nameErr || descriptionErr || prepErr || cookErr || servingsErr || instructionsErr || ingredientsErr) {
+      setError('');
       return;
     }
 
@@ -942,6 +1019,7 @@ const Recipes = () => {
               {filteredRecipes.map((recipe) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
                   <Paper
+                    data-recipe-id={recipe._id}
                     elevation={0}
                     sx={{
                       height: '100%',
@@ -1296,24 +1374,40 @@ const Recipes = () => {
         <DialogTitle>{editingRecipe ? 'Edit Recipe' : 'Add Recipe'}</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent sx={isMobile ? { maxHeight: '80vh', overflowY: 'auto' } : {}}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                {error}
+              </Alert>
+            )}
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
                   label="Name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, name: '' }));
+                  }}
                   fullWidth
                   required
+                  error={!!fieldErrors.name}
+                  helperText={fieldErrors.name}
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   label="Description"
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, description: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, description: false }));
+                  }}
                   fullWidth
                   multiline
                   rows={2}
+                  required
+                  error={fieldErrors.description}
+                  helperText={fieldErrors.description ? 'Please fill out this field!' : ''}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -1355,6 +1449,7 @@ const Recipes = () => {
                         return [...filtered, createOption];
                       }}
                       onChange={(e, value) => {
+                        setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
                         if (value?.isCreate) {
                           handleOpenCreateIngredient(index, value.prefillName || '');
                         } else if (typeof value === 'string') {
@@ -1376,6 +1471,8 @@ const Recipes = () => {
                           {...params}
                           label="Ingredient"
                           required={!ingredient.ingredient && !(ingredient.ingredientName && ingredient.ingredientName.trim())}
+                          error={index === 0 && !!fieldErrors.ingredients}
+                          helperText={index === 0 ? fieldErrors.ingredients : ''}
                         />
                       )}
                     />
@@ -1383,6 +1480,7 @@ const Recipes = () => {
                       label="Quantity"
                       value={ingredient.quantity}
                       onChange={(e) => {
+                        setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
                         const newIngredients = [...formData.ingredients];
                         const val = e?.target?.value;
                         const el = getSafeElement(newIngredients, index);
@@ -1397,6 +1495,7 @@ const Recipes = () => {
                       <Select
                         value={ingredient.unit}
                         onChange={(e) => {
+                          setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
                           const newIngredients = [...formData.ingredients];
                           const v = e?.target?.value;
                           const el = getSafeElement(newIngredients, index);
@@ -1424,7 +1523,10 @@ const Recipes = () => {
                 })}
                 <Button
                   startIcon={<AddIcon />}
-                  onClick={handleAddIngredient}
+                  onClick={() => {
+                    handleAddIngredient();
+                    setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
+                  }}
                   sx={{ mt: 1 }}
                 >
                   Add Ingredient
@@ -1434,6 +1536,11 @@ const Recipes = () => {
                 <Typography variant="subtitle1" gutterBottom>
                   Instructions
                 </Typography>
+                {fieldErrors.instructions && (
+                  <FormHelperText error sx={{ mt: -1, mb: 1 }}>
+                    {fieldErrors.instructions}
+                  </FormHelperText>
+                )}
                 {formData.instructions.map((instruction, index) => (
                   <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
                     <TextField
@@ -1443,6 +1550,7 @@ const Recipes = () => {
                         const newInstructions = [...formData.instructions];
                         newInstructions[index] = e.target.value;
                         setFormData({ ...formData, instructions: newInstructions });
+                        setFieldErrors((prev) => ({ ...prev, instructions: '' }));
                       }}
                       fullWidth
                       required
@@ -1472,7 +1580,10 @@ const Recipes = () => {
                 ))}
                 <Button
                   startIcon={<AddIcon />}
-                  onClick={handleAddInstruction}
+                  onClick={() => {
+                    handleAddInstruction();
+                    setFieldErrors((prev) => ({ ...prev, instructions: '' }));
+                  }}
                   sx={{ mt: 1 }}
                 >
                   Add Step
@@ -1483,9 +1594,14 @@ const Recipes = () => {
                   label="Prep Time (minutes)"
                   type="number"
                   value={formData.prepTime}
-                  onChange={(e) => setFormData({ ...formData, prepTime: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, prepTime: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, prepTime: '' }));
+                  }}
                   fullWidth
                   required
+                  error={!!fieldErrors.prepTime}
+                  helperText={fieldErrors.prepTime}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1493,9 +1609,14 @@ const Recipes = () => {
                   label="Cook Time (minutes)"
                   type="number"
                   value={formData.cookTime}
-                  onChange={(e) => setFormData({ ...formData, cookTime: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, cookTime: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, cookTime: '' }));
+                  }}
                   fullWidth
                   required
+                  error={!!fieldErrors.cookTime}
+                  helperText={fieldErrors.cookTime}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1503,9 +1624,14 @@ const Recipes = () => {
                   label="Servings"
                   type="number"
                   value={formData.servings}
-                  onChange={(e) => setFormData({ ...formData, servings: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, servings: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, servings: '' }));
+                  }}
                   fullWidth
                   required
+                  error={!!fieldErrors.servings}
+                  helperText={fieldErrors.servings}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>

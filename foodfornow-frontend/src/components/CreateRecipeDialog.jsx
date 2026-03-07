@@ -11,6 +11,7 @@ import {
   Typography,
   IconButton,
   FormControl,
+  FormHelperText,
   InputLabel,
   Select,
   MenuItem,
@@ -47,6 +48,15 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
   const [formData, setFormData] = useState(initialFormData);
   const [ingredients, setIngredients] = useState([]);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({
+    name: '',
+    description: false,
+    prepTime: '',
+    cookTime: '',
+    servings: '',
+    instructions: '',
+    ingredients: '',
+  });
   const [submitting, setSubmitting] = useState(false);
   const [openCreateIngredient, setOpenCreateIngredient] = useState(false);
   const [createIngredientForIndex, setCreateIngredientForIndex] = useState(null);
@@ -66,6 +76,7 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
     if (open) {
       setFormData(initialFormData);
       setError('');
+      setFieldErrors({ name: '', description: false, prepTime: '', cookTime: '', servings: '', instructions: '', ingredients: '' });
       fetchIngredients();
     }
   }, [open]);
@@ -179,35 +190,31 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name?.trim()) {
-      setError('Recipe name is required');
-      return;
-    }
-    if (!formData.description?.trim()) {
-      setError('Recipe description is required');
-      return;
-    }
-    if (!formData.prepTime || Number(formData.prepTime) <= 0) {
-      setError('Prep time must be greater than 0');
-      return;
-    }
-    if (!formData.cookTime || Number(formData.cookTime) <= 0) {
-      setError('Cook time must be greater than 0');
-      return;
-    }
-    if (!formData.servings || Number(formData.servings) <= 0) {
-      setError('Servings must be greater than 0');
-      return;
-    }
-    if (!formData.instructions?.length || !formData.instructions[0]?.trim()) {
-      setError('At least one instruction is required');
-      return;
-    }
+    setFieldErrors({ name: '', description: false, prepTime: '', cookTime: '', servings: '', instructions: '', ingredients: '' });
+    const nameErr = !formData.name?.trim() ? 'Please fill out this field!' : '';
+    const descriptionErr = !formData.description?.trim();
+    const prepErr = !formData.prepTime || Number(formData.prepTime) <= 0 ? 'Must be greater than 0' : '';
+    const cookErr = !formData.cookTime || Number(formData.cookTime) <= 0 ? 'Must be greater than 0' : '';
+    const servingsErr = !formData.servings || Number(formData.servings) <= 0 ? 'Must be greater than 0' : '';
+    const instructionsErr = !formData.instructions?.length || !formData.instructions[0]?.trim() ? 'At least one instruction is required' : '';
     const hasIngredient = formData.ingredients?.some(
       (ing) => (ing.ingredient || (ing.ingredientName && ing.ingredientName.trim())) && ing.quantity && ing.unit
     );
-    if (!formData.ingredients?.length || !hasIngredient) {
-      setError('At least one ingredient is required');
+    const ingredientsErr = !formData.ingredients?.length || !hasIngredient
+      ? 'Create that ingredient or choose from your collection.'
+      : '';
+
+    setFieldErrors({
+      name: nameErr,
+      description: descriptionErr,
+      prepTime: prepErr,
+      cookTime: cookErr,
+      servings: servingsErr,
+      instructions: instructionsErr,
+      ingredients: ingredientsErr,
+    });
+    if (nameErr || descriptionErr || prepErr || cookErr || servingsErr || instructionsErr || ingredientsErr) {
+      setError('');
       return;
     }
 
@@ -268,19 +275,30 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                 <TextField
                   label="Name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, name: '' }));
+                  }}
                   fullWidth
                   required
+                  error={!!fieldErrors.name}
+                  helperText={fieldErrors.name}
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   label="Description"
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, description: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, description: false }));
+                  }}
                   fullWidth
                   multiline
                   rows={2}
+                  required
+                  error={fieldErrors.description}
+                  helperText={fieldErrors.description ? 'Please fill out this field!' : ''}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -322,6 +340,7 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                           return [...filtered, createOption];
                         }}
                         onChange={(e, value) => {
+                          setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
                           if (value?.isCreate) {
                             handleOpenCreateIngredient(index, value.prefillName || '');
                           } else if (typeof value === 'string') {
@@ -339,13 +358,20 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                           }
                         }}
                         renderInput={(params) => (
-                          <TextField {...params} label="Ingredient" required={!ingredient.ingredient && !(ingredient.ingredientName && ingredient.ingredientName.trim())} />
+                          <TextField
+                            {...params}
+                            label="Ingredient"
+                            required={!ingredient.ingredient && !(ingredient.ingredientName && ingredient.ingredientName.trim())}
+                            error={index === 0 && !!fieldErrors.ingredients}
+                            helperText={index === 0 ? fieldErrors.ingredients : ''}
+                          />
                         )}
                       />
                       <TextField
                         label="Quantity"
                         value={ingredient.quantity}
                         onChange={(e) => {
+                          setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
                           const newIngredients = [...formData.ingredients];
                           newIngredients[index] = { ...newIngredients[index], quantity: e.target.value };
                           setFormData({ ...formData, ingredients: newIngredients });
@@ -358,6 +384,7 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                         <Select
                           value={ingredient.unit || 'piece'}
                           onChange={(e) => {
+                            setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
                             const newIngredients = [...formData.ingredients];
                             newIngredients[index] = { ...newIngredients[index], unit: e.target.value };
                             setFormData({ ...formData, ingredients: newIngredients });
@@ -376,7 +403,14 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                     </Box>
                   );
                 })}
-                <Button startIcon={<AddIcon />} onClick={handleAddIngredient} sx={{ mt: 1 }}>
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    handleAddIngredient();
+                    setFieldErrors((prev) => ({ ...prev, ingredients: '' }));
+                  }}
+                  sx={{ mt: 1 }}
+                >
                   Add ingredient
                 </Button>
               </Grid>
@@ -384,6 +418,11 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                 <Typography variant="subtitle1" gutterBottom>
                   Instructions
                 </Typography>
+                {fieldErrors.instructions && (
+                  <FormHelperText error sx={{ mt: -1, mb: 1 }}>
+                    {fieldErrors.instructions}
+                  </FormHelperText>
+                )}
                 {formData.instructions.map((instruction, index) => (
                   <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
                     <TextField
@@ -393,6 +432,7 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                         const next = [...formData.instructions];
                         next[index] = e.target.value;
                         setFormData({ ...formData, instructions: next });
+                        setFieldErrors((prev) => ({ ...prev, instructions: '' }));
                       }}
                       fullWidth
                       required
@@ -408,7 +448,14 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                     </IconButton>
                   </Box>
                 ))}
-                <Button startIcon={<AddIcon />} onClick={handleAddInstruction} sx={{ mt: 1 }}>
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    handleAddInstruction();
+                    setFieldErrors((prev) => ({ ...prev, instructions: '' }));
+                  }}
+                  sx={{ mt: 1 }}
+                >
                   Add step
                 </Button>
               </Grid>
@@ -417,10 +464,15 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                   label="Prep time (minutes)"
                   type="number"
                   value={formData.prepTime}
-                  onChange={(e) => setFormData({ ...formData, prepTime: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, prepTime: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, prepTime: '' }));
+                  }}
                   fullWidth
                   required
                   inputProps={{ min: 1 }}
+                  error={!!fieldErrors.prepTime}
+                  helperText={fieldErrors.prepTime}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -428,10 +480,15 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                   label="Cook time (minutes)"
                   type="number"
                   value={formData.cookTime}
-                  onChange={(e) => setFormData({ ...formData, cookTime: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, cookTime: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, cookTime: '' }));
+                  }}
                   fullWidth
                   required
                   inputProps={{ min: 1 }}
+                  error={!!fieldErrors.cookTime}
+                  helperText={fieldErrors.cookTime}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -439,10 +496,15 @@ export default function CreateRecipeDialog({ open, onClose, onSuccess }) {
                   label="Servings"
                   type="number"
                   value={formData.servings}
-                  onChange={(e) => setFormData({ ...formData, servings: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, servings: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, servings: '' }));
+                  }}
                   fullWidth
                   required
                   inputProps={{ min: 1 }}
+                  error={!!fieldErrors.servings}
+                  helperText={fieldErrors.servings}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
