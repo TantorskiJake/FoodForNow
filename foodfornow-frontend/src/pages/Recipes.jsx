@@ -71,6 +71,16 @@ const Recipes = () => {
   const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
   /** Safe for use as array index: integer in [0, length). Prevents prototype pollution (CWE-1321). */
   const isSafeArrayIndex = (i, length) => Number.isInteger(i) && i >= 0 && i < length;
+  /** Returns the element at valid index without using index as object key (avoids prototype pollution). */
+  const getSafeElement = (arr, index) => {
+    if (!Array.isArray(arr) || !isSafeArrayIndex(index, arr.length)) return null;
+    let i = 0;
+    for (const el of arr) {
+      if (i === index) return el;
+      i += 1;
+    }
+    return null;
+  };
   const theme = useTheme();
 
   // Inline create ingredient state
@@ -1375,9 +1385,8 @@ const Recipes = () => {
                       onChange={(e) => {
                         const newIngredients = [...formData.ingredients];
                         const val = e?.target?.value;
-                        if (isSafeArrayIndex(index, newIngredients.length)) {
-                          newIngredients[index].quantity = typeof val === 'string' ? val : String(val ?? '');
-                        }
+                        const el = getSafeElement(newIngredients, index);
+                        if (el) el.quantity = typeof val === 'string' ? val : String(val ?? '');
                         setFormData({ ...formData, ingredients: newIngredients });
                       }}
                       required
@@ -1390,9 +1399,8 @@ const Recipes = () => {
                         onChange={(e) => {
                           const newIngredients = [...formData.ingredients];
                           const v = e?.target?.value;
-                          if (isSafeArrayIndex(index, newIngredients.length)) {
-                            newIngredients[index].unit = validUnits.includes(v) ? v : (ingredient.unit || '');
-                          }
+                          const el = getSafeElement(newIngredients, index);
+                          if (el) el.unit = validUnits.includes(v) ? v : (ingredient.unit || '');
                           setFormData({ ...formData, ingredients: newIngredients });
                         }}
                         required

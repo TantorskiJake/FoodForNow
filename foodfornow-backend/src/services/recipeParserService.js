@@ -6,11 +6,29 @@
  * valid JSON-LD but fail strict schema validation.
  */
 
+const crypto = require('crypto');
 const getRecipeData = require('@dimfu/recipe-scraper').default;
 const { parseIngredient } = require('parse-ingredient');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const { getAllowedUrlForFetch } = require('../utils/urlSafety');
+
+/** Short-lived cache for validated URLs keyed by server-generated token (SSRF mitigation: fetch uses only cache lookup, not request input). */
+const validatedUrlCache = new Map();
+const VALIDATED_URL_TTL_MS = 60 * 1000;
+
+function storeValidatedUrlForFetch(url) {
+  const token = crypto.randomUUID();
+  validatedUrlCache.set(token, url);
+  setTimeout(() => validatedUrlCache.delete(token), VALIDATED_URL_TTL_MS);
+  return token;
+}
+
+function getValidatedUrlForFetch(token) {
+  const url = validatedUrlCache.get(token) || null;
+  validatedUrlCache.delete(token);
+  return url;
+}
 
 const PROXY_ENDPOINT_TEMPLATE = (process.env.RECIPE_FETCH_PROXY_URL || '').trim();
 const PROXY_REQUIRED = parseBoolean(process.env.RECIPE_FETCH_PROXY_REQUIRED);
@@ -289,14 +307,53 @@ async function fetchRecipeHtml(url) {
 }
 
 /**
- * Lenient fallback: fetch HTML and extract Recipe from JSON-LD manually.
- * Handles sites (e.g. WP Recipe Maker, Salt & Lavender) that use valid schema
- * but fail @dimfu's strict validation (e.g. different property names).
- * Uses browser-like headers and retries with alternate User-Agent on 403.
+ * Fetch HTML using an already-validated URL (no user input). Used by parseRecipeFromUrlByToken so
+ * the fetch URL comes only from cache lookup by server-generated token, not from request body.
  */
-async function parseRecipeFromUrlFallback(url) {
-  const html = await fetchRecipeHtml(url);
+async function fetchRecipeHtmlValidated(validatedUrl) {
+  if (PROXY_REQUIRED && !PROXY_ENDPOINT_TEMPLATE) {
+    throw new Error('Recipe import proxy is required but RECIPE_FETCH_PROXY_URL is not configured.');
+  }
+  const targetOrigin = new URL(validatedUrl).origin;
+  const proxyTarget = buildProxyFetchTarget(validatedUrl);
+  if (PROXY_REQUIRED && !proxyTarget.viaProxy) {
+    throw new Error('Recipe import proxy is required but the configured proxy URL is invalid.');
+  }
+  const baseHeaders = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+  };
+  const opts = { responseType: 'text', timeout: 15000 };
+  const { url: fetchUrl, headers: proxyHeaders } = proxyTarget;
+  const headerSets = [
+    { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_CHROME['User-Agent'] },
+    { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_FIREFOX['User-Agent'], 'Referer': `${targetOrigin}/` },
+  ];
+  let lastErr;
+  for (const headers of headerSets) {
+    try {
+      const { data } = await axios.get(fetchUrl, { ...opts, headers });
+      return data;
+    } catch (err) {
+      lastErr = err;
+      const is403 = err.response?.status === 403 || (err.message && err.message.includes('403'));
+      if (!is403) throw err;
+    }
+  }
+  throw lastErr;
+}
 
+/**
+ * Extract recipe data from HTML (JSON-LD). Shared by fallback and validated fallback.
+ */
+function extractRecipeFromHtml(html) {
   const $ = cheerio.load(html);
   const scripts = $('script[type="application/ld+json"]');
 
@@ -361,21 +418,30 @@ async function parseRecipeFromUrlFallback(url) {
 }
 
 /**
- * Parse recipe from URL and return data in our format
- * @param {string} url - Recipe URL (must be allowlisted by caller or will be validated here)
- * @returns {Promise<Object>} Parsed recipe data
+ * Lenient fallback: fetch HTML and extract Recipe from JSON-LD manually.
+ * Handles sites (e.g. WP Recipe Maker, Salt & Lavender) that use valid schema
+ * but fail @dimfu's strict validation (e.g. different property names).
+ * Uses browser-like headers and retries with alternate User-Agent on 403.
  */
-async function parseRecipeFromUrl(url) {
-  const allowedUrl = await getAllowedUrlForFetch(url);
-  if (!allowedUrl) {
-    throw new Error('This URL is not allowed for recipe import.');
-  }
-  let data = null;
+async function parseRecipeFromUrlFallback(url) {
+  const html = await fetchRecipeHtml(url);
+  return extractRecipeFromHtml(html);
+}
 
-  // Try fallback first: it uses browser-like headers and retries with alternate User-Agent on 403.
-  // @dimfu/recipe-scraper sends no User-Agent, so many sites (ChewOutLoud, Food Network, etc.) block it.
+/** Fallback parser using an already-validated URL (no request-derived input). */
+async function parseRecipeFromUrlFallbackValidated(validatedUrl) {
+  const html = await fetchRecipeHtmlValidated(validatedUrl);
+  return extractRecipeFromHtml(html);
+}
+
+/**
+ * Parse recipe using an already-validated URL. Used by parseRecipeFromUrlByToken so the fetch URL
+ * comes only from cache lookup (server-generated token), not from request body (SSRF-safe).
+ */
+async function parseRecipeFromUrlWithValidatedUrl(validatedUrl) {
+  let data = null;
   try {
-    data = await parseRecipeFromUrlFallback(allowedUrl);
+    data = await parseRecipeFromUrlFallbackValidated(validatedUrl);
   } catch {
     data = null;
   }
@@ -385,14 +451,14 @@ async function parseRecipeFromUrl(url) {
       throw new Error('Recipe import proxy is required; this URL could not be parsed via the proxy worker.');
     }
     try {
-      data = await getRecipeData(allowedUrl);
+      data = await getRecipeData(validatedUrl);
     } catch (err) {
       const shouldFallback =
         err.message === 'Recipe is not valid' ||
         err.response?.status === 403 ||
         (err.message && err.message.includes('status code 403'));
       if (shouldFallback) {
-        data = await parseRecipeFromUrlFallback(allowedUrl);
+        data = await parseRecipeFromUrlFallbackValidated(validatedUrl);
       }
       if (!data) throw err;
     }
@@ -416,6 +482,31 @@ async function parseRecipeFromUrl(url) {
     servings: parseServings(data.recipeYield || data.servings),
     tags: data.tags || data.keywords || [],
   };
+}
+
+/**
+ * Parse recipe by server-generated token. URL is resolved from internal cache only (no request-derived URL passed in).
+ * Call storeValidatedUrlForFetch(allowedUrl) first to get a token, then pass that token here.
+ */
+async function parseRecipeFromUrlByToken(token) {
+  const validatedUrl = getValidatedUrlForFetch(token);
+  if (!validatedUrl) {
+    throw new Error('Invalid or expired fetch token.');
+  }
+  return parseRecipeFromUrlWithValidatedUrl(validatedUrl);
+}
+
+/**
+ * Parse recipe from URL and return data in our format
+ * @param {string} url - Recipe URL (must be allowlisted by caller or will be validated here)
+ * @returns {Promise<Object>} Parsed recipe data
+ */
+async function parseRecipeFromUrl(url) {
+  const allowedUrl = await getAllowedUrlForFetch(url);
+  if (!allowedUrl) {
+    throw new Error('This URL is not allowed for recipe import.');
+  }
+  return parseRecipeFromUrlWithValidatedUrl(allowedUrl);
 }
 
 /**
@@ -860,6 +951,8 @@ function parseRecipeFromText(rawText) {
 
 module.exports = {
   parseRecipeFromUrl,
+  parseRecipeFromUrlByToken,
+  storeValidatedUrlForFetch,
   parseRecipeFromText,
   parseIngredientString,
   buildRawRecipeFormat,

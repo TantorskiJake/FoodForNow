@@ -2,7 +2,7 @@ const express = require('express');
 const authMiddleware = require('../middleware/auth');
 const Recipe = require('../models/recipe');
 const Ingredient = require('../models/ingredient');
-const { parseRecipeFromUrl, parseRecipeFromText, buildRawRecipeFormat } = require('../services/recipeParserService');
+const { parseRecipeFromUrlByToken, storeValidatedUrlForFetch, parseRecipeFromText, buildRawRecipeFormat } = require('../services/recipeParserService');
 const { resolveRecipeIngredient } = require('../services/ingredientResolutionService');
 const { getAllowedUrlForFetch } = require('../utils/urlSafety');
 
@@ -65,8 +65,9 @@ router.post('/parse-url', authMiddleware, async (req, res) => {
     if (!urlToFetch) {
       return res.status(400).json({ error: 'This URL is not allowed for recipe import.' });
     }
-
-    const parsed = await parseRecipeFromUrl(urlToFetch);
+    // SSRF mitigation: pass only a server-generated token; fetch uses URL from internal cache lookup.
+    const fetchToken = storeValidatedUrlForFetch(urlToFetch);
+    const parsed = await parseRecipeFromUrlByToken(fetchToken);
     const recipeData = buildRawRecipeFormat(parsed, VALID_UNITS);
     res.json(recipeData);
   } catch (err) {
