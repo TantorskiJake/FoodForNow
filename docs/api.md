@@ -23,6 +23,34 @@ JWT tokens are automatically handled via HTTP-only cookies. The token contains:
 }
 ```
 
+### CSRF Protection (Double-Submit Cookie)
+
+State-changing API calls (`POST`, `PUT`, `PATCH`, `DELETE`) are protected by
+`csrf-csrf` using a double-submit cookie pattern:
+
+1. Client requests `GET /api/csrf-token`.
+2. Server sets/refreshes a `csrf-token` cookie and returns a token value.
+3. Client sends that token in the `x-csrf-token` header for all state-changing calls.
+
+`GET`, `HEAD`, and `OPTIONS` requests are not CSRF-protected.
+
+**Token bootstrap endpoint:**
+
+#### GET `/api/csrf-token`
+
+Returns a CSRF token for SPA clients. Call this before the first state-changing request.
+
+**Success Response (200):**
+```json
+{
+  "csrfToken": "csrf_token_value"
+}
+```
+
+**Notes:**
+- In production, if `CSRF_SECRET` is missing, the backend logs a warning and returns an empty token (`{ "csrfToken": "" }`), effectively disabling CSRF enforcement.
+- In development, cross-origin requests from explicitly allowed origins can bypass CSRF validation to support local split-origin setups.
+
 ### Error Responses
 
 Most route-level errors now use a shared helper (`errorPayload`) that returns both
@@ -1432,12 +1460,27 @@ Get users ranked by achievement completion.
 
 ## Rate Limiting
 
-The backend currently rate-limits authentication routes only:
+Authentication endpoints use layered rate limiting:
 
+- Global auth limiter (`server.js`)
 - Scope: `/api/auth/*`
 - Window: `15 minutes`
 - Max requests: `AUTH_RATE_LIMIT_MAX` env var, default `50` in production and `500` outside production
 - Message payload: `{ "error": "Too many attempts, please try again later." }`
+
+- Login-specific limiter (`src/routes/auth.js`)
+- Scope: `POST /api/auth/login`
+- Window: `15 minutes`
+- Max requests: `LOGIN_RATE_LIMIT_MAX` env var, default `5`
+- Message payload: `{ "error": "Too many login attempts. Please try again later." }`
+
+- Signup-specific limiter (`src/routes/auth.js`)
+- Scope: `POST /api/auth/register`
+- Window: `15 minutes`
+- Max requests: `SIGNUP_RATE_LIMIT_MAX` env var, default `10`
+- Message payload: `{ "error": "Too many signup attempts. Please try again later." }`
+
+For `login` and `register`, the effective limit is the stricter of the route-specific limiter and the global auth limiter.
 
 Rate limit headers are included (`standardHeaders: true`), for example:
 ```
