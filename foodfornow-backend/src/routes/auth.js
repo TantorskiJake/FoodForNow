@@ -11,6 +11,21 @@ const { errorPayload } = require('../utils/httpErrors');
 
 const router = express.Router();
 
+function buildForgotPasswordResponse(token) {
+  const payload = {
+    success: true,
+    message: 'If that email exists, a reset link will be sent.',
+  };
+  // Never expose reset tokens by default. Local debugging can opt in explicitly.
+  const exposeResetToken =
+    process.env.EXPOSE_RESET_TOKEN_IN_RESPONSE === 'true' &&
+    process.env.NODE_ENV !== 'production';
+  if (exposeResetToken && token) {
+    payload.resetToken = token;
+  }
+  return payload;
+}
+
 // Stricter rate limits for login/signup to prevent brute force (applied in addition to global auth limiter)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -341,7 +356,7 @@ router.post('/forgot-password', async (req, res) => {
     const user = await User.findOne({ email });
     // Always return success to prevent email enumeration
     if (!user) {
-      return res.json({ success: true, message: 'If that email exists, a reset link will be sent.' });
+      return res.json(buildForgotPasswordResponse());
     }
 
     // Invalidate any existing reset tokens for this user
@@ -356,11 +371,7 @@ router.post('/forgot-password', async (req, res) => {
       expiresAt,
     }).save();
 
-    res.json({
-      success: true,
-      message: 'If that email exists, a reset link will be sent.',
-      resetToken: token, // For now, return token so user can reset (add email later)
-    });
+    res.json(buildForgotPasswordResponse(token));
   } catch (err) {
     console.error('Forgot password error:', err);
     res.status(500).json({ error: 'Failed to process request. Please try again.' });
@@ -540,3 +551,6 @@ router.put('/profile', auth, async (req, res) => {
 
 // Export the router
 module.exports = router;
+module.exports.__internal = {
+  buildForgotPasswordResponse,
+};
