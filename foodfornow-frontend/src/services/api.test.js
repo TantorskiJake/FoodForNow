@@ -132,3 +132,98 @@ test('queued 401 requests are rejected when refresh fails', async () => {
     __internal.resetRefreshState();
   }
 });
+
+test('queued 401 requests are retried after one successful refresh', async () => {
+  __internal.resetCsrfTokenState();
+  __internal.resetRefreshState();
+  const originalAdapter = api.defaults.adapter;
+  let refreshCalls = 0;
+
+  api.defaults.adapter = async (config) => {
+    if (config.url === '/auth/token') {
+      refreshCalls += 1;
+      return axiosResponse(config, { ok: true });
+    }
+    if (config.url === '/a' || config.url === '/b') {
+      if (config._retry) {
+        return axiosResponse(config, { url: config.url, retried: true });
+      }
+      return Promise.reject({ config, response: { status: 401 } });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
+  };
+
+  try {
+    const settled = await Promise.race([
+      Promise.all([api.get('/a'), api.get('/b')]),
+      new Promise((resolve) => setTimeout(() => resolve('timeout'), 300)),
+    ]);
+    assert.notEqual(settled, 'timeout');
+    assert.equal(refreshCalls, 1);
+    assert.deepEqual(
+      settled.map((res) => res.data),
+      [
+        { url: '/a', retried: true },
+        { url: '/b', retried: true },
+      ]
+    );
+  } finally {
+    api.defaults.adapter = originalAdapter;
+    __internal.resetCsrfTokenState();
+    __internal.resetRefreshState();
+  }
+});
+
+test('401 from refresh endpoint is not retried recursively', async () => {
+  __internal.resetCsrfTokenState();
+  __internal.resetRefreshState();
+  const originalAdapter = api.defaults.adapter;
+  let refreshCalls = 0;
+
+  api.defaults.adapter = async (config) => {
+    if (config.url === '/auth/token') {
+      refreshCalls += 1;
+      return Promise.reject({ config, response: { status: 401 } });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
+  };
+
+  try {
+    await assert.rejects(() => api.get('/auth/token'));
+    assert.equal(refreshCalls, 1);
+  } finally {
+    api.defaults.adapter = originalAdapter;
+    __internal.resetCsrfTokenState();
+    __internal.resetRefreshState();
+  }
+});
+
+test('requests marked with _skipAuthRefresh reject without refresh attempt', async () => {
+  __internal.resetCsrfTokenState();
+  __internal.resetRefreshState();
+  const originalAdapter = api.defaults.adapter;
+  let refreshCalls = 0;
+  let protectedCalls = 0;
+
+  api.defaults.adapter = async (config) => {
+    if (config.url === '/auth/token') {
+      refreshCalls += 1;
+      return axiosResponse(config, { ok: true });
+    }
+    if (config.url === '/protected') {
+      protectedCalls += 1;
+      return Promise.reject({ config, response: { status: 401 } });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
+  };
+
+  try {
+    await assert.rejects(() => api.get('/protected', { _skipAuthRefresh: true }));
+    assert.equal(protectedCalls, 1);
+    assert.equal(refreshCalls, 0);
+  } finally {
+    api.defaults.adapter = originalAdapter;
+    __internal.resetCsrfTokenState();
+    __internal.resetRefreshState();
+  }
+});
