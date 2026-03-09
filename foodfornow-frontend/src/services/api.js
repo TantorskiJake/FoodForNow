@@ -176,9 +176,7 @@ let isRefreshing = false;
 let refreshSubscribers = [];
 
 /**
- * Execute Queued Requests
- * 
- * Called after successful token refresh to retry all queued requests.
+ * Execute queued requests after successful token refresh.
  */
 function onRefreshed() {
   refreshSubscribers.forEach(({ config, resolve, reject }) => {
@@ -193,6 +191,11 @@ function onRefreshed() {
  */
 function onRefreshFailed(error) {
   refreshSubscribers.forEach(({ reject }) => reject(error));
+  refreshSubscribers = [];
+}
+
+function resetRefreshState() {
+  isRefreshing = false;
   refreshSubscribers = [];
 }
 
@@ -213,6 +216,12 @@ api.interceptors.response.use(
     const requestUrl = typeof config?.url === 'string' ? config.url : '';
     const isRefreshRequest = /\/auth\/token(?:\?|$)/.test(requestUrl);
     
+    // Never attempt to refresh in response to the refresh endpoint itself.
+    // Otherwise a 401 from /auth/token can deadlock the interceptor queue.
+    if (isRefreshRequest || config?._skipAuthRefresh) {
+      return Promise.reject(error);
+    }
+
     // Check if this is a 401 error and we haven't already retried
     if (response && response.status === 401 && !config?._retry && !isRefreshRequest) {
       if (isRefreshing) {
@@ -228,7 +237,7 @@ api.interceptors.response.use(
       
       try {
         // Attempt to refresh the access token
-        await api.post('/auth/token');
+        await api.post('/auth/token', undefined, { _skipAuthRefresh: true });
         isRefreshing = false;
         onRefreshed(); // Retry all queued requests
         
@@ -262,8 +271,5 @@ export default api;
 export const __internal = {
   ensureCsrfToken,
   resetCsrfTokenState,
-  resetRefreshState: () => {
-    isRefreshing = false;
-    refreshSubscribers = [];
-  },
+  resetRefreshState,
 };
