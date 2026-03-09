@@ -20,7 +20,10 @@ const VALIDATED_URL_TTL_MS = 60 * 1000;
 function storeValidatedUrlForFetch(url) {
   const token = crypto.randomUUID();
   validatedUrlCache.set(token, url);
-  setTimeout(() => validatedUrlCache.delete(token), VALIDATED_URL_TTL_MS);
+  const cleanupTimer = setTimeout(() => validatedUrlCache.delete(token), VALIDATED_URL_TTL_MS);
+  if (typeof cleanupTimer.unref === 'function') {
+    cleanupTimer.unref();
+  }
   return token;
 }
 

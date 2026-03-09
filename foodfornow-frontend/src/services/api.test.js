@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import api, { __internal } from './api.js';
 
-function makeHttpError(message, config, status) {
-  const err = new Error(message);
-  err.config = config;
-  err.response = { status, data: {} };
-  return err;
-}
+const axiosResponse = (config, data = {}) => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config,
+});
 
 test('ensureCsrfToken retries after initial fetch failure', async () => {
   __internal.resetCsrfTokenState();
@@ -65,28 +66,30 @@ test('ensureCsrfToken memoizes successful token fetches', async () => {
   }
 });
 
-test('failed refresh rejects original 401 request without hanging', async () => {
+test('failed refresh token request rejects instead of hanging', async () => {
   __internal.resetCsrfTokenState();
   __internal.resetRefreshState();
   const originalAdapter = api.defaults.adapter;
 
   api.defaults.adapter = async (config) => {
     if (config.url === '/csrf-token') {
-      return { status: 200, statusText: 'OK', headers: {}, config, data: { csrfToken: 'csrf-token-value' } };
+      return axiosResponse(config, { csrfToken: 'csrf-token' });
     }
     if (config.url === '/auth/token') {
-      throw makeHttpError('refresh denied', config, 401);
+      return Promise.reject({ config, response: { status: 401 } });
     }
-    throw makeHttpError('protected denied', config, 401);
+    if (config.url === '/protected') {
+      return Promise.reject({ config, response: { status: 401 } });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
   };
 
   try {
-    const result = await Promise.race([
-      api.get('/recipes').then(() => 'resolved').catch((err) => `rejected:${err.message}`),
-      new Promise((resolve) => setTimeout(() => resolve('timeout'), 250)),
+    const settled = await Promise.race([
+      api.get('/protected').then(() => 'resolved').catch(() => 'rejected'),
+      new Promise((resolve) => setTimeout(() => resolve('timeout'), 200)),
     ]);
-    assert.notEqual(result, 'timeout');
-    assert.match(result, /^rejected:/);
+    assert.equal(settled, 'rejected');
   } finally {
     api.defaults.adapter = originalAdapter;
     __internal.resetCsrfTokenState();
@@ -94,30 +97,35 @@ test('failed refresh rejects original 401 request without hanging', async () => 
   }
 });
 
-test('failed refresh rejects queued 401 requests', async () => {
+test('queued 401 requests are rejected when refresh fails', async () => {
   __internal.resetCsrfTokenState();
   __internal.resetRefreshState();
   const originalAdapter = api.defaults.adapter;
 
   api.defaults.adapter = async (config) => {
     if (config.url === '/csrf-token') {
-      return { status: 200, statusText: 'OK', headers: {}, config, data: { csrfToken: 'csrf-token-value' } };
+      return axiosResponse(config, { csrfToken: 'csrf-token' });
     }
     if (config.url === '/auth/token') {
-      throw makeHttpError('refresh denied', config, 401);
+      return new Promise((_, reject) => {
+        setTimeout(() => reject({ config, response: { status: 401 } }), 25);
+      });
     }
-    throw makeHttpError('protected denied', config, 401);
+    if (config.url === '/a' || config.url === '/b') {
+      return Promise.reject({ config, response: { status: 401 } });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
   };
 
   try {
     const settled = await Promise.race([
-      Promise.allSettled([api.get('/recipes'), api.get('/ingredients')]),
-      new Promise((resolve) => setTimeout(() => resolve('timeout'), 300)),
+      Promise.all([
+        api.get('/a').then(() => 'resolved').catch(() => 'rejected'),
+        api.get('/b').then(() => 'resolved').catch(() => 'rejected'),
+      ]),
+      new Promise((resolve) => setTimeout(() => resolve(['timeout', 'timeout']), 300)),
     ]);
-    assert.notEqual(settled, 'timeout');
-    assert.equal(settled.length, 2);
-    assert.equal(settled[0].status, 'rejected');
-    assert.equal(settled[1].status, 'rejected');
+    assert.deepEqual(settled, ['rejected', 'rejected']);
   } finally {
     api.defaults.adapter = originalAdapter;
     __internal.resetCsrfTokenState();
