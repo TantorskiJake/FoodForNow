@@ -603,7 +603,8 @@ Centralized API communication layer.
 **Features:**
 - Axios instance configuration
 - Request/response interceptors
-- Authentication token handling
+- Cookie-based authentication token handling
+- CSRF bootstrap + header injection for state-changing requests
 - Error handling
 - In-memory GET caching (`cachedGet`, `prefetch`, `invalidateCache`, `clearCache`)
 - Base URL configuration with same-origin fallback
@@ -617,9 +618,24 @@ const api = axios.create({
 ```
 
 **Interceptors:**
-- Request: Add authentication headers
-- Response: Handle errors and token refresh
-- Error: Global error handling
+- `Request`: for `POST|PUT|PATCH`, sets `Content-Type: application/json`; for `GET`, removes `Content-Type` to reduce unnecessary CORS preflights.
+- `Request (CSRF)`: for `POST|PUT|PATCH|DELETE`, calls `GET /csrf-token` once, caches the token, and sends it as `x-csrf-token`. If token bootstrap fails transiently, the cached promise is cleared so the next request can retry.
+- `Response`: on `401`, queues concurrent requests while a single `/auth/token` refresh is in flight, then replays queued requests on success.
+- `Response (failure path)`: redirects to `/login` on refresh failure, except when already on public auth routes.
+- `Error`: global error passthrough for non-auth failures.
+
+**CSRF flow example:**
+```jsx
+// First state-changing request triggers CSRF bootstrap automatically:
+await api.post('/recipes', recipeData);
+// Internally:
+// 1) GET /csrf-token
+// 2) Set x-csrf-token on the outgoing POST
+```
+
+**Troubleshooting:**
+- `403` on write requests with split frontend/backend origins in dev: ensure backend `CORS_ORIGIN` explicitly includes the frontend origin used by the browser, and confirm requests send credentials (`withCredentials: true`).
+- Repeated `401` + redirect loops: verify refresh cookies are being set by `/auth/login` and `/auth/token`, and confirm `VITE_API_URL` points at the backend API root (including `/api`).
 
 **Usage:**
 ```jsx

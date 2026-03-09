@@ -68,8 +68,6 @@ dist-ssr/
 tmp/
 temp/
 *.tgz
-snyk
-snyk-report.json
 test-results/
 
 # ESLint and other tool caches
@@ -91,9 +89,3 @@ tests/temp/
 *.test.log
 test-results/
 
-# Snyk CLI binary and reports (do not commit)
-snyk
-snyk-report.json
-
-# Snyk Security Extension - AI Rules (auto-generated)
-.cursor/rules/snyk_rules.mdc

@@ -151,7 +151,12 @@ api.interceptors.request.use(async (config) => {
   if (['post', 'put', 'patch', 'delete'].includes(method)) {
     try {
       const token = await ensureCsrfToken();
-      if (token) config.headers['x-csrf-token'] = token;
+      if (token) {
+        config.headers = {
+          ...(config.headers || {}),
+          'x-csrf-token': token,
+        };
+      }
     } catch (_) {
       // Proceed without token if endpoint unavailable (e.g. backend not running)
     }
@@ -176,7 +181,18 @@ let refreshSubscribers = [];
  * Called after successful token refresh to retry all queued requests.
  */
 function onRefreshed() {
-  refreshSubscribers.forEach((callback) => callback());
+  refreshSubscribers.forEach(({ config, resolve, reject }) => {
+    config._retry = true;
+    api(config).then(resolve).catch(reject);
+  });
+  refreshSubscribers = [];
+}
+
+/**
+ * Reject queued requests when refresh fails, so callers don't hang forever.
+ */
+function onRefreshFailed(error) {
+  refreshSubscribers.forEach(({ reject }) => reject(error));
   refreshSubscribers = [];
 }
 
@@ -194,16 +210,15 @@ api.interceptors.response.use(
   // Error handler - handle authentication errors
   async (error) => {
     const { response, config } = error;
+    const requestUrl = typeof config?.url === 'string' ? config.url : '';
+    const isRefreshRequest = /\/auth\/token(?:\?|$)/.test(requestUrl);
     
     // Check if this is a 401 error and we haven't already retried
-    if (response && response.status === 401 && !config._retry) {
+    if (response && response.status === 401 && !config?._retry && !isRefreshRequest) {
       if (isRefreshing) {
         // If already refreshing, queue this request
         return new Promise((resolve, reject) => {
-          refreshSubscribers.push(() => {
-            config._retry = true;
-            api(config).then(resolve).catch(reject);
-          });
+          refreshSubscribers.push({ config, resolve, reject });
         });
       }
       
@@ -222,7 +237,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Token refresh failed - clear state and redirect to login
         isRefreshing = false;
-        refreshSubscribers = [];
+        onRefreshFailed(refreshError);
         
         // Only redirect if not already on a public auth page (avoids reload loop when
         // initial /auth/me returns 401 on login page)
@@ -247,4 +262,8 @@ export default api;
 export const __internal = {
   ensureCsrfToken,
   resetCsrfTokenState,
+  resetRefreshState: () => {
+    isRefreshing = false;
+    refreshSubscribers = [];
+  },
 };

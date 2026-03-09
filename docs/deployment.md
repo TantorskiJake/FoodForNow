@@ -44,9 +44,14 @@ This document provides comprehensive guidance for deploying the FoodForNow appli
    ```env
    MONGO_URI=mongodb://localhost:27017/foodfornow
    JWT_SECRET=your_secure_jwt_secret_key_here
+   CSRF_SECRET=replace_with_a_long_random_secret
    PORT=3001
    CORS_ORIGIN=http://localhost:5173
    NODE_ENV=development
+   # Optional auth throttle tuning
+   AUTH_RATE_LIMIT_MAX=500
+   LOGIN_RATE_LIMIT_MAX=5
+   SIGNUP_RATE_LIMIT_MAX=10
    ```
    For the frontend, optional variables live in `foodfornow-frontend/.env`. Set `VITE_APP_PUBLIC_URL=http://<your_LAN_IP>:5173` whenever you need phones/tablets to hit the Vite dev server for barcode scanning tests.
 
@@ -376,9 +381,13 @@ docker system prune -a
 NODE_ENV=development
 MONGO_URI=mongodb://localhost:27017/foodfornow
 JWT_SECRET=dev_jwt_secret_key
+CSRF_SECRET=dev_csrf_secret_key
 PORT=3001
 CORS_ORIGIN=http://localhost:5173
 LOG_LEVEL=debug
+AUTH_RATE_LIMIT_MAX=500
+LOGIN_RATE_LIMIT_MAX=5
+SIGNUP_RATE_LIMIT_MAX=10
 ```
 
 ```env
@@ -398,10 +407,14 @@ VITE_GEONAMES_USERNAME=your_geonames_username
 NODE_ENV=staging
 MONGO_URI=mongodb://staging-mongodb:27017/foodfornow
 JWT_SECRET=staging_jwt_secret_key
+CSRF_SECRET=staging_csrf_secret_key
 PORT=3001
 CORS_ORIGIN=https://staging.foodfornow.com
 LOG_LEVEL=info
 REDIS_URL=redis://staging-redis:6379
+AUTH_RATE_LIMIT_MAX=100
+LOGIN_RATE_LIMIT_MAX=10
+SIGNUP_RATE_LIMIT_MAX=20
 ```
 
 ### Production Environment
@@ -411,13 +424,22 @@ REDIS_URL=redis://staging-redis:6379
 NODE_ENV=production
 MONGO_URI=mongodb://production-mongodb:27017/foodfornow
 JWT_SECRET=production_jwt_secret_key
+CSRF_SECRET=production_csrf_secret_key
 PORT=3001
-CORS_ORIGIN=https://foodfornow.com
+CORS_ORIGIN=https://foodfornow.com,https://www.foodfornow.com
 LOG_LEVEL=warn
 REDIS_URL=redis://production-redis:6379
-RATE_LIMIT_WINDOW=900000
-RATE_LIMIT_MAX=100
+AUTH_RATE_LIMIT_MAX=50
+LOGIN_RATE_LIMIT_MAX=5
+SIGNUP_RATE_LIMIT_MAX=10
 ```
+
+### Cookie, CSRF, and Proxy Notes
+
+- `CSRF_SECRET` should always be set in staging/production. If missing in production, the backend logs a warning and CSRF enforcement is effectively disabled.
+- Cookie behavior differs by environment: production uses `SameSite=None; Secure` for auth + CSRF cookies, while development defaults to `SameSite=Lax`.
+- `server.js` sets `trust proxy` so IP-based auth throttles work behind reverse proxies/load balancers.
+- `CORS_ORIGIN` supports comma-separated origins and should match the exact frontend origins that call the API.
 
 ### Environment Variable Management
 
@@ -999,7 +1021,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token']
 }));
 ```
 
@@ -1042,6 +1064,17 @@ htop
 free -h
 df -h
 ```
+
+**`403 Invalid CSRF token` on `POST|PUT|PATCH|DELETE`:**
+1. Confirm backend `CSRF_SECRET` is set.
+2. Confirm frontend is calling `GET /api/csrf-token` before write requests (handled automatically by `src/services/api.js`).
+3. Confirm requests include cookies (`withCredentials: true`) and `x-csrf-token`.
+4. In split-origin development, ensure frontend origin is explicitly present in backend `CORS_ORIGIN`.
+
+**Unexpected auth throttling (`429`) during login/register:**
+1. Check `AUTH_RATE_LIMIT_MAX`, `LOGIN_RATE_LIMIT_MAX`, and `SIGNUP_RATE_LIMIT_MAX`.
+2. Verify reverse proxy forwards client IPs and backend `trust proxy` is enabled.
+3. Inspect `RateLimit-*` response headers to see the active limiter and reset window.
 
 ### Performance Optimization
 
