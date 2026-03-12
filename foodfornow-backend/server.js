@@ -83,31 +83,29 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-enc
 app.use(cookieParser()); // Parse cookies from requests
 
 // CSRF protection (double-submit cookie): apply to state-changing /api requests; GET/HEAD/OPTIONS ignored
-const { doubleCsrf } = require('csrf-csrf');
-const csrfSecret = process.env.CSRF_SECRET || (process.env.NODE_ENV === 'production' ? null : 'dev-csrf-secret');
-if (process.env.NODE_ENV === 'production' && !csrfSecret) {
-  console.warn('CSRF_SECRET not set in production — CSRF protection disabled');
+const isProduction = process.env.NODE_ENV === 'production';
+const csrfSecret = process.env.CSRF_SECRET || (!isProduction ? 'dev-csrf-secret' : null);
+if (isProduction && !csrfSecret) {
+  throw new Error('CSRF_SECRET environment variable is required in production');
 }
-const csrfOptions = csrfSecret ? {
+const { doubleCsrf } = require('csrf-csrf');
+const csrfOptions = {
   getSecret: () => csrfSecret,
   getSessionIdentifier: (req) => req.ip || 'default',
   cookieName: 'csrf-token',
   cookieOptions: {
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
     path: '/',
   },
   getCsrfTokenFromRequest: (req) => req.headers['x-csrf-token'],
-} : null;
-const { generateCsrfToken, doubleCsrfProtection } = csrfOptions ? doubleCsrf(csrfOptions) : { generateCsrfToken: null, doubleCsrfProtection: (req, res, next) => next() };
+};
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf(csrfOptions);
 
 // Expose CSRF token for SPAs (must be before doubleCsrfProtection so this route is not protected)
 app.get('/api/csrf-token', (req, res) => {
-  if (generateCsrfToken) {
-    const token = generateCsrfToken(req, res);
-    return res.json({ csrfToken: token });
-  }
-  res.json({ csrfToken: '' });
+  const token = generateCsrfToken(req, res);
+  return res.json({ csrfToken: token });
 });
 
 // In development, cross-origin requests (e.g. VITE_API_URL=http://localhost:3001/api) don't send
