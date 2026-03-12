@@ -432,4 +432,8 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;
+module.exports.__internal = {
+  sanitizeSearchQuery,
+  SEARCH_MAX_LENGTH,
+};
