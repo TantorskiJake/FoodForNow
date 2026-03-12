@@ -51,6 +51,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { createWorker } from 'tesseract.js';
 import useProgressiveLoader from '../hooks/useProgressiveLoader';
+import { getSafeElement } from '../utils/safeArrayAccess';
 
 const Recipes = () => {
   const [recipes, setRecipes] = useState([]);
@@ -79,18 +80,6 @@ const Recipes = () => {
   });
   const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
   const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
-  /** Safe for use as array index: integer in [0, length). Prevents prototype pollution (CWE-1321). */
-  const isSafeArrayIndex = (i, length) => Number.isInteger(i) && i >= 0 && i < length;
-  /** Returns the element at valid index without using index as object key (avoids prototype pollution). */
-  const getSafeElement = (arr, index) => {
-    if (!Array.isArray(arr) || !isSafeArrayIndex(index, arr.length)) return null;
-    let i = 0;
-    for (const el of arr) {
-      if (i === index) return el;
-      i += 1;
-    }
-    return null;
-  };
   const theme = useTheme();
 
   // Inline create ingredient state

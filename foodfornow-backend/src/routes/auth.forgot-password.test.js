@@ -34,6 +34,14 @@ test('forgot-password response includes token only with explicit non-production 
   assert.equal(payload.resetToken, 'sensitive-token');
 });
 
+test('forgot-password response omits token when explicit opt-in is set but token is missing', () => {
+  process.env.NODE_ENV = 'development';
+  process.env.EXPOSE_RESET_TOKEN_IN_RESPONSE = 'true';
+
+  const payload = __internal.buildForgotPasswordResponse();
+  assert.equal(Object.prototype.hasOwnProperty.call(payload, 'resetToken'), false);
+});
+
 test.after(() => {
   if (originalJwtSecret == null) delete process.env.JWT_SECRET;
   else process.env.JWT_SECRET = originalJwtSecret;
