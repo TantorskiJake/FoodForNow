@@ -21,8 +21,8 @@ import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 import { AUTH_TRANSITION } from '../config/authTransitionConfig';
+import api from '../services/api';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const REMEMBERED_LOGIN_KEY = 'foodfornow_remembered_login';
 
 const LOGIN_PHASE = { FORM: 'form', SUCCESS: 'success', EXITING: 'exiting' };
@@ -124,27 +124,17 @@ const Login = () => {
     setIsLoading(true);
     setError('');
 
-    // Safety: stop spinner after 10s no matter what (in case fetch never settles)
+    // Safety: stop spinner after 10s no matter what (in case request never settles)
     const safetyTimeoutId = setTimeout(() => {
       setIsLoading(false);
       setError('Request is taking too long. Please try again.');
     }, 10000);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json().catch(() => ({}));
+      const res = await api.post('/auth/login', { email, password }, { timeout: 10000 });
+      const data = res.data;
 
       clearTimeout(safetyTimeoutId);
-
-      if (!res.ok) {
-        setError(data?.error || 'Login failed. Please try again.');
-        return;
-      }
 
       const user = data?.user ?? data;
       if (!user?.id && !user?._id) {
@@ -173,7 +163,8 @@ const Login = () => {
     } catch (err) {
       clearTimeout(safetyTimeoutId);
       console.error('Login error:', err);
-      setError(err.message || 'Login failed. Please try again.');
+      const errMsg = err.response?.data?.error || err.message || 'Login failed. Please try again.';
+      setError(errMsg);
     } finally {
       clearTimeout(safetyTimeoutId);
       setIsLoading(false);

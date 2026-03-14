@@ -160,6 +160,20 @@ app.get("/", (req, res) => {
 });
 
 /**
+ * Health Check Endpoint
+ * 
+ * Used by container orchestrators (Docker, Kubernetes) and load balancers
+ * for liveness/readiness probes. Returns 200 with basic status info.
+ */
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+/**
  * Global Error Handling Middleware
  * 
  * Catches any errors that weren't handled by route handlers
