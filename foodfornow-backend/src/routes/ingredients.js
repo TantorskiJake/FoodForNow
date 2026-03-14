@@ -6,10 +6,19 @@ const Recipe = require('../models/recipe');
 const { findSimilarIngredient } = require('../services/ingredientResolutionService');
 const { errorPayload } = require('../utils/httpErrors');
 
+const SEARCH_MAX_LENGTH = 200;
+
+function sanitizeSearchQuery(value) {
+  if (value == null) return '';
+  const s = typeof value === 'string' ? value : String(value);
+  const trimmed = s.trim().slice(0, SEARCH_MAX_LENGTH);
+  return trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Get all ingredients with search
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    let { search = '' } = req.query;
+    const search = sanitizeSearchQuery(req.query?.search);
     const filter = { user: req.userId };
     if (search) {
       filter.name = { $regex: search, $options: 'i' };
@@ -26,7 +35,7 @@ router.get('/', authMiddleware, async (req, res) => {
 // excluding any whose name matches the user's (case-insensitive)
 router.get('/shared', authMiddleware, async (req, res) => {
   try {
-    let { search = '' } = req.query;
+    const search = sanitizeSearchQuery(req.query?.search);
 
     // Find all of the user's ingredient names (case-insensitive)
     const userIngredients = await Ingredient.find({ user: req.userId }).select('name');
@@ -110,9 +119,10 @@ router.post('/', authMiddleware, async (req, res) => {
         });
       }
     }
-    const { forceCreate: _, ...bodyWithoutFlag } = req.body;
     const ingredient = new Ingredient({
-      ...bodyWithoutFlag,
+      name: req.body.name,
+      category: req.body.category,
+      description: req.body.description,
       user: req.userId
     });
     await ingredient.save();
@@ -129,9 +139,15 @@ router.post('/', authMiddleware, async (req, res) => {
 // Update ingredient
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
+    const allowedFields = ['name', 'category', 'description'];
+    const update = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) update[key] = req.body[key];
+    }
+
     const ingredient = await Ingredient.findOneAndUpdate(
       { _id: req.params.id, user: req.userId },
-      req.body,
+      update,
       { new: true }
     );
     if (!ingredient) {

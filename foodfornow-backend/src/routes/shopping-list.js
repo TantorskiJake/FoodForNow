@@ -363,9 +363,15 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 // Update fields of a shopping list item
 router.patch('/:id', authMiddleware, async (req, res) => {
   try {
+    const allowedFields = ['quantity', 'unit', 'completed', 'ingredient', 'recipe'];
+    const update = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) update[key] = req.body[key];
+    }
+
     const item = await ShoppingListItem.findOneAndUpdate(
       { _id: req.params.id, user: req.userId },
-      req.body,
+      update,
       { new: true }
     );
     if (!item) {

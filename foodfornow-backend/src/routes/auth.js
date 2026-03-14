@@ -429,11 +429,17 @@ router.post('/reset-password', async (req, res) => {
 /**
  * POST /auth/logout - Logout user
  *
- * Clears authentication cookies to log out the user.
- * Note: This doesn't revoke the refresh token from the database.
+ * Revokes the refresh token and clears authentication cookies.
  */
-router.post("/logout", (req, res) => {
-  // Clear authentication cookies
+router.post("/logout", async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken;
+  if (refreshToken) {
+    try {
+      await RefreshToken.findOneAndUpdate({ token: refreshToken, isRevoked: false }, { isRevoked: true });
+    } catch (err) {
+      console.error('Error revoking refresh token on logout:', err);
+    }
+  }
   res.clearCookie('accessToken', cookieOptions);
   res.clearCookie('refreshToken', cookieOptions);
   res.json({ success: true });
