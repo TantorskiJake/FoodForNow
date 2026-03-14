@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
-const { buildMissingShoppingListBulkOps } = require('./mealplan');
+const { buildMissingShoppingListBulkOps, __internal } = require('./mealplan');
+const { getWeekRangeUtc } = __internal;
 
 test('buildMissingShoppingListBulkOps aggregates duplicate ingredient+unit rows', () => {
   const userId = 'user-1';
@@ -49,4 +50,19 @@ test('buildMissingShoppingListBulkOps skips invalid rows', () => {
   ]);
 
   assert.deepEqual(ops, []);
+});
+
+test('getWeekRangeUtc parses date-only input as UTC week boundaries', () => {
+  const { start, end } = getWeekRangeUtc('2026-03-09');
+
+  assert.equal(start.toISOString(), '2026-03-09T00:00:00.000Z');
+  assert.equal(end.toISOString(), '2026-03-16T00:00:00.000Z');
+  assert.equal(end.getTime() - start.getTime(), 7 * 24 * 60 * 60 * 1000);
+});
+
+test('getWeekRangeUtc ignores time and timezone offset in ISO input', () => {
+  const { start, end } = getWeekRangeUtc('2026-03-09T23:30:00-05:00');
+
+  assert.equal(start.toISOString(), '2026-03-09T00:00:00.000Z');
+  assert.equal(end.toISOString(), '2026-03-16T00:00:00.000Z');
 });
