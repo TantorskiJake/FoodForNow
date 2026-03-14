@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -38,7 +38,20 @@ import { useAchievements } from '../context/AchievementContext';
 
 const DEFAULT_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, onEditMeal, onMealPlanUpdate, onAddRecipeToSlot, onAddRestaurantToSlot }) => {
+function mealsForSelectedWeek(mealPlan, selectedWeekStart) {
+  if (!selectedWeekStart || !Array.isArray(mealPlan)) return mealPlan;
+  const start = new Date(selectedWeekStart);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return mealPlan.filter((m) => {
+    if (!m?.weekStart) return false;
+    const d = new Date(m.weekStart);
+    return d >= start && d < end;
+  });
+}
+
+const MealPlanGrid = ({ mealPlan = [], days: daysProp, selectedWeekStart, onAddMeal, onDeleteMeal, onEditMeal, onMealPlanUpdate, onAddRecipeToSlot, onAddRestaurantToSlot }) => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -58,6 +71,11 @@ const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, 
   const [mealToUncook, setMealToUncook] = useState(null);
   const days = Array.isArray(daysProp) && daysProp.length === 7 ? daysProp : DEFAULT_DAYS;
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
+
+  const displayMeals = useMemo(
+    () => mealsForSelectedWeek(mealPlan, selectedWeekStart),
+    [mealPlan, selectedWeekStart]
+  );
 
   const handleMealClick = (meal, event) => {
     if (!meal) return;
@@ -205,7 +223,7 @@ const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, 
   };
 
   const getMealsInSlot = (day, mealType) =>
-    mealPlan.filter(
+    displayMeals.filter(
       (m) => m?.day?.toLowerCase() === day?.toLowerCase() && m?.meal === mealType
     );
 
@@ -340,7 +358,7 @@ const MealPlanGrid = ({ mealPlan = [], days: daysProp, onAddMeal, onDeleteMeal, 
 
   const renderSlotCard = (day, mealType, options = {}) => {
     const { mobile = false } = options;
-    const mealsInSlot = mealPlan.filter(
+    const mealsInSlot = displayMeals.filter(
       (m) => m?.day?.toLowerCase() === day.toLowerCase() && m?.meal === mealType
     );
     const slotEmpty = mealsInSlot.length === 0;

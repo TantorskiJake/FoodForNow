@@ -435,15 +435,9 @@ const Dashboard = () => {
         }
       }
 
-      const mealItem = response.data.mealPlanItem || response.data;
       handleCloseMealDialog();
-      setMealPlan(prev => {
-        if (mealFormData._id) {
-          return prev.map(m => m._id === mealItem._id ? mealItem : m);
-        }
-        return [...prev, mealItem];
-      });
       invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchMealPlan({ forceRefresh: true });
       await fetchIngredients({ forceRefresh: true });
       setError('');
       toast.success(mealFormData.eatingOut ? 'Eating out meal added' : 'Meal added');
@@ -508,13 +502,8 @@ const Dashboard = () => {
         cancelledOptimisticIds.current.delete(optimisticId);
         return;
       }
-      setMealPlan(prev => {
-        if (editingId) {
-          return prev.map(m => m._id === mealItem._id ? mealItem : m);
-        }
-        return prev.map(m => m._id === optimisticId ? mealItem : m);
-      });
       invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchMealPlan({ forceRefresh: true });
       await fetchIngredients({ forceRefresh: true });
       setError('');
     } catch (err) {
@@ -542,6 +531,7 @@ const Dashboard = () => {
     try {
       await api.delete(`/mealplan/${id}`);
       invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchMealPlan({ forceRefresh: true });
       await fetchIngredients({ forceRefresh: true });
     } catch (err) {
       console.error('Error deleting meal:', err);
@@ -569,14 +559,8 @@ const Dashboard = () => {
           showAchievements(response.data.achievements);
         }
       }
-      const mealItem = response.data.mealPlanItem || response.data;
-      setMealPlan(prev => {
-        if (existingMealId) {
-          return prev.map(m => m._id === mealItem._id ? mealItem : m);
-        }
-        return [...prev, mealItem];
-      });
       invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchMealPlan({ forceRefresh: true });
       await fetchIngredients({ forceRefresh: true });
       setError('');
       toast.success(`Added ${recipe.name} to ${day} ${mealType}`);
@@ -606,9 +590,8 @@ const Dashboard = () => {
           notes: restaurant.notes || undefined
         }
       });
-      const mealItem = response.data.mealPlanItem || response.data;
-      setMealPlan(prev => [...prev, mealItem]);
       invalidateCache(MEALPLAN_CACHE_KEYS);
+      await fetchMealPlan({ forceRefresh: true });
       await fetchIngredients({ forceRefresh: true });
       setError('');
       toast.success(`Added ${restaurant.name} to ${day} ${mealType}`);
@@ -624,15 +607,8 @@ const Dashboard = () => {
 
   const handleMealPlanUpdate = async (updatedMeal) => {
     try {
-      // Update the local meal plan state with the updated meal
-      setMealPlan(prevMealPlan => 
-        prevMealPlan.map(meal => 
-          meal._id === updatedMeal._id ? updatedMeal : meal
-        )
-      );
-      // Refresh needed ingredients whenever cook/uncook changes (both affect which meals need ingredients).
-      // Uncook restocks the pantry on the backend, so invalidate pantry cache too.
       invalidateCache([...MEALPLAN_CACHE_KEYS, ...PANTRY_CACHE_KEYS]);
+      await fetchMealPlan({ forceRefresh: true });
       await fetchIngredients({ forceRefresh: true });
     } catch (err) {
       console.error('Error updating meal plan:', err);
@@ -1021,6 +997,7 @@ const Dashboard = () => {
               <MealPlanGrid
                 days={orderedDayNames}
                 mealPlan={mealPlan}
+                selectedWeekStart={selectedWeekStart}
                 onAddMeal={handleOpenMealDialog}
                 onEditMeal={handleEditMeal}
                 onDeleteMeal={handleDeleteMeal}
