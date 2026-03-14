@@ -7,6 +7,16 @@ const { toStandard, fromStandard, getStandardUnit } = require('../services/unitC
 
 const router = express.Router();
 
+/** Parse YYYY-MM-DD as UTC and return [weekStart, weekEnd) for DB queries (timezone-safe). */
+function getWeekRangeUtc(weekStartStr) {
+  const dateOnly = String(weekStartStr).slice(0, 10);
+  const [y, m, d] = dateOnly.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 7);
+  return { start, end };
+}
+
 function buildMissingShoppingListBulkOps(userId, missingIngredients) {
   const quantitiesByIngredientUnit = new Map();
 
@@ -43,16 +53,10 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     let query = { user: req.userId };
     
-    // If weekStart is provided, filter by that week
+    // If weekStart is provided, filter by that week (UTC so server TZ doesn't mix weeks)
     if (req.query.weekStart) {
-      const weekStart = new Date(req.query.weekStart);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      
-      query.weekStart = {
-        $gte: weekStart,
-        $lt: weekEnd
-      };
+      const { start, end } = getWeekRangeUtc(req.query.weekStart);
+      query.weekStart = { $gte: start, $lt: end };
     }
     
     const mealPlan = await MealPlan.find(query).populate('recipe');
@@ -270,16 +274,10 @@ router.delete('/reset-week', authMiddleware, async (req, res) => {
   try {
     let query = { user: req.userId };
     
-    // If weekStart is provided, only delete meal plans for that week
+    // If weekStart is provided, only delete meal plans for that week (UTC)
     if (req.query.weekStart) {
-      const weekStart = new Date(req.query.weekStart);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      
-      query.weekStart = {
-        $gte: weekStart,
-        $lt: weekEnd
-      };
+      const { start, end } = getWeekRangeUtc(req.query.weekStart);
+      query.weekStart = { $gte: start, $lt: end };
     }
     
     // Delete meal plans matching the query
@@ -502,16 +500,10 @@ router.get('/ingredients', authMiddleware, async (req, res) => {
   try {
     let query = { user: req.userId };
     
-    // If weekStart is provided, filter by that week
+    // If weekStart is provided, filter by that week (UTC)
     if (req.query.weekStart) {
-      const weekStart = new Date(req.query.weekStart);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      
-      query.weekStart = {
-        $gte: weekStart,
-        $lt: weekEnd
-      };
+      const { start, end } = getWeekRangeUtc(req.query.weekStart);
+      query.weekStart = { $gte: start, $lt: end };
     }
     
     // Get meal plans for the user (filtered by week if specified)
