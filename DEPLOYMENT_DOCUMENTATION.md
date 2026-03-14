@@ -647,6 +647,25 @@ echo "Production deployment completed!"
 
 ## Production Deployment
 
+### SPA routing (direct URLs and refresh)
+
+The app uses client-side routing (React Router). For direct URLs like `https://yoursite.com/recipes` or a refresh on a deep link to work, the server must serve `index.html` for those paths instead of returning 404.
+
+- **Docker (frontend image)**  
+  The frontend Dockerfile uses `foodfornow-frontend/nginx.conf`, which sets `try_files $uri $uri/ /index.html;` so nginx serves the SPA for any non-file path. No extra steps needed.
+
+- **Render (static site)**  
+  In the [Render Dashboard](https://dashboard.render.com/), open your static site → **Redirects/Rewrites**. Add a **Rewrite** (not Redirect) rule:
+  - **Source:** `/*`
+  - **Destination:** `/index.html`  
+  That way all requests that don’t match a real file are served `index.html` and the client router can handle the path. If you use a Blueprint (`render.yaml`), add under your static site service:
+  ```yaml
+  routes:
+    - type: rewrite
+      source: /*
+      destination: /index.html
+  ```
+
 ### Kubernetes Deployment
 
 **Backend Deployment:**
