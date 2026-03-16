@@ -667,74 +667,89 @@ Delete a recipe.
 
 ### GET `/api/mealplan`
 
-Get meal plan for the specified date range.
+Get meal-plan entries for the authenticated user.
 
 **Query Parameters:**
-- `startDate` (string): Start date (ISO string, default: start of current week)
-- `endDate` (string): End date (ISO string, default: end of current week)
+- `weekStart` (string, optional): Week anchor used for filtering. The server reads only the `YYYY-MM-DD` portion and applies a UTC week window (`[weekStart, weekStart + 7 days)`), which avoids server-timezone drift.
 
-**Success Response (200):**
+If `weekStart` is omitted, all of the user's meal-plan items are returned.
+
+**Success Response (200):** Array of meal-plan items.
 ```json
-{
-  "success": true,
-  "mealPlan": [
-    {
-      "id": "507f1f77bcf86cd799439011",
-      "date": "2024-01-15T00:00:00.000Z",
-      "mealType": "dinner",
-      "recipe": {
-        "id": "507f1f77bcf86cd799439012",
-        "name": "Spaghetti Carbonara",
-        "description": "Classic Italian pasta dish"
-      },
-      "customMeal": null,
-      "isCooked": false,
-      "notes": "Add extra cheese",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "updatedAt": "2024-01-01T00:00:00.000Z"
-    }
-  ]
-}
+[
+  {
+    "_id": "507f1f77bcf86cd799439011",
+    "user": "507f1f77bcf86cd799439099",
+    "weekStart": "2026-03-16T00:00:00.000Z",
+    "day": "Monday",
+    "meal": "Dinner",
+    "recipe": {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "Spaghetti Carbonara"
+    },
+    "eatingOut": false,
+    "cooked": false,
+    "notes": "Add extra cheese",
+    "createdAt": "2026-03-16T01:00:00.000Z",
+    "updatedAt": "2026-03-16T01:00:00.000Z"
+  }
+]
 ```
 
 ---
 
 ### POST `/api/mealplan`
 
-Add a meal to the meal plan.
+Create a meal-plan item.
 
 **Request Body:**
 ```json
 {
-  "date": "2024-01-15",
-  "mealType": "dinner",
-  "recipe": "507f1f77bcf86cd799439012",
-  "customMeal": "Custom meal name",
+  "weekStart": "2026-03-16",
+  "day": "Monday",
+  "meal": "Dinner",
+  "recipeId": "507f1f77bcf86cd799439012",
   "notes": "Optional notes"
 }
 ```
 
 **Validation Rules:**
-- `date`: Required, valid date
-- `mealType`: Required, enum: ['breakfast', 'lunch', 'dinner', 'snack']
-- `recipe` or `customMeal`: At least one required
+- `weekStart`, `day`, and `meal` are required.
+- `day`: `Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday`
+- `meal`: `Breakfast|Lunch|Dinner|Snack`
+- If `eatingOut` is `false` (default), `recipeId` is required and must exist.
+- If `eatingOut` is `true`, `restaurant.name` is required.
 
-**Success Response (201):**
+**Success Response (201) - standard:**
 ```json
 {
-  "success": true,
-  "message": "Meal added to plan successfully",
-  "mealPlan": {
-    "id": "507f1f77bcf86cd799439011",
-    "date": "2024-01-15T00:00:00.000Z",
-    "mealType": "dinner",
-    "recipe": {...},
-    "customMeal": null,
-    "isCooked": false,
-    "notes": "Optional notes",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
+  "_id": "507f1f77bcf86cd799439011",
+  "weekStart": "2026-03-16T00:00:00.000Z",
+  "day": "Monday",
+  "meal": "Dinner",
+  "recipe": {
+    "_id": "507f1f77bcf86cd799439012",
+    "name": "Spaghetti Carbonara"
   }
+}
+```
+
+**Success Response (201) - with achievements:**
+```json
+{
+  "mealPlanItem": {
+    "_id": "507f1f77bcf86cd799439011",
+    "weekStart": "2026-03-16T00:00:00.000Z",
+    "day": "Monday",
+    "meal": "Dinner",
+    "recipe": {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "Spaghetti Carbonara"
+    }
+  },
+  "achievements": [
+    { "name": "Weekly Warrior", "description": "Filled a full week", "icon": "..." }
+  ]
 }
 ```
 
@@ -742,16 +757,28 @@ Add a meal to the meal plan.
 
 ### PUT `/api/mealplan/:id`
 
-Update a meal plan entry.
+Update a meal-plan entry.
 
-**Request Body:** (Same as POST, all fields optional)
+**Request Body (all optional):**
+- `recipeId`
+- `notes`
+- `eatingOut`
+- `restaurant`
+
+Switching from recipe-based meals to eating out requires `restaurant.name`.  
+Switching from eating out back to recipe-based requires a valid `recipeId`.
 
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Meal plan updated successfully",
-  "mealPlan": {...}
+  "_id": "507f1f77bcf86cd799439011",
+  "day": "Monday",
+  "meal": "Dinner",
+  "eatingOut": true,
+  "restaurant": {
+    "name": "Joe's Pizza",
+    "url": "https://example.com/menu"
+  }
 }
 ```
 
@@ -759,18 +786,125 @@ Update a meal plan entry.
 
 ### PATCH `/api/mealplan/:id/cook`
 
-Mark a meal as cooked.
+Attempt to cook a meal. This endpoint handles pantry deduction and missing-ingredient behavior.
+
+**Request Body (optional):**
+```json
+{
+  "addMissingToShoppingList": false
+}
+```
+
+Behavior:
+- If all required ingredients are available in pantry, the meal is marked cooked and pantry quantities are deducted.
+- If ingredients are missing and `addMissingToShoppingList` is `false`, request fails with `400`.
+- If ingredients are missing and `addMissingToShoppingList` is `true`, missing quantities are bulk-upserted into shopping list and the meal remains uncooked.
+- For `eatingOut` meals, the item is marked cooked without pantry checks.
+
+**Success Response (200) - fully cooked:**
+```json
+{
+  "mealPlanItem": {
+    "_id": "507f1f77bcf86cd799439011",
+    "cooked": true
+  },
+  "removedIngredients": 4,
+  "addedToShoppingList": 0
+}
+```
+
+**Success Response (200) - added missing items instead:**
+```json
+{
+  "mealPlanItem": {
+    "_id": "507f1f77bcf86cd799439011",
+    "cooked": false
+  },
+  "removedIngredients": 2,
+  "addedToShoppingList": 3,
+  "message": "Missing ingredients added to shopping list. Meal not marked as cooked."
+}
+```
+
+**Error Response (400) - missing ingredients:**
+```json
+{
+  "error": "Missing ingredients",
+  "message": "Some ingredients are missing from your pantry",
+  "missingIngredients": [
+    {
+      "ingredient": {
+        "_id": "507f1f77bcf86cd799439012",
+        "name": "Milk"
+      },
+      "quantity": 1.5,
+      "unit": "cup",
+      "needed": 2,
+      "available": 0.5
+    }
+  ]
+}
+```
+
+---
+
+### PATCH `/api/mealplan/:id/cooked`
+
+Toggle cooked status directly.
+
+Notes:
+- If toggling from cooked -> uncooked for a recipe meal, recipe ingredients are added back to pantry (same units as stored on recipe).
+- If toggling from uncooked -> cooked with this endpoint, it does **not** run missing-ingredient checks (`/:id/cook` does).
 
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Meal marked as cooked",
-  "mealPlan": {
-    "id": "507f1f77bcf86cd799439011",
-    "isCooked": true,
-    "updatedAt": "2024-01-01T00:00:00.000Z"
+  "_id": "507f1f77bcf86cd799439011",
+  "cooked": false,
+  "updatedAt": "2026-03-16T02:00:00.000Z"
+}
+```
+
+---
+
+### GET `/api/mealplan/ingredients`
+
+Get needed ingredients from uncooked, non-restaurant meals.
+
+**Query Parameters:**
+- `weekStart` (string, optional): Same week filtering behavior as `GET /api/mealplan`.
+- `aggregateByIngredient` (`true|false`, optional): When `true`, quantities are merged per ingredient (with unit-conversion support and pantry availability attached).
+
+Always-available staples (for example salt/pepper/water) are excluded.
+
+**Success Response (200):**
+```json
+[
+  {
+    "_id": "507f1f77bcf86cd799439012",
+    "name": "Milk",
+    "category": "Dairy",
+    "quantity": 2,
+    "unit": "cup",
+    "pantryQuantity": 0.5
   }
+]
+```
+
+---
+
+### DELETE `/api/mealplan/reset-week`
+
+Delete meal-plan items for a week (or all meal plans if `weekStart` is omitted).
+
+**Query Parameters:**
+- `weekStart` (string, optional): Same UTC week filtering as `GET /api/mealplan`.
+
+**Success Response (200):**
+```json
+{
+  "message": "Reset week - deleted 21 meal plans",
+  "mealPlans": []
 }
 ```
 
@@ -778,43 +912,32 @@ Mark a meal as cooked.
 
 ### POST `/api/mealplan/populate-week`
 
-Automatically populate the week with recipes.
+Auto-fill one week with random recipes from the authenticated user's recipe library.
 
-**Request Body:**
+**Request Body (optional):**
 ```json
 {
-  "startDate": "2024-01-15",
-  "endDate": "2024-01-21",
-  "mealTypes": ["breakfast", "lunch", "dinner"]
+  "weekStart": "2026-03-16"
 }
 ```
+
+Behavior:
+- Creates entries for `Monday..Sunday` across `Breakfast|Lunch|Dinner`.
+- Clears existing entries in the target week first.
+- Returns `400` when user has no recipes.
 
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Week populated successfully",
-  "addedMeals": 21,
-  "mealPlan": [...]
-}
-```
-
----
-
-### DELETE `/api/mealplan/reset-week`
-
-Clear all meals for the current week.
-
-**Query Parameters:**
-- `startDate` (string): Start date (ISO string)
-- `endDate` (string): End date (ISO string)
-
-**Success Response (200):**
-```json
-{
-  "success": true,
-  "message": "Week reset successfully",
-  "deletedMeals": 21
+  "message": "Week populated with 21 random recipes",
+  "mealPlans": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "day": "Monday",
+      "meal": "Breakfast",
+      "weekStart": "2026-03-16T00:00:00.000Z"
+    }
+  ]
 }
 ```
 
@@ -827,10 +950,21 @@ Remove a meal from the meal plan.
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Meal removed from plan successfully"
+  "message": "Meal plan item deleted successfully"
 }
 ```
+
+**Error Responses:**
+- `404`: Meal plan item not found
+- `500`: Failed to delete meal plan item
+
+---
+
+### Week Filtering Pitfalls
+
+- Prefer sending `weekStart` as date-only `YYYY-MM-DD` from the client.
+- If you send a full ISO string, the backend currently uses only the first 10 chars (`YYYY-MM-DD`) and ignores time/offset.
+- For consistent client behavior, the dashboard computes week starts locally, then passes only `weekStart` to `/mealplan`, `/mealplan/ingredients`, `/mealplan/reset-week`, and `/mealplan/populate-week`.
 
 ---
 
