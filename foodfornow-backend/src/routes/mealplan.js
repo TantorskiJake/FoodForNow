@@ -740,6 +740,4 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
 
 module.exports = router;
 module.exports.buildMissingShoppingListBulkOps = buildMissingShoppingListBulkOps;
-module.exports.__internal = {
-  getWeekRangeUtc,
-};
+module.exports.getWeekRangeUtc = getWeekRangeUtc;

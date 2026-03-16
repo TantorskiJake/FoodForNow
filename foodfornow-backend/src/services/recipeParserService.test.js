@@ -120,6 +120,88 @@ test('parseRecipeFromUrlByToken uses configured proxy URL and source headers', a
   }
 });
 
+test('parseRecipeFromUrlByToken appends validated URL when proxy template has no placeholder', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: 'https://proxy.example/import',
+    proxyRequired: undefined,
+  });
+
+  const validatedUrl = 'https://example.com/recipe?foo=bar&x=1';
+  let capturedUrl = null;
+  axios.get = async (url) => {
+    capturedUrl = url;
+    return { data: RECIPE_HTML };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch(validatedUrl);
+    const parsed = await service.parseRecipeFromUrlByToken(token);
+
+    assert.equal(parsed.name, 'Token Import Recipe');
+    assert.ok(capturedUrl);
+    const parsedProxyUrl = new URL(capturedUrl);
+    assert.equal(parsedProxyUrl.origin, 'https://proxy.example');
+    assert.equal(parsedProxyUrl.pathname, '/import');
+    assert.equal(parsedProxyUrl.searchParams.get('url'), validatedUrl);
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});
+
+test('parseRecipeFromUrlByToken rejects when proxy is required but not configured', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: undefined,
+    proxyRequired: 'true',
+  });
+
+  let axiosCalls = 0;
+  axios.get = async () => {
+    axiosCalls += 1;
+    return { data: RECIPE_HTML };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch('https://example.com/recipe');
+    await assert.rejects(
+      () => service.parseRecipeFromUrlByToken(token),
+      /proxy is required; this URL could not be parsed via the proxy worker/i
+    );
+    assert.equal(axiosCalls, 0);
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});
+
+test('parseRecipeFromUrlByToken rejects when required proxy URL is invalid', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: 'not-a-valid-url',
+    proxyRequired: 'true',
+  });
+
+  let axiosCalls = 0;
+  axios.get = async () => {
+    axiosCalls += 1;
+    return { data: RECIPE_HTML };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch('https://example.com/recipe');
+    await assert.rejects(
+      () => service.parseRecipeFromUrlByToken(token),
+      /proxy is required; this URL could not be parsed via the proxy worker/i
+    );
+    assert.equal(axiosCalls, 0);
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});
+
 test('parseRecipeFromUrlByToken rejects unknown token', async () => {
   const { service, restoreEnv } = loadServiceWithEnv({
     proxyUrl: undefined,
