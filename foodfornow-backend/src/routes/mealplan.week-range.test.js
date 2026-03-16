@@ -11,6 +11,13 @@ test('getWeekRangeUtc builds an inclusive start and exclusive 7-day end in UTC',
   assert.equal(end.toISOString(), '2026-03-16T00:00:00.000Z');
 });
 
+test('getWeekRangeUtc anchors week start to UTC midnight from date portion', () => {
+  const { start, end } = getWeekRangeUtc('2026-03-09T23:30:00-07:00');
+
+  assert.equal(start.toISOString(), '2026-03-09T00:00:00.000Z');
+  assert.equal(end.toISOString(), '2026-03-16T00:00:00.000Z');
+});
+
 test('getWeekRangeUtc ignores time and timezone suffixes from ISO datetimes', () => {
   const { start, end } = getWeekRangeUtc('2026-03-09T23:30:00-11:00');
 
