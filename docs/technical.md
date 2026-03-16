@@ -188,11 +188,26 @@ const recipeSchema = new mongoose.Schema({
 ```javascript
 const mealPlanSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  date: { type: Date, required: true },
-  mealType: { type: String, enum: ['breakfast', 'lunch', 'dinner', 'snack'], required: true },
+  weekStart: { type: Date, required: true },
+  day: {
+    type: String,
+    enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    required: true
+  },
+  meal: {
+    type: String,
+    enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'],
+    required: true
+  },
   recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe' },
-  customMeal: { type: String },
-  isCooked: { type: Boolean, default: false },
+  eatingOut: { type: Boolean, default: false },
+  restaurant: {
+    name: { type: String },
+    url: { type: String },
+    address: { type: String },
+    notes: { type: String }
+  },
+  cooked: { type: Boolean, default: false },
   notes: { type: String }
 }, { timestamps: true });
 ```
@@ -360,11 +375,10 @@ Delete a recipe.
 ### Meal Plan Endpoints
 
 #### GET `/api/mealplan`
-Get meal plan for the current week.
+Get meal-plan items, optionally filtered by `weekStart`.
 
 **Query Parameters:**
-- `startDate`: Start date for meal plan (ISO string)
-- `endDate`: End date for meal plan (ISO string)
+- `weekStart`: Date-only string (`YYYY-MM-DD`). Backend applies UTC week filtering (`[start, start + 7 days)`).
 
 #### POST `/api/mealplan`
 Add a meal to the meal plan.
@@ -372,22 +386,28 @@ Add a meal to the meal plan.
 **Request Body:**
 ```json
 {
-  "date": "2024-01-15",
-  "mealType": "dinner",
-  "recipe": "recipe_id",
-  "customMeal": "Custom meal name",
+  "weekStart": "2026-03-16",
+  "day": "Monday",
+  "meal": "Dinner",
+  "recipeId": "recipe_id",
   "notes": "Optional notes"
 }
 ```
 
 #### PATCH `/api/mealplan/:id/cook`
-Mark a meal as cooked.
+Attempt to cook a meal (deduct pantry, optionally add missing items to shopping list via `addMissingToShoppingList`).
+
+#### PATCH `/api/mealplan/:id/cooked`
+Toggle cooked status directly (used by uncook flow).
+
+#### GET `/api/mealplan/ingredients`
+Return needed ingredients for uncooked recipe meals (supports `weekStart` and `aggregateByIngredient=true`).
 
 #### POST `/api/mealplan/populate-week`
-Automatically populate the week with recipes.
+Automatically populate Monday-Sunday (`Breakfast|Lunch|Dinner`) for a target week.
 
 #### DELETE `/api/mealplan/reset-week`
-Clear all meals for the current week.
+Delete meal-plan items for a target week (`weekStart`) or all meals if not provided.
 
 ### Pantry Endpoints
 

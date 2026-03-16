@@ -217,28 +217,40 @@ Route protection component that redirects unauthenticated users.
 
 ### MealPlanGrid (`src/components/MealPlanGrid.jsx`)
 
-Weekly meal planning interface with drag-and-drop functionality.
+Weekly meal-planning grid for one selected week.
 
 **Features:**
-- Weekly calendar view
-- Drag-and-drop meal assignment
-- Meal status tracking (cooked/uncooked)
-- Recipe integration
-- Custom meal support
+- Renders only meals whose `weekStart` matches `selectedWeekStart` (UTC date-only comparison)
+- Supports multiple meals per day/slot (stacked cards in each cell)
+- Context actions per meal: edit, delete, view recipe, open restaurant URL
+- Cook flow integration (`PATCH /mealplan/:id/cook`) with missing-ingredients dialog
+- Uncook confirmation flow (`PATCH /mealplan/:id/cooked`)
+- Copy mode for recipe/eating-out meals (copy one meal or all meals in a slot, then click target slots to paste)
+- Mobile-first rendering (day sections) and desktop matrix rendering (days x meal types)
 
 **Props:**
-- `startDate`: Start date for the week
-- `endDate`: End date for the week
-- `onMealUpdate`: Callback for meal updates
-- `onMealDelete`: Callback for meal deletion
+- `mealPlan`: Raw meal-plan array from API
+- `days`: Ordered day names for the current week layout
+- `selectedWeekStart`: `YYYY-MM-DD` string used to filter visible meals
+- `onAddMeal(day, mealType)`
+- `onDeleteMeal(mealId)`
+- `onEditMeal(day, mealType, meal)`
+- `onMealPlanUpdate(updatedMeal)`
+- `onAddRecipeToSlot(day, mealType, recipe, existingMealId?)`
+- `onAddRestaurantToSlot(day, mealType, restaurant)`
 
 **Usage:**
 ```jsx
 <MealPlanGrid
-  startDate={startOfWeek}
-  endDate={endOfWeek}
-  onMealUpdate={handleMealUpdate}
-  onMealDelete={handleMealDelete}
+  days={orderedDayNames}
+  mealPlan={mealPlan}
+  selectedWeekStart={selectedWeekStart}
+  onAddMeal={handleOpenMealDialog}
+  onEditMeal={handleEditMeal}
+  onDeleteMeal={handleDeleteMeal}
+  onMealPlanUpdate={handleMealPlanUpdate}
+  onAddRecipeToSlot={handleAddRecipeToSlot}
+  onAddRestaurantToSlot={handleAddRestaurantToSlot}
 />
 ```
 
@@ -395,16 +407,22 @@ Stepper-style modal that guides first-time users through the workflow.
 Main dashboard page providing overview of all application features.
 
 **Features:**
-- Personalized greeting + stats (recipes, pantry items, meal plans, shopping items)
-- Weekly meal plan grid with copy-to-slot mode, cooked toggles, and optimistic edits
-- Collapsible “Needed Ingredients” panel with Add-All-to-shopping-list, pantry adjustments, and per-item state chips
+- Week selector with previous/next navigation, date-picker popover, and a persisted “Week starts on” preference (`localStorage`)
+- Week-scoped meal-plan operations (`/mealplan?weekStart=...`, `/mealplan/reset-week`, `/mealplan/populate-week`)
+- Meal grid with copy-to-slot mode, cooked toggles, eating-out support, and optimistic recipe-slot assignment
+- Collapsible “Needed Ingredients” panel backed by `/mealplan/ingredients?weekStart=...&aggregateByIngredient=true`
+- Ingredient action shortcuts (add/remove pantry, add to shopping list, add-all to shopping list)
 - EmptyState fallbacks for meal plan/ingredient widgets
 - Contextual help dialog ("How FoodForNow Works") accessible from the header
 
 **State Management:**
-- Fetches recipes, pantry, shopping list, and meal plans in parallel
-- Optimistic updates for add/edit/cook operations with toast feedback
+- Fetches recipes, week-filtered meal plans, and week-filtered needed ingredients in parallel
+- Uses cached API reads with targeted invalidation (`api.cachedGet` + `api.invalidateCache`)
+- Optimistic updates for slot-level recipe assignment and delete-with-rollback flows
 - Achievement notifications fire when API responses include `achievements`
+
+**Operational Pitfall:**
+- Always pass `weekStart` as `YYYY-MM-DD` when calling meal-plan endpoints to avoid timezone edge cases between client locale and server locale.
 
 **Usage:**
 ```jsx
@@ -416,18 +434,18 @@ Main dashboard page providing overview of all application features.
 User authentication page.
 
 **Features:**
-- Email and password form
-- Form validation
+- Email/password form that submits via shared API service (`api.post('/auth/login')`) so interceptors/cookies are handled consistently
+- Remember-email preference stored in `localStorage` (`foodfornow_remembered_login`)
+- Success transition state (`form` -> `success` -> `exiting`) before navigating to `/dashboard`
+- Browser credential save attempt via `PasswordCredential` when supported
+- Safety timeout to stop indefinite loading if login request hangs
 - Error handling
-- Remember me functionality
 - Link to registration
 - Link to forgot password
 
-**Form Validation:**
-- Email format validation
-- Password requirements
-- Required field validation
-- API error display
+**Error Handling Notes:**
+- API error messages prefer backend-provided `error` payloads.
+- If no response arrives in 10 seconds, the UI shows `"Request is taking too long. Please try again."`.
 
 **Usage:**
 ```jsx
