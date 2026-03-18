@@ -16,6 +16,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require('cookie-parser');
 const { errorPayload } = require('./src/utils/httpErrors');
+const { parseAllowedOrigins, shouldBypassCsrfForRequest } = require('./src/utils/csrfConfig');
 
 // Import API route modules
 const authRoutes = require("./src/routes/auth");
@@ -54,10 +55,7 @@ if (process.env.NODE_ENV !== 'production') {
  * cors: Configures Cross-Origin Resource Sharing
  */
 app.use(helmet()); // Adds various HTTP headers for security
-const defaultOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
-  : defaultOrigins;
+const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
 // In development, also allow Vite dev server on port 5173 from any host (e.g. --host network URLs)
 const isDev = process.env.NODE_ENV !== 'production';
 const devOriginPattern = /^https?:\/\/[^/]+:5173$/;
@@ -111,7 +109,13 @@ app.get('/api/csrf-token', (req, res) => {
 // In development, cross-origin requests (e.g. VITE_API_URL=http://localhost:3001/api) don't send
 // sameSite=lax cookies, so CSRF validation would always fail. Allow requests from allowed origins.
 function csrfProtection(req, res, next) {
-  if (isDev && req.get('origin') && allowedOrigins.includes(req.get('origin'))) {
+  if (
+    shouldBypassCsrfForRequest({
+      isDev,
+      origin: req.get('origin'),
+      allowedOrigins,
+    })
+  ) {
     return next();
   }
   return doubleCsrfProtection(req, res, next);
