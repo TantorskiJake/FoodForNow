@@ -31,3 +31,18 @@ test('mealsForSelectedWeek returns input when no selected week or non-array meal
   const notArray = { _id: 'x' };
   assert.equal(mealsForSelectedWeek(notArray, '2026-03-10'), notArray);
 });
+
+test('mealsForSelectedWeek keeps meals when week starts on changes', () => {
+  const mealPlan = [
+    { _id: 'sun', weekStart: '2026-03-08T00:00:00.000Z' },
+    { _id: 'mon', weekStart: '2026-03-09T00:00:00.000Z' },
+    { _id: 'sat', weekStart: '2026-03-14T23:59:59.999Z' },
+    { _id: 'next', weekStart: '2026-03-15T00:00:00.000Z' },
+  ];
+
+  const filtered = mealsForSelectedWeek(mealPlan, '2026-03-08');
+  assert.deepEqual(
+    filtered.map((meal) => meal._id),
+    ['sun', 'mon', 'sat']
+  );
+});
