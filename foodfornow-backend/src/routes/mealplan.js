@@ -17,6 +17,38 @@ function getWeekRangeUtc(weekStartStr) {
   return { start, end };
 }
 
+function isValidDate(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
+/** Return start-of-week (Monday) at 00:00:00.000 UTC for "now". */
+function getCurrentWeekStartUtc(now = new Date()) {
+  const utcMidnight = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    0,
+    0,
+    0,
+    0
+  ));
+  const daysBackToMonday = (utcMidnight.getUTCDay() + 6) % 7;
+  utcMidnight.setUTCDate(utcMidnight.getUTCDate() - daysBackToMonday);
+  return utcMidnight;
+}
+
+/**
+ * Normalize a requested week start into a UTC Monday-like week key used by route filters.
+ * Falls back to current UTC week when input is missing/invalid.
+ */
+function getPopulateWeekStartUtc(weekStartStr, now = new Date()) {
+  if (typeof weekStartStr === 'string' && weekStartStr.trim() !== '') {
+    const { start } = getWeekRangeUtc(weekStartStr);
+    if (isValidDate(start)) return start;
+  }
+  return getCurrentWeekStartUtc(now);
+}
+
 function buildMissingShoppingListBulkOps(userId, missingIngredients) {
   const quantitiesByIngredientUnit = new Map();
 
@@ -655,29 +687,17 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'No recipes found. Please add some recipes first.' });
     }
 
-    // Use provided weekStart or calculate the start of the current week (Monday)
-    let monday;
-    if (req.body && typeof req.body.weekStart === 'string') {
-      const parts = req.body.weekStart.split('-').map(Number);
-      const [year, month, day] = parts.length >= 3 ? parts : [NaN, NaN, NaN];
-      if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
-        monday = new Date(year, month - 1, day);
-        monday.setHours(0, 0, 0, 0);
-      }
-    }
-    if (!monday) {
-      const today = new Date();
-      monday = new Date(today);
-      monday.setDate(today.getDate() - today.getDay() + 1);
-      monday.setHours(0, 0, 0, 0);
-    }
+    // Keep populate-week storage aligned with UTC week filtering used by read/reset routes.
+    const monday = getPopulateWeekStartUtc(req.body?.weekStart);
+    const weekEnd = new Date(monday);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
     // Clear existing meal plan for the week
     await MealPlan.deleteMany({ 
       user: req.userId,
       weekStart: {
         $gte: monday,
-        $lt: new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000)
+        $lt: weekEnd
       }
     });
 
@@ -741,3 +761,8 @@ router.post('/populate-week', authMiddleware, async (req, res) => {
 module.exports = router;
 module.exports.buildMissingShoppingListBulkOps = buildMissingShoppingListBulkOps;
 module.exports.getWeekRangeUtc = getWeekRangeUtc;
+module.exports.__internal = {
+  getWeekRangeUtc,
+  getCurrentWeekStartUtc,
+  getPopulateWeekStartUtc,
+};
