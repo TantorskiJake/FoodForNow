@@ -22,6 +22,7 @@ import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 import { AUTH_TRANSITION } from '../config/authTransitionConfig';
 import api from '../services/api';
+import { getLoginErrorMessage, getValidLoginUser } from '../utils/loginResponse';
 
 const REMEMBERED_LOGIN_KEY = 'foodfornow_remembered_login';
 
@@ -134,9 +135,8 @@ const Login = () => {
       const res = await api.post('/auth/login', { email, password });
       clearTimeout(safetyTimeoutId);
 
-      const data = res.data;
-      const user = data?.user ?? data;
-      if (!user?.id && !user?._id) {
+      const user = getValidLoginUser(res.data);
+      if (!user) {
         setError('Invalid response from server. Please try again.');
         return;
       }
@@ -162,8 +162,7 @@ const Login = () => {
     } catch (err) {
       clearTimeout(safetyTimeoutId);
       console.error('Login error:', err);
-      const message = err.response?.data?.error || err.message || 'Login failed. Please try again.';
-      setError(message);
+      setError(getLoginErrorMessage(err));
     } finally {
       clearTimeout(safetyTimeoutId);
       setIsLoading(false);
