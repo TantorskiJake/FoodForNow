@@ -217,3 +217,37 @@ test('parseRecipeFromUrlByToken rejects unknown token', async () => {
     restoreEnv();
   }
 });
+
+test('parseRecipeFromUrlByToken blocks redirect pivots to internal URLs', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: undefined,
+    proxyRequired: undefined,
+  });
+
+  const requests = [];
+  axios.get = async (url, opts = {}) => {
+    requests.push({ url, opts });
+    return {
+      status: 302,
+      headers: {
+        location: 'http://169.254.169.254/latest/meta-data/',
+      },
+      data: '',
+    };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch('https://example.com');
+    await assert.rejects(() => service.parseRecipeFromUrlByToken(token));
+    assert.ok(requests.length >= 1);
+    assert.ok(requests.some((call) => call.opts.maxRedirects === 0));
+    for (const call of requests) {
+      const parsedUrl = new URL(call.url);
+      assert.notEqual(parsedUrl.hostname, '169.254.169.254');
+    }
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});

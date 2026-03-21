@@ -38,6 +38,7 @@ const PROXY_REQUIRED = parseBoolean(process.env.RECIPE_FETCH_PROXY_REQUIRED);
 const PROXY_SOURCE_URL_HEADER = 'X-Recipe-Source-Url';
 const PROXY_SOURCE_HOST_HEADER = 'X-Recipe-Source-Host';
 let proxyTemplateErrorLogged = false;
+const MAX_SAFE_REDIRECTS = 5;
 
 function parseBoolean(value) {
   if (value == null) return false;
@@ -158,6 +159,52 @@ function buildProxyFetchTarget(originalUrl) {
     }
     return { url: originalUrl, headers: {}, viaProxy: false };
   }
+}
+
+function createHttpStatusError(response) {
+  const status = response?.status == null ? 500 : Number(response.status) || 500;
+  const err = new Error(`Request failed with status code ${status}`);
+  err.response = response;
+  return err;
+}
+
+/**
+ * Follow redirects manually and re-validate each Location target.
+ * This closes SSRF redirect pivots (public URL -> internal URL).
+ */
+async function fetchHtmlWithSafeRedirects(initialUrl, requestConfig) {
+  let currentUrl = initialUrl;
+  for (let redirectCount = 0; redirectCount <= MAX_SAFE_REDIRECTS; redirectCount++) {
+    const response = await axios.get(currentUrl, {
+      ...requestConfig,
+      maxRedirects: 0,
+      validateStatus: () => true,
+    });
+
+    const status = response?.status == null ? 200 : Number(response.status) || 0;
+    if (status >= 200 && status < 300) {
+      return response.data;
+    }
+
+    const location = response?.headers?.location;
+    const isRedirect = status >= 300 && status < 400 && location;
+    if (!isRedirect) {
+      throw createHttpStatusError(response);
+    }
+
+    if (redirectCount === MAX_SAFE_REDIRECTS) {
+      throw new Error('Too many redirects while importing recipe URL.');
+    }
+
+    const nextUrl = new URL(location, currentUrl).toString();
+    const allowedRedirectUrl = await getAllowedUrlForFetch(nextUrl);
+    if (!allowedRedirectUrl) {
+      throw new Error('This URL is not allowed for recipe import.');
+    }
+    currentUrl = allowedRedirectUrl;
+  }
+
+  throw new Error('Too many redirects while importing recipe URL.');
 }
 
 /**
@@ -298,8 +345,11 @@ async function fetchRecipeHtml(url) {
   let lastErr;
   for (const headers of headerSets) {
     try {
-      const { data } = await axios.get(fetchUrl, { ...opts, headers });
-      return data;
+      if (proxyTarget.viaProxy) {
+        const { data } = await axios.get(fetchUrl, { ...opts, headers });
+        return data;
+      }
+      return await fetchHtmlWithSafeRedirects(fetchUrl, { ...opts, headers });
     } catch (err) {
       lastErr = err;
       const is403 = err.response?.status === 403 || (err.message && err.message.includes('403'));
@@ -342,8 +392,11 @@ async function fetchRecipeHtmlValidated(validatedUrl) {
   let lastErr;
   for (const headers of headerSets) {
     try {
-      const { data } = await axios.get(fetchUrl, { ...opts, headers });
-      return data;
+      if (proxyTarget.viaProxy) {
+        const { data } = await axios.get(fetchUrl, { ...opts, headers });
+        return data;
+      }
+      return await fetchHtmlWithSafeRedirects(fetchUrl, { ...opts, headers });
     } catch (err) {
       lastErr = err;
       const is403 = err.response?.status === 403 || (err.message && err.message.includes('403'));
