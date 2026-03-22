@@ -24,6 +24,18 @@ test('mealsForSelectedWeek ignores meals without weekStart', () => {
   assert.deepEqual(filtered.map((meal) => meal._id), ['c']);
 });
 
+test('mealsForSelectedWeek skips malformed weekStart values without throwing', () => {
+  const mealPlan = [
+    { _id: 'a', weekStart: 'not-a-date' },
+    { _id: 'b', weekStart: {} },
+    { _id: 'c', weekStart: '2026-03-10T12:00:00Z' },
+  ];
+
+  assert.doesNotThrow(() => mealsForSelectedWeek(mealPlan, '2026-03-10'));
+  const filtered = mealsForSelectedWeek(mealPlan, '2026-03-10');
+  assert.deepEqual(filtered.map((meal) => meal._id), ['c']);
+});
+
 test('mealsForSelectedWeek returns input when no selected week or non-array meal plan', () => {
   const mealPlan = [{ _id: 'a', weekStart: '2026-03-10T00:00:00.000Z' }];
   assert.equal(mealsForSelectedWeek(mealPlan, ''), mealPlan);

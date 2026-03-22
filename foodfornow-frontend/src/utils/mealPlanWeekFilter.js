@@ -5,6 +5,7 @@ export function mealsForSelectedWeek(mealPlan, selectedWeekStart) {
   return mealPlan.filter((m) => {
     if (!m?.weekStart) return false;
     const d = new Date(m.weekStart);
+    if (Number.isNaN(d.getTime())) return false;
     const weekKey = d.toISOString().slice(0, 10);
     return weekKey === selectedKey;
   });
