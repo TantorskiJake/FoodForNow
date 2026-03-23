@@ -25,10 +25,22 @@ test('rejects blocked internal hostnames', async () => {
   assert.equal(await isUrlAllowedForFetch('https://api.internal/recipe'), false);
 });
 
+test('rejects blocked hostnames with mixed case and trailing dots', async () => {
+  assert.equal(await isUrlAllowedForFetch('https://LOCALHOST./recipe'), false);
+  assert.equal(await isUrlAllowedForFetch('https://Kitchen.Local./recipe'), false);
+  assert.equal(await isUrlAllowedForFetch('https://API.Internal./recipe'), false);
+});
+
 test('rejects private and metadata IPv4 targets', async () => {
   assert.equal(await getAllowedUrlForFetch('https://127.0.0.1/'), null);
   assert.equal(await getAllowedUrlForFetch('https://10.0.0.5/'), null);
   assert.equal(await getAllowedUrlForFetch('https://169.254.169.254/latest'), null);
+});
+
+test('rejects obfuscated loopback IPv4 host formats', async () => {
+  assert.equal(await getAllowedUrlForFetch('https://2130706433/recipe'), null);
+  assert.equal(await getAllowedUrlForFetch('https://0x7f000001/recipe'), null);
+  assert.equal(await getAllowedUrlForFetch('https://0177.0.0.1/recipe'), null);
 });
 
 test('rejects IPv6 addresses mapped to blocked IPv4 ranges', async () => {
@@ -70,6 +82,24 @@ test('rejects hostname when DNS lookup fails', async (t) => {
   assert.equal(await isUrlAllowedForFetch('https://example.com/recipe'), false);
   const allowed = await getAllowedUrlForFetch('https://example.com/recipe');
   assert.equal(allowed, null);
+});
+
+test('rejects hostnames that resolve to blocked IPv6 ranges', async (t) => {
+  t.mock.method(dnsPromises, 'lookup', async () => [
+    { address: 'fe80::1' },
+  ]);
+
+  assert.equal(await isUrlAllowedForFetch('https://example.com/recipe'), false);
+  assert.equal(await getAllowedUrlForFetch('https://example.com/recipe'), null);
+});
+
+test('rejects hostnames that resolve to mapped loopback IPv6 addresses', async (t) => {
+  t.mock.method(dnsPromises, 'lookup', async () => [
+    { address: '::ffff:7f00:1' },
+  ]);
+
+  assert.equal(await isUrlAllowedForFetch('https://example.com/recipe'), false);
+  assert.equal(await getAllowedUrlForFetch('https://example.com/recipe'), null);
 });
 
 test('getAllowedUrlForFetch returns normalized URL only when allowed', async (t) => {
