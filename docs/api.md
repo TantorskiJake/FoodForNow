@@ -48,8 +48,10 @@ Returns a CSRF token for SPA clients. Call this before the first state-changing 
 ```
 
 **Notes:**
-- In production, if `CSRF_SECRET` is missing, the backend logs a warning and returns an empty token (`{ "csrfToken": "" }`), effectively disabling CSRF enforcement.
-- In development, cross-origin requests from explicitly allowed origins can bypass CSRF validation to support local split-origin setups.
+- In production, `CSRF_SECRET` is required. The server exits during startup when it is missing.
+- In development, CSRF validation is bypassed only for requests whose `Origin` exactly matches one of the parsed `CORS_ORIGIN` values (or defaults: `http://localhost:5173`, `http://127.0.0.1:5173`).
+- In development, CORS also allows `http(s)://<any-host>:5173`, but those origins are not auto-whitelisted for CSRF bypass unless they are explicitly in `CORS_ORIGIN`.
+- `GET`, `HEAD`, and `OPTIONS` are not CSRF-protected.
 
 ### Error Responses
 
