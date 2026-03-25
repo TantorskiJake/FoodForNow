@@ -31,3 +31,19 @@ test('getWeekRangeUtc handles year boundary week windows in UTC', () => {
   assert.equal(start.toISOString(), '2025-12-29T00:00:00.000Z');
   assert.equal(end.toISOString(), '2026-01-05T00:00:00.000Z');
 });
+
+test('getCurrentWeekStartUtc snaps any UTC date to Monday UTC midnight', () => {
+  const { getCurrentWeekStartUtc } = require('./mealplan');
+  const wednesdayUtc = new Date('2026-03-11T18:45:00.000Z');
+  const monday = getCurrentWeekStartUtc(wednesdayUtc);
+
+  assert.equal(monday.toISOString(), '2026-03-09T00:00:00.000Z');
+});
+
+test('getCurrentWeekStartUtc treats Sunday as previous week Monday in UTC', () => {
+  const { getCurrentWeekStartUtc } = require('./mealplan');
+  const sundayUtc = new Date('2026-03-15T23:59:59.999Z');
+  const monday = getCurrentWeekStartUtc(sundayUtc);
+
+  assert.equal(monday.toISOString(), '2026-03-09T00:00:00.000Z');
+});
