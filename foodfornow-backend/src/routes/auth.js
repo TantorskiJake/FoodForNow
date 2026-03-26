@@ -26,6 +26,28 @@ function buildForgotPasswordResponse(token) {
   return payload;
 }
 
+function applyPreferenceUpdates(user, preferences) {
+  if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) {
+    return;
+  }
+
+  if (typeof preferences.theme === 'string') user.preferences.theme = preferences.theme;
+  if (typeof preferences.units === 'string') user.preferences.units = preferences.units;
+  if (typeof preferences.language === 'string') user.preferences.language = preferences.language;
+  if (typeof preferences.timezone === 'string') user.preferences.timezone = preferences.timezone;
+}
+
+function applyNotificationUpdates(user, notifications) {
+  if (!notifications || typeof notifications !== 'object' || Array.isArray(notifications)) {
+    return;
+  }
+
+  if (typeof notifications.email === 'boolean') user.notifications.email = notifications.email;
+  if (typeof notifications.push === 'boolean') user.notifications.push = notifications.push;
+  if (typeof notifications.mealReminders === 'boolean') user.notifications.mealReminders = notifications.mealReminders;
+  if (typeof notifications.shoppingReminders === 'boolean') user.notifications.shoppingReminders = notifications.shoppingReminders;
+}
+
 // Stricter rate limits for login/signup to prevent brute force (applied in addition to global auth limiter)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -472,21 +494,9 @@ router.put('/profile', auth, async (req, res) => {
     if (website !== undefined) user.website = website || null;
     if (profilePicture !== undefined) user.profilePicture = profilePicture || null;
     
-    // Update preferences if provided (validate type)
-    if (preferences && typeof preferences === 'object' && !Array.isArray(preferences)) {
-      if (typeof preferences.theme === 'string') user.preferences.theme = preferences.theme;
-      if (typeof preferences.units === 'string') user.preferences.units = preferences.units;
-      if (typeof preferences.language === 'string') user.preferences.language = preferences.language;
-      if (typeof preferences.timezone === 'string') user.preferences.timezone = preferences.timezone;
-    }
-    
-    // Update notifications if provided (validate type to avoid prototype pollution)
-    if (notifications && typeof notifications === 'object' && !Array.isArray(notifications)) {
-      if (typeof notifications.email === 'boolean') user.notifications.email = notifications.email;
-      if (typeof notifications.push === 'boolean') user.notifications.push = notifications.push;
-      if (typeof notifications.mealReminders === 'boolean') user.notifications.mealReminders = notifications.mealReminders;
-      if (typeof notifications.shoppingReminders === 'boolean') user.notifications.shoppingReminders = notifications.shoppingReminders;
-    }
+    // Update preferences/notifications only when values are valid primitives.
+    applyPreferenceUpdates(user, preferences);
+    applyNotificationUpdates(user, notifications);
 
     // Update email if provided (with duplicate check)
     if (email) {
@@ -553,4 +563,6 @@ router.put('/profile', auth, async (req, res) => {
 module.exports = router;
 module.exports.__internal = {
   buildForgotPasswordResponse,
+  applyPreferenceUpdates,
+  applyNotificationUpdates,
 };
