@@ -57,22 +57,9 @@ import { useAchievements } from '../context/AchievementContext';
 import useProgressiveLoader from '../hooks/useProgressiveLoader';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useNavigate } from 'react-router-dom';
+import { DAY_NAMES, getOrderedDayNames, getStartOfWeek } from '../utils/dashboardWeekUtils';
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const WEEK_STARTS_ON_KEY = 'foodfornow_dashboard_week_starts_on';
-
-function getStartOfWeek(date, weekStartsOn) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const daysBack = (day - weekStartsOn + 7) % 7;
-  d.setDate(d.getDate() - daysBack);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function getOrderedDayNames(weekStartsOn) {
-  return [...DAY_NAMES.slice(weekStartsOn), ...DAY_NAMES.slice(0, weekStartsOn)];
-}
 
 const Dashboard = () => {
   const theme = useTheme();
