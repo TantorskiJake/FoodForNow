@@ -88,10 +88,27 @@ The main server file sets up the Express application with the following configur
 ```javascript
 // Key middleware setup
 app.use(helmet()); // Security headers
+
+const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
+const isDev = process.env.NODE_ENV !== 'production';
+const devOriginPattern = /^https?:\/\/[^/]+:5173$/;
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (isDev && devOriginPattern.test(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
+
+const isProduction = process.env.NODE_ENV === 'production';
+const csrfSecret = process.env.CSRF_SECRET || (!isProduction ? 'dev-csrf-secret' : null);
+if (isProduction && !csrfSecret) {
+  throw new Error('CSRF_SECRET environment variable is required in production');
+}
+
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 ```
@@ -103,8 +120,9 @@ Required environment variables for backend:
 ```env
 MONGO_URI=mongodb://localhost:27017/foodfornow
 JWT_SECRET=your_secure_jwt_secret_key
+CSRF_SECRET=your_csrf_secret
 PORT=3001
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 ### Middleware
@@ -378,7 +396,7 @@ Delete a recipe.
 Get meal-plan items, optionally filtered by `weekStart`.
 
 **Query Parameters:**
-- `weekStart`: Date-only string (`YYYY-MM-DD`). Backend applies UTC week filtering (`[start, start + 7 days)`).
+- `weekStart`: Date-only string (`YYYY-MM-DD`). Backend reads the first 10 chars, parses as UTC midnight, then applies `[start, start + 7 days)` filtering.
 
 #### POST `/api/mealplan`
 Add a meal to the meal plan.

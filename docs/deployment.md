@@ -436,10 +436,11 @@ SIGNUP_RATE_LIMIT_MAX=10
 
 ### Cookie, CSRF, and Proxy Notes
 
-- `CSRF_SECRET` should always be set in staging/production. If missing in production, the backend logs a warning and CSRF enforcement is effectively disabled.
+- `CSRF_SECRET` must be set in production. The backend fails fast on startup when it is missing.
 - Cookie behavior differs by environment: production uses `SameSite=None; Secure` for auth + CSRF cookies, while development defaults to `SameSite=Lax`.
 - `server.js` sets `trust proxy` so IP-based auth throttles work behind reverse proxies/load balancers.
 - `CORS_ORIGIN` supports comma-separated origins and should match the exact frontend origins that call the API.
+- In development, CORS allows `http(s)://<any-host>:5173`, but CSRF bypass only applies to exact origins in `CORS_ORIGIN` (or the localhost defaults). For LAN testing, include your LAN origin explicitly.
 
 ### Environment Variable Management
 

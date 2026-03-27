@@ -221,12 +221,14 @@ Weekly meal-planning grid for one selected week.
 
 **Features:**
 - Renders only meals whose `weekStart` matches `selectedWeekStart` (UTC date-only comparison)
+- Week matching uses `mealsForSelectedWeek` (`new Date(...).toISOString().slice(0, 10)`), so offset timestamps can move across local dates but still match UTC date keys
 - Supports multiple meals per day/slot (stacked cards in each cell)
 - Context actions per meal: edit, delete, view recipe, open restaurant URL
 - Cook flow integration (`PATCH /mealplan/:id/cook`) with missing-ingredients dialog
 - Uncook confirmation flow (`PATCH /mealplan/:id/cooked`)
 - Copy mode for recipe/eating-out meals (copy one meal or all meals in a slot, then click target slots to paste)
 - Mobile-first rendering (day sections) and desktop matrix rendering (days x meal types)
+- If a cook attempt adds missing ingredients to shopping list and the meal remains uncooked, the component currently forces a full page reload to sync state
 
 **Props:**
 - `mealPlan`: Raw meal-plan array from API
@@ -253,6 +255,10 @@ Weekly meal-planning grid for one selected week.
   onAddRestaurantToSlot={handleAddRestaurantToSlot}
 />
 ```
+
+**Week filter example (UTC behavior):**
+- Selecting `2026-03-10` includes `weekStart: "2026-03-09T19:00:00-05:00"` (UTC key becomes `2026-03-10`).
+- Selecting `2026-03-10` excludes `weekStart: "2026-03-10T00:00:00+09:00"` (UTC key becomes `2026-03-09`).
 
 ### BarcodeScanner (`src/components/BarcodeScanner.jsx`)
 
