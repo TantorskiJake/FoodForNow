@@ -22,8 +22,11 @@ import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 import { AUTH_TRANSITION } from '../config/authTransitionConfig';
 import api from '../services/api';
-
-const REMEMBERED_LOGIN_KEY = 'foodfornow_remembered_login';
+import {
+  clearRememberedCredentials,
+  getRememberedEmail,
+  setRememberedEmail,
+} from '../utils/loginRememberedEmail';
 
 const LOGIN_PHASE = { FORM: 'form', SUCCESS: 'success', EXITING: 'exiting' };
 
@@ -32,28 +35,6 @@ const BRAND = {
   greenDark: '#1B6B1B',
   greenLight: 'rgba(34, 139, 34, 0.12)',
 };
-
-function getRememberedEmail() {
-  try {
-    const raw = localStorage.getItem(REMEMBERED_LOGIN_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (data && typeof data.email === 'string') return data.email;
-  } catch (_) {}
-  return null;
-}
-
-function setRememberedEmail(email) {
-  try {
-    localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify({ email }));
-  } catch (_) {}
-}
-
-function clearRememberedCredentials() {
-  try {
-    localStorage.removeItem(REMEMBERED_LOGIN_KEY);
-  } catch (_) {}
-}
 
 const {
   easeOut: EASE_OUT,
