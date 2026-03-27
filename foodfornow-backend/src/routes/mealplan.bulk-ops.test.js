@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 const { buildMissingShoppingListBulkOps, __internal } = require('./mealplan');
-const { getWeekRangeUtc } = __internal;
+const { getWeekRangeUtc, getCurrentWeekStartUtc, getPopulateWeekStartUtc } = __internal;
 
 test('buildMissingShoppingListBulkOps aggregates duplicate ingredient+unit rows', () => {
   const userId = 'user-1';
@@ -65,4 +65,25 @@ test('getWeekRangeUtc ignores time and timezone offset in ISO input', () => {
 
   assert.equal(start.toISOString(), '2026-03-09T00:00:00.000Z');
   assert.equal(end.toISOString(), '2026-03-16T00:00:00.000Z');
+});
+
+test('getCurrentWeekStartUtc returns Monday 00:00 UTC for any day in week', () => {
+  const mondayFromSunday = getCurrentWeekStartUtc(new Date('2026-03-15T18:00:00.000Z'));
+  const mondayFromWednesday = getCurrentWeekStartUtc(new Date('2026-03-11T08:30:00.000Z'));
+
+  assert.equal(mondayFromSunday.toISOString(), '2026-03-09T00:00:00.000Z');
+  assert.equal(mondayFromWednesday.toISOString(), '2026-03-09T00:00:00.000Z');
+});
+
+test('getPopulateWeekStartUtc parses requested week start as UTC date-only key', () => {
+  const parsed = getPopulateWeekStartUtc('2026-03-09T23:30:00-11:00');
+
+  assert.equal(parsed.toISOString(), '2026-03-09T00:00:00.000Z');
+});
+
+test('getPopulateWeekStartUtc falls back to current UTC week for invalid input', () => {
+  const now = new Date('2026-03-11T12:00:00.000Z');
+  const parsed = getPopulateWeekStartUtc('not-a-date', now);
+
+  assert.equal(parsed.toISOString(), '2026-03-09T00:00:00.000Z');
 });
