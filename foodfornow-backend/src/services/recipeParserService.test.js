@@ -26,6 +26,16 @@ const RECIPE_HTML = `
   </html>
 `;
 
+function okHtmlResponse(data = RECIPE_HTML) {
+  return {
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    config: {},
+    data,
+  };
+}
+
 function setOrUnsetEnv(name, value) {
   if (value == null) {
     delete process.env[name];
@@ -63,7 +73,7 @@ test('parseRecipeFromUrlByToken consumes token and rejects reuse', async () => {
   let axiosCalls = 0;
   axios.get = async () => {
     axiosCalls += 1;
-    return { data: RECIPE_HTML };
+    return okHtmlResponse();
   };
 
   try {
@@ -100,7 +110,7 @@ test('parseRecipeFromUrlByToken uses configured proxy URL and source headers', a
   axios.get = async (url, opts = {}) => {
     capturedUrl = url;
     capturedHeaders = opts.headers || {};
-    return { data: RECIPE_HTML };
+    return okHtmlResponse();
   };
 
   try {
@@ -131,7 +141,7 @@ test('parseRecipeFromUrlByToken appends validated URL when proxy template has no
   let capturedUrl = null;
   axios.get = async (url) => {
     capturedUrl = url;
-    return { data: RECIPE_HTML };
+    return okHtmlResponse();
   };
 
   try {
@@ -160,14 +170,14 @@ test('parseRecipeFromUrlByToken rejects when proxy is required but not configure
   let axiosCalls = 0;
   axios.get = async () => {
     axiosCalls += 1;
-    return { data: RECIPE_HTML };
+    return okHtmlResponse();
   };
 
   try {
     const token = service.storeValidatedUrlForFetch('https://example.com/recipe');
     await assert.rejects(
       () => service.parseRecipeFromUrlByToken(token),
-      /proxy is required; this URL could not be parsed via the proxy worker/i
+      /proxy is required/i
     );
     assert.equal(axiosCalls, 0);
   } finally {
@@ -186,14 +196,14 @@ test('parseRecipeFromUrlByToken rejects when required proxy URL is invalid', asy
   let axiosCalls = 0;
   axios.get = async () => {
     axiosCalls += 1;
-    return { data: RECIPE_HTML };
+    return okHtmlResponse();
   };
 
   try {
     const token = service.storeValidatedUrlForFetch('https://example.com/recipe');
     await assert.rejects(
       () => service.parseRecipeFromUrlByToken(token),
-      /proxy is required; this URL could not be parsed via the proxy worker/i
+      /proxy is required/i
     );
     assert.equal(axiosCalls, 0);
   } finally {
@@ -214,6 +224,39 @@ test('parseRecipeFromUrlByToken rejects unknown token', async () => {
       /Invalid or expired fetch token\./
     );
   } finally {
+    restoreEnv();
+  }
+});
+
+test('parseRecipeFromUrlByToken blocks redirects to disallowed hosts', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: undefined,
+    proxyRequired: undefined,
+  });
+
+  const calls = [];
+  axios.get = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    return {
+      status: 302,
+      headers: { location: 'http://169.254.169.254/latest/meta-data/' },
+      data: '',
+      config: { url, ...opts },
+    };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch('https://example.com/redirect');
+    await assert.rejects(
+      () => service.parseRecipeFromUrlByToken(token),
+      /Redirect target URL is not allowed for recipe import\./
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'https://example.com/redirect');
+    assert.equal(calls[0].opts.maxRedirects, 0);
+  } finally {
+    axios.get = originalAxiosGet;
     restoreEnv();
   }
 });

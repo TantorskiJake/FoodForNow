@@ -259,6 +259,55 @@ const BROWSER_HEADERS_FIREFOX = {
   'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
 };
 
+const MAX_SAFE_REDIRECTS = 5;
+
+function buildStatusError(response) {
+  const status = response?.status ?? 'unknown';
+  const error = new Error(`Request failed with status code ${status}`);
+  error.response = response;
+  return error;
+}
+
+async function fetchHtmlWithSafeRedirects(fetchUrl, headers, { allowRedirects }) {
+  let currentUrl = fetchUrl;
+
+  for (let redirectCount = 0; redirectCount <= MAX_SAFE_REDIRECTS; redirectCount += 1) {
+    const response = await axios.get(currentUrl, {
+      responseType: 'text',
+      timeout: 15000,
+      maxRedirects: 0,
+      validateStatus: () => true,
+      headers,
+    });
+
+    if (response.status >= 200 && response.status < 300) {
+      return response.data;
+    }
+
+    const isRedirect = response.status >= 300 && response.status < 400;
+    if (allowRedirects && isRedirect) {
+      const location = response.headers?.location;
+      if (!location) {
+        throw buildStatusError(response);
+      }
+      if (redirectCount === MAX_SAFE_REDIRECTS) {
+        throw new Error('Too many redirects while fetching recipe URL.');
+      }
+      const resolvedRedirect = new URL(location, currentUrl).toString();
+      const allowedRedirect = await getAllowedUrlForFetch(resolvedRedirect);
+      if (!allowedRedirect) {
+        throw new Error('Redirect target URL is not allowed for recipe import.');
+      }
+      currentUrl = allowedRedirect;
+      continue;
+    }
+
+    throw buildStatusError(response);
+  }
+
+  throw new Error('Too many redirects while fetching recipe URL.');
+}
+
 /**
  * Fetch HTML with browser-like headers. Retries with alternate User-Agent on 403.
  * Uses only the allowlisted URL for the request so SSRF analyzers see a sanitized flow.
@@ -289,8 +338,8 @@ async function fetchRecipeHtml(url) {
     'Sec-Fetch-Site': 'none',
     'Sec-Fetch-User': '?1',
   };
-  const opts = { responseType: 'text', timeout: 15000 };
   const { url: fetchUrl, headers: proxyHeaders } = proxyTarget;
+  const allowRedirects = !proxyTarget.viaProxy;
   const headerSets = [
     { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_CHROME['User-Agent'] },
     { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_FIREFOX['User-Agent'], 'Referer': `${targetOrigin}/` },
@@ -298,8 +347,7 @@ async function fetchRecipeHtml(url) {
   let lastErr;
   for (const headers of headerSets) {
     try {
-      const { data } = await axios.get(fetchUrl, { ...opts, headers });
-      return data;
+      return await fetchHtmlWithSafeRedirects(fetchUrl, headers, { allowRedirects });
     } catch (err) {
       lastErr = err;
       const is403 = err.response?.status === 403 || (err.message && err.message.includes('403'));
@@ -333,8 +381,8 @@ async function fetchRecipeHtmlValidated(validatedUrl) {
     'Sec-Fetch-Site': 'none',
     'Sec-Fetch-User': '?1',
   };
-  const opts = { responseType: 'text', timeout: 15000 };
   const { url: fetchUrl, headers: proxyHeaders } = proxyTarget;
+  const allowRedirects = !proxyTarget.viaProxy;
   const headerSets = [
     { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_CHROME['User-Agent'] },
     { ...baseHeaders, ...proxyHeaders, 'User-Agent': BROWSER_HEADERS_FIREFOX['User-Agent'], 'Referer': `${targetOrigin}/` },
@@ -342,8 +390,7 @@ async function fetchRecipeHtmlValidated(validatedUrl) {
   let lastErr;
   for (const headers of headerSets) {
     try {
-      const { data } = await axios.get(fetchUrl, { ...opts, headers });
-      return data;
+      return await fetchHtmlWithSafeRedirects(fetchUrl, headers, { allowRedirects });
     } catch (err) {
       lastErr = err;
       const is403 = err.response?.status === 403 || (err.message && err.message.includes('403'));
@@ -442,28 +489,18 @@ async function parseRecipeFromUrlFallbackValidated(validatedUrl) {
  * comes only from cache lookup (server-generated token), not from request body (SSRF-safe).
  */
 async function parseRecipeFromUrlWithValidatedUrl(validatedUrl) {
-  let data = null;
-  try {
-    data = await parseRecipeFromUrlFallbackValidated(validatedUrl);
-  } catch {
-    data = null;
-  }
+  const html = await fetchRecipeHtmlValidated(validatedUrl);
+  let data = extractRecipeFromHtml(html);
 
   if (!data) {
     if (PROXY_REQUIRED) {
       throw new Error('Recipe import proxy is required; this URL could not be parsed via the proxy worker.');
     }
     try {
-      data = await getRecipeData(validatedUrl);
+      // Parse from already-fetched HTML to avoid any secondary network fetches.
+      data = await getRecipeData({ html, url: validatedUrl });
     } catch (err) {
-      const shouldFallback =
-        err.message === 'Recipe is not valid' ||
-        err.response?.status === 403 ||
-        (err.message && err.message.includes('status code 403'));
-      if (shouldFallback) {
-        data = await parseRecipeFromUrlFallbackValidated(validatedUrl);
-      }
-      if (!data) throw err;
+      throw err;
     }
   }
 
