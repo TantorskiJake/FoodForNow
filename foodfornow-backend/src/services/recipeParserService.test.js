@@ -260,3 +260,66 @@ test('parseRecipeFromUrlByToken blocks redirects to disallowed hosts', async () 
     restoreEnv();
   }
 });
+
+test('parseRecipeFromUrlByToken fails when redirect response has no location header', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: undefined,
+    proxyRequired: undefined,
+  });
+
+  let axiosCalls = 0;
+  axios.get = async () => {
+    axiosCalls += 1;
+    return {
+      status: 302,
+      headers: {},
+      data: '',
+      config: {},
+    };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch('https://example.com/redirect');
+    await assert.rejects(
+      () => service.parseRecipeFromUrlByToken(token),
+      /Request failed with status code 302/
+    );
+    assert.equal(axiosCalls, 1);
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});
+
+test('parseRecipeFromUrlByToken aborts redirect loops after maximum redirects', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: undefined,
+    proxyRequired: undefined,
+  });
+
+  const calls = [];
+  axios.get = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    return {
+      status: 302,
+      headers: { location: 'https://8.8.8.8/loop' },
+      data: '',
+      config: { url, ...opts },
+    };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch('https://example.com/redirect-start');
+    await assert.rejects(
+      () => service.parseRecipeFromUrlByToken(token),
+      /Too many redirects while fetching recipe URL\./
+    );
+    assert.equal(calls.length, 6);
+    assert.equal(calls[0].opts.maxRedirects, 0);
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});
