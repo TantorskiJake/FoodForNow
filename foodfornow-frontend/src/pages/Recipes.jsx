@@ -1531,7 +1531,7 @@ const Recipes = () => {
                   </FormHelperText>
                 )}
                 {formData.instructions.map((instruction, index) => (
-                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'flex-start' }}>
                     <TextField
                       label={`Step ${index + 1}`}
                       value={instruction}
@@ -1541,8 +1541,23 @@ const Recipes = () => {
                         setFormData({ ...formData, instructions: newInstructions });
                         setFieldErrors((prev) => ({ ...prev, instructions: '' }));
                       }}
+                      multiline
+                      rows={3}
                       fullWidth
                       required
+                      InputProps={{
+                        inputComponent: 'textarea',
+                      }}
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        '& .MuiInputBase-root': { alignItems: 'flex-start' },
+                        '& textarea.MuiInputBase-input': {
+                          resize: 'both',
+                          minHeight: '4.5rem',
+                          boxSizing: 'border-box',
+                        },
+                      }}
                     />
                     <IconButton
                       onClick={() => handleMoveInstructionUp(index)}
