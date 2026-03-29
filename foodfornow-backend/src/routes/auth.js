@@ -103,10 +103,12 @@ const generateTokens = async (userId) => {
     expiresIn: ACCESS_TOKEN_EXPIRATION,
   });
 
-  // Create long-lived refresh token
-  const refreshToken = jwt.sign({ userId }, JWT_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRATION,
-  });
+  // Long-lived refresh token: include jti so two mints in the same second never collide on DB unique index
+  const refreshToken = jwt.sign(
+    { userId, jti: crypto.randomBytes(16).toString("hex") },
+    JWT_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRATION }
+  );
 
   // Store refresh token in database for security
   const refreshTokenDoc = new RefreshToken({

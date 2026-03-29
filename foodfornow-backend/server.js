@@ -89,7 +89,10 @@ if (isProduction && !csrfSecret) {
 const { doubleCsrf } = require('csrf-csrf');
 const csrfOptions = {
   getSecret: () => csrfSecret,
-  getSessionIdentifier: (req) => req.ip || 'default',
+  // Stable id for double-submit HMAC. Using req.ip breaks validation when the
+  // perceived client IP changes between GET /csrf-token and a later POST (proxies,
+  // IPv4/IPv6, mobile networks) — users then see a generic 500 from the old handler.
+  getSessionIdentifier: () => 'ffn-spa-csrf',
   cookieName: 'csrf-token',
   cookieOptions: {
     sameSite: isProduction ? 'none' : 'lax',
@@ -165,12 +168,34 @@ app.get("/", (req, res) => {
 
 /**
  * Global Error Handling Middleware
- * 
- * Catches any errors that weren't handled by route handlers
- * and returns a generic error response.
+ *
+ * Catches errors passed to next(err) (e.g. invalid CSRF from csrf-csrf) and
+ * returns the correct status. Previously every such error became 500
+ * "Something went wrong!", which hid CSRF/proxy issues from operators and users.
  */
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  if (res.headersSent) {
+    return next(err);
+  }
+  console.error(err.stack || err);
+  const status =
+    typeof err.status === 'number'
+      ? err.status
+      : typeof err.statusCode === 'number'
+        ? err.statusCode
+        : 500;
+
+  if (status >= 400 && status < 500) {
+    const message =
+      err.code === 'EBADCSRFTOKEN'
+        ? 'Security verification failed. Please refresh the page and try again.'
+        : typeof err.message === 'string' && err.message && err.expose !== false
+          ? err.message
+          : 'Request could not be completed.';
+    const extras = err.code === 'EBADCSRFTOKEN' ? { code: 'EBADCSRFTOKEN' } : {};
+    return res.status(status).json(errorPayload(message, extras));
+  }
+
   res.status(500).json(errorPayload('Something went wrong!'));
 });
 

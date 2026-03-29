@@ -198,6 +198,47 @@ test('401 from refresh endpoint is not retried recursively', async () => {
   }
 });
 
+test('403 EBADCSRFTOKEN clears cached CSRF and retries request once', async () => {
+  __internal.resetCsrfTokenState();
+  __internal.resetRefreshState();
+  const originalAdapter = api.defaults.adapter;
+  let postCalls = 0;
+
+  api.defaults.adapter = async (config) => {
+    if (config.url === '/csrf-token') {
+      return axiosResponse(config, { csrfToken: 'fresh-csrf' });
+    }
+    if (config.method === 'post' && config.url === '/ingredients') {
+      postCalls += 1;
+      if (!config._csrfRetry) {
+        return Promise.reject({
+          config,
+          response: {
+            status: 403,
+            data: {
+              error: 'Security verification failed.',
+              message: 'Security verification failed.',
+              code: 'EBADCSRFTOKEN',
+            },
+          },
+        });
+      }
+      return axiosResponse(config, { _id: 'new-ing', name: 'Tortilla' });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
+  };
+
+  try {
+    const res = await api.post('/ingredients', { name: 'Tortilla', category: 'Pantry' });
+    assert.equal(postCalls, 2);
+    assert.equal(res.data.name, 'Tortilla');
+  } finally {
+    api.defaults.adapter = originalAdapter;
+    __internal.resetCsrfTokenState();
+    __internal.resetRefreshState();
+  }
+});
+
 test('requests marked with _skipAuthRefresh reject without refresh attempt', async () => {
   __internal.resetCsrfTokenState();
   __internal.resetRefreshState();

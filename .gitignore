@@ -11,6 +11,9 @@ Thumbs.db
 .vscode/
 !.vscode/extensions.json
 .cursor/
+!.cursor/mcp.json
+!.cursor/automations/
+!.cursor/automations/**
 .idea/
 *.suo
 *.ntvs*

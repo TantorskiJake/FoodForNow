@@ -260,8 +260,20 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-    
-    // For non-401 errors, just reject the promise
+
+    // Stale or rotated CSRF secret: clear cached token and retry once so the
+    // request interceptor fetches a fresh /csrf-token (matches new cookie).
+    if (
+      response?.status === 403 &&
+      response?.data?.code === 'EBADCSRFTOKEN' &&
+      config &&
+      !config._csrfRetry
+    ) {
+      resetCsrfTokenState();
+      config._csrfRetry = true;
+      return api(config);
+    }
+
     return Promise.reject(error);
   }
 );
