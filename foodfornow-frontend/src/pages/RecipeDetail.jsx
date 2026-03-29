@@ -25,6 +25,7 @@ import TimerIcon from '@mui/icons-material/Timer';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import EditIcon from '@mui/icons-material/Edit';
 import api from '../services/api';
+import RecipeFormDialog from '../components/RecipeFormDialog';
 
 const RecipeDetail = () => {
   const theme = useTheme();
@@ -34,6 +35,7 @@ const RecipeDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchRecipe = async () => {
@@ -181,7 +183,7 @@ const RecipeDetail = () => {
                   {recipe.name}
                 </Typography>
                 <IconButton
-                  onClick={() => navigate(`/recipes?edit=${id}`)}
+                  onClick={() => setEditDialogOpen(true)}
                   aria-label="Edit recipe"
                   sx={{
                     color: '#228B22',
@@ -277,18 +279,44 @@ const RecipeDetail = () => {
               >
                 Instructions
               </Typography>
-              <List>
+              <List sx={{ listStyle: 'none', p: 0, m: 0 }}>
                 {recipe.instructions.map((instruction, index) => (
-                  <ListItem key={index} sx={{ py: 1 }}>
-                    <ListItemText
-                      primary={`${index + 1}. ${instruction}`}
+                  <ListItem
+                    key={index}
+                    disablePadding
+                    sx={{
+                      py: 1,
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 1.5,
+                    }}
+                  >
+                    <Typography
+                      component="span"
+                      variant="body1"
                       sx={{
-                        '& .MuiListItemText-primary': {
-                          color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
-                          lineHeight: 1.6,
-                        },
+                        flexShrink: 0,
+                        minWidth: '2.25em',
+                        fontVariantNumeric: 'tabular-nums',
+                        fontWeight: 600,
+                        color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.75)',
+                        lineHeight: 1.6,
                       }}
-                    />
+                    >
+                      {index + 1}.
+                    </Typography>
+                    <Typography
+                      component="span"
+                      variant="body1"
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {instruction}
+                    </Typography>
                   </ListItem>
                 ))}
               </List>
@@ -304,6 +332,18 @@ const RecipeDetail = () => {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        <RecipeFormDialog
+          open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          editingRecipe={recipe}
+          createSeed={null}
+          onSaved={async ({ recipe: updated }) => {
+            setRecipe(updated);
+            api.invalidateCache((key) => key.includes('/recipes'));
+            setSnackbar({ open: true, message: 'Recipe updated', severity: 'success' });
+          }}
+        />
       </Container>
     </Box>
   );
