@@ -406,6 +406,25 @@ Stepper-style modal that guides first-time users through the workflow.
 />
 ```
 
+### RecipeFormDialog (`src/components/RecipeFormDialog.jsx`)
+
+Shared add/edit dialog used by both `Recipes` and `RecipeDetail`.
+
+**Features:**
+- Supports two modes: create (`POST /recipes`) and edit (`PUT /recipes/:id`)
+- Accepts `createSeed` payloads from import flows (`parse-url`/`parse-text` -> `prepare-import`)
+- Ingredient autocomplete with "Create new ingredient" fallback (`POST /ingredients`)
+- Multi-line instruction editor with step reordering and validation
+- Supports both ingredient IDs and free-text ingredient names (resolved on recipe save)
+- Optional `runTask` + `submitDisabled` props for parent-level loading states
+
+**Key Props:**
+- `open`, `onClose`
+- `editingRecipe`: switches dialog into edit mode
+- `createSeed`: pre-fills fields for imported recipes
+- `onSaved(payload)`: callback after successful create/update
+- `runTask`, `submitDisabled`: optional wrappers from parent pages
+
 ## Pages
 
 ### Dashboard (`src/pages/Dashboard.jsx`)
@@ -514,14 +533,17 @@ Recipe management page that now supports both URL scraping and handwritten card 
 
 **Features:**
 - Recipe listing with search, filters, sorting, and empty-state guidance
-- Dual import menu (URL scraper + OCR image upload powered by `tesseract.js`)
+- Dual import menu (URL scraper + OCR image upload powered by `tesseract.js`) plus pasted text import
 - Category review dialog for uncertain ingredients before import completes
-- Inline editing/creation with image upload, tags, timings, and instructions
-- Toast notifications + loading states for parse/prep flows
+- Shared `RecipeFormDialog` for create/edit
+- Shared recipe tab with "Add" duplication flow (`POST /recipes/:id/duplicate`)
+- Dashboard deep-link support (`/recipes?create=1`) to open create dialog directly
+- Optimistic delete with rollback on API failure
 
 **State Management:**
 - Tracks list filters, import dialog states, OCR progress, category overrides, and pending recipe payloads
-- Uses `api.post('/recipes/parse-text')` + `/prepare-import` to hydrate forms
+- Uses `api.cachedGet('/recipes')` and invalidates recipe cache after writes
+- Import pipeline: `parse-url` or `parse-text` -> optional category review -> `prepare-import` -> `RecipeFormDialog`
 
 ### RecipeDetail (`src/pages/RecipeDetail.jsx`)
 
@@ -530,10 +552,12 @@ Individual recipe view page.
 **Features:**
 - Complete recipe information
 - Ingredient list with quantities
-- Step-by-step instructions
+- Numbered step-by-step instructions
 - Cooking time and servings
-- Edit and delete options
-- Add to meal plan functionality
+- Back navigation to dashboard and recipe list
+- In-place edit icon that opens `RecipeFormDialog`
+- Updates local recipe state + invalidates recipe cache after successful save
+- Success feedback via snackbar after edits
 
 **URL Parameters:**
 - `id`: Recipe ID from URL
@@ -577,7 +601,8 @@ Simple mobile-friendly page used when a user scans the QR code from the desktop 
 
 **Features:**
 - Uses `@zxing/browser` to access the device camera and continuously decode barcodes
-- Submits scanned text to `POST /scan-session/:id` (session ID comes from QR query string)
+- Requires both `session` and signed `token` query params from the QR link
+- Submits scanned text to `POST /scan-session/:id` with `{ barcode, token }`
 - Shows success/error states and instructs the user to return to their computer after scanning
 
 **Usage:**
@@ -646,6 +671,7 @@ const api = axios.create({
 - `Request (CSRF)`: for `POST|PUT|PATCH|DELETE`, calls `GET /csrf-token` once, caches the token, and sends it as `x-csrf-token`. If token bootstrap fails transiently, the cached promise is cleared so the next request can retry.
 - `Response`: on `401`, queues concurrent requests while a single `/auth/token` refresh is in flight, then replays queued requests on success.
 - `Response (failure path)`: redirects to `/login` on refresh failure, except when already on public auth routes.
+- `Response (CSRF recovery)`: on `403` + `code: "EBADCSRFTOKEN"`, clears cached CSRF state and retries once.
 - `Error`: global error passthrough for non-auth failures.
 
 **CSRF flow example:**

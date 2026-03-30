@@ -52,6 +52,7 @@ Returns a CSRF token for SPA clients. Call this before the first state-changing 
 - In development, CSRF validation is bypassed only for requests whose `Origin` exactly matches one of the parsed `CORS_ORIGIN` values (or defaults: `http://localhost:5173`, `http://127.0.0.1:5173`).
 - In development, CORS also allows `http(s)://<any-host>:5173`, but those origins are not auto-whitelisted for CSRF bypass unless they are explicitly in `CORS_ORIGIN`.
 - `GET`, `HEAD`, and `OPTIONS` are not CSRF-protected.
+- Invalid/rotated CSRF tokens return `403` with `code: "EBADCSRFTOKEN"` so clients can refresh and retry.
 
 ### Error Responses
 
@@ -185,12 +186,13 @@ Request a password reset for the given email address.
 ```json
 {
   "success": true,
-  "message": "If that email exists, a reset link will be sent.",
-  "resetToken": "hex_token_string"
+  "message": "If that email exists, a reset link will be sent."
 }
 ```
 
-**Note:** Returns success regardless of whether the email exists (prevents email enumeration). The `resetToken` is returned for development; in production, this would be sent via email.
+**Notes:**
+- Returns success regardless of whether the email exists (prevents email enumeration).
+- `resetToken` is omitted by default. For local debugging, it is included only when `EXPOSE_RESET_TOKEN_IN_RESPONSE=true` and `NODE_ENV` is not `production`.
 
 ---
 
@@ -553,7 +555,7 @@ Update an existing recipe.
 
 ### POST `/api/recipes/parse-url`
 
-Scrape recipe data from a supported website (Serious Eats, TheKitchn, Food Network, ChewOutLoud, etc.). Requires authentication.
+Scrape recipe data from a supported website. Requires authentication.
 
 **Request Body:**
 ```json
@@ -584,9 +586,12 @@ Scrape recipe data from a supported website (Serious Eats, TheKitchn, Food Netwo
 }
 ```
 
+**Constraints:**
+- URL must start with `https://`.
+- URL host/path must pass backend allowlist checks.
+
 **Error Responses:**
-- `400`: Missing/invalid URL or unsupported schema
-- `403`: Upstream site blocked scraping after retries
+- `400`: Missing/invalid URL, disallowed URL, or parsing failure
 
 ---
 
@@ -611,7 +616,8 @@ Same payload shape as `parse-url`. Unparsable lines become `uncertain` ingredien
 
 ### POST `/api/recipes/prepare-import`
 
-Create ingredient records (or map to existing ones) after parsing. Returns a recipe payload where all ingredient IDs are resolvable.
+Normalize parsed recipe data for the form-review step before save. This endpoint does **not**
+create ingredient records; ingredient resolution/creation happens when `POST /api/recipes` is called.
 
 **Request Body:**
 ```json
@@ -627,23 +633,26 @@ Create ingredient records (or map to existing ones) after parsing. Returns a rec
 **Success Response (200):**
 ```json
 {
-  "recipe": {
-    "name": "Real Deal Carbonara",
-    "ingredients": [
-      {
-        "ingredient": "65f5f41fc...",
-        "quantity": 150,
-        "unit": "g"
-      }
-    ],
-    "instructions": ["..."]
-  }
+  "name": "Real Deal Carbonara",
+  "description": "Roman-style pasta",
+  "ingredients": [
+    {
+      "name": "guanciale",
+      "quantity": 150,
+      "unit": "g",
+      "category": "Meat"
+    }
+  ],
+  "instructions": ["..."],
+  "prepTime": 15,
+  "cookTime": 15,
+  "servings": 4,
+  "tags": ["italian"]
 }
 ```
 
 **Error Responses:**
-- `400`: Validation error (e.g., missing ingredient IDs)
-- `500`: Failed to create ingredient records
+- `400`: Invalid recipe payload or prepare-import failure
 
 ---
 
@@ -1704,13 +1713,19 @@ Look up product metadata by UPC/EAN barcode via the Open Food Facts proxy. Requi
 ### POST `/api/scan-session`
 
 Create a 5-minute session to pair a logged-in desktop browser with a phone scanner.
+The session is tied to the authenticated user and includes a signed submit token.
 
 **Success Response (200):**
 ```json
-{ "sessionId": "4c7ab1f9fa1e44c3a4cd1f89a6d26335" }
+{
+  "sessionId": "4c7ab1f9fa1e44c3a4cd1f89a6d26335",
+  "submitToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 300
+}
 ```
 
-Use the session ID to generate `https://app.example.com/scan?session=<id>` or rely on the frontend QR code.
+Use `sessionId` and `submitToken` to generate
+`https://app.example.com/scan?session=<id>&token=<submitToken>` or rely on the frontend QR code.
 
 ---
 
@@ -1726,6 +1741,7 @@ Poll for barcode submissions tied to a session. Requires authentication.
 When the phone posts, `barcode` becomes a numeric string (e.g., `"3017620422003"`).
 
 **Error Responses:**
+- `403`: Session does not belong to authenticated user
 - `404`: Session expired or invalid
 
 ---
@@ -1733,10 +1749,14 @@ When the phone posts, `barcode` becomes a numeric string (e.g., `"3017620422003"
 ### POST `/api/scan-session/:id`
 
 Called from the mobile `/scan` page (no auth) to send a decoded barcode back to the desktop.
+The phone must include the signed token issued by `POST /api/scan-session`.
 
 **Request Body:**
 ```json
-{ "barcode": "3017620422003" }
+{
+  "barcode": "3017620422003",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
 ```
 
 **Success Response (200):**
@@ -1746,6 +1766,8 @@ Called from the mobile `/scan` page (no auth) to send a decoded barcode back to 
 
 **Error Responses:**
 - `400`: Missing/invalid barcode
+- `401`: Missing, invalid, or expired scan token
+- `403`: Session/token mismatch
 - `404`: Session expired or invalid
 
 ---
