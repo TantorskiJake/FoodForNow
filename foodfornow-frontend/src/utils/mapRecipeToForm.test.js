@@ -23,7 +23,7 @@ test('mapRecipeDataToForm maps ingredient ids and free-text ingredient fallbacks
       { ingredient: { _id: 'ing-1', name: 'Salt' }, quantity: 2, unit: 'tsp' },
       { ingredient: 'ing-2', quantity: null },
       { name: 'Mystery Spice', quantity: 0, category: 'Spices' },
-      { ingredient: { name: 'Banana' }, quantity: 1, unit: '' },
+      { ingredient: { _id: '', name: 'Banana' }, quantity: 1, unit: '' },
     ],
     instructions: [],
     prepTime: 0,
