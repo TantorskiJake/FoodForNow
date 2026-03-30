@@ -90,8 +90,8 @@ npm run start
 
 1. Run `npm run dev:host` from the repo root so the Vite dev server binds to `0.0.0.0`.
 2. Set `VITE_APP_PUBLIC_URL` to the LAN URL your phone can open (e.g., `http://192.168.1.23:5173`), restart the frontend if you change it.
-3. Open the barcode scanner dialog on desktop, switch to **Use phone**, and scan the QR code. The app generates URLs like `http://192.168.1.23:5173/scan?session=...`.
-4. The `/scan` page runs `@zxing/browser` to stream the camera feed and hits `POST /api/scan-session/:id` whenever a barcode is decoded.
+3. Open the barcode scanner dialog on desktop, switch to **Use phone**, and scan the QR code. The app generates URLs like `http://192.168.1.23:5173/scan?session=...&token=...`.
+4. The `/scan` page runs `@zxing/browser` to stream the camera feed and hits `POST /api/scan-session/:id` with `{ barcode, token }` whenever a barcode is decoded.
 5. Back on desktop, the dialog polls `GET /api/scan-session/:id` until a barcode arrives, then performs the normal lookup flow.
 
 ## Docker Configuration

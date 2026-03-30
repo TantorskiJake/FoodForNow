@@ -123,6 +123,11 @@ JWT_SECRET=your_secure_jwt_secret_key
 CSRF_SECRET=your_csrf_secret
 PORT=3001
 CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
+# Optional: expose reset token in forgot-password responses for local debugging only
+EXPOSE_RESET_TOKEN_IN_RESPONSE=false
+# Optional: signed phone-submit token settings for scan-session flow
+SCAN_SESSION_TOKEN_SECRET=separate_secret_for_scan_tokens
+SCAN_SESSION_TOKEN_TTL_SECONDS=300
 ```
 
 ### Middleware
@@ -143,8 +148,17 @@ The application implements comprehensive error handling:
 ```javascript
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Something went wrong!" });
+  console.error(err.stack || err);
+  const status = err.status || err.statusCode || 500;
+  if (status >= 400 && status < 500) {
+    return res.status(status).json(errorPayload(
+      err.code === 'EBADCSRFTOKEN'
+        ? 'Security verification failed. Please refresh the page and try again.'
+        : (err.message || 'Request could not be completed.'),
+      err.code === 'EBADCSRFTOKEN' ? { code: 'EBADCSRFTOKEN' } : {}
+    ));
+  }
+  return res.status(500).json(errorPayload('Something went wrong!'));
 });
 
 // Process error handlers
@@ -482,9 +496,9 @@ Automatically update shopping list based on meal plan.
 ### Barcode & Scan Session Infrastructure
 
 - **`GET /api/barcode/:code`**: Express route defined in `src/routes/barcode.js`. Uses Axios with browser-like headers to fetch product info from Open Food Facts and maps categories/units to the app's enums.
-- **`POST /api/scan-session`**/**`GET /api/scan-session/:id`**/**`POST /api/scan-session/:id`**: Implemented in `src/routes/scan-session.js`. Sessions live in an in-memory `Map` (TTL 5 minutes). Desktop clients poll via authenticated GET; phones submit barcodes via POST without auth (session ID acts as the shared secret).
+- **`POST /api/scan-session`**/**`GET /api/scan-session/:id`**/**`POST /api/scan-session/:id`**: Implemented in `src/routes/scan-session.js`. Sessions live in an in-memory `Map` (TTL 5 minutes). Session creation returns `{ sessionId, submitToken, expiresIn }`; desktop polling is authenticated and user-bound, and phone submissions are unauthenticated but must include the signed submit token.
 - **Always-Available Ingredients**: `src/constants/ingredients.js` exports `ALWAYS_AVAILABLE_INGREDIENTS` plus `isAlwaysAvailableIngredient(name)`. Meal plan cooking (`mealplan.js`) and shopping list aggregation skip staples such as water, salt, and pepper when checking pantry levels or adding missing items.
-- **Recipe Parser Enhancements**: `src/services/recipeParserService.js` now includes `fetchRecipeHtml` with UA retries, `parseRecipeFromText` for OCR output, and improved JSON-LD fallback parsing. These functions power the `/recipes/parse-url`, `/recipes/parse-text`, and `/recipes/prepare-import` flows.
+- **Recipe Parser Enhancements**: `src/services/recipeParserService.js` includes `fetchRecipeHtml` with UA retries, `parseRecipeFromText` for OCR output, and improved JSON-LD fallback parsing. These functions power `/recipes/parse-url` and `/recipes/parse-text`; `/recipes/prepare-import` normalizes parsed data for review and does not create ingredient records.
 
 ### Achievement Endpoints
 
@@ -562,8 +576,9 @@ The main application component now wraps routing inside `AppRoutes`, which:
 - Auto-populate/reset week controls, recipe copy mode, cooked toggles, and contextual help dialog
 
 #### Recipes (`src/pages/Recipes.jsx`)
-- Recipe listing with search/sort + dual import dialog (URL scraper + OCR image ingestion)
+- Recipe listing with search/sort + import dialog (URL scraper, OCR image ingestion, and pasted text)
 - Category review modal for uncertain ingredients before import finalization
+- Shared `RecipeFormDialog` for create/edit and imported recipe review
 
 #### Pantry (`src/pages/Pantry.jsx`)
 - Grouped ingredient cards with expiration badges and EmptyState CTA
@@ -574,6 +589,7 @@ The main application component now wraps routing inside `AppRoutes`, which:
 
 #### Scan (`src/pages/Scan.jsx`)
 - Mobile-friendly QR destination that uses `@zxing/browser` to send decoded barcodes back through `scan-session`
+- Requires both `session` and signed `token` query params from the desktop-generated QR URL
 
 ### Services
 
