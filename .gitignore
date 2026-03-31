@@ -7,6 +7,9 @@
 ehthumbs.db
 Thumbs.db
 
+# Local agent / tooling clones (not part of the app)
+.claude/
+
 # Editor and IDE files
 .vscode/
 !.vscode/extensions.json

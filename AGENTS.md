@@ -24,7 +24,7 @@ When the user asks to explore the UI for bugs, with **backend + frontend dev ser
 4. Check **console** at error severity (`browser_console_messages` / equivalent) and note any **401/500** or broken network calls from snapshots.
 5. Summarize findings: regressions, confusing UX, a11y gaps, and console or network errors.
 
-**Automated breadth check (no MCP):** from repo root with dev servers up, run `npm run e2e:smoke` (or `npm run e2e` to include [`e2e/full-flow.spec.js`](e2e/full-flow.spec.js)). GitHub Actions in this repo does **not** currently run Playwright; smoke is for local/optional CI wiring later.
+**Automated breadth check (no MCP):** from repo root with dev servers up, run `npm run e2e:smoke` (or `npm run e2e` to include [`e2e/full-flow.spec.js`](e2e/full-flow.spec.js)). **CI:** pushes and PRs to `main` / `develop` run `npm test` (backend + frontend unit tests) and `npm run e2e:smoke` with a MongoDB service (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ## On-demand automations
 

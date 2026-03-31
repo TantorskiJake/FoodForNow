@@ -15,6 +15,7 @@
     "dev:host": "concurrently \"npm run dev -w foodfornow-backend\" \"npm run dev:host -w foodfornow-frontend\"",
     "build": "npm run build -w foodfornow-frontend",
     "start": "npm run start -w foodfornow-backend",
+    "test": "npm run test -w foodfornow-backend && npm run test -w foodfornow-frontend",
     "e2e": "playwright test",
     "e2e:smoke": "playwright test e2e/smoke-routes.spec.js"
   },
