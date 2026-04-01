@@ -43,7 +43,7 @@ test('mapRecipeDataToForm maps unresolved ingredient names with defaults', () =>
     name: 'Imported Soup',
     ingredients: [
       { name: 'Mystery Spice', quantity: 1.5 },
-      { ingredient: { name: 'Garlic' }, quantity: 3, unit: 'tsp', category: 'Spices' },
+      { name: 'Garlic', quantity: 3, unit: 'tsp', category: 'Spices' },
     ],
     instructions: ['Mix'],
   });
