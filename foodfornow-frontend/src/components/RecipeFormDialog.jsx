@@ -100,19 +100,24 @@ export default function RecipeFormDialog({
   useEffect(() => {
     if (!open) return undefined;
     let cancelled = false;
+
+    // Initialize form state immediately so we never render stale data from a
+    // previous recipe while ingredient options are still loading.
+    if (editingRecipe) {
+      setFormData(mapRecipeDataToForm(editingRecipe));
+    } else if (createSeed) {
+      setFormData(mapRecipeDataToForm(createSeed));
+    } else {
+      setFormData({ ...emptyFormData });
+    }
+    setError('');
+    setFieldErrors({ ...initialFieldErrors });
+
     (async () => {
       await fetchIngredients({ forceRefresh: false });
       if (cancelled) return;
-      if (editingRecipe) {
-        setFormData(mapRecipeDataToForm(editingRecipe));
-      } else if (createSeed) {
-        setFormData(mapRecipeDataToForm(createSeed));
-      } else {
-        setFormData({ ...emptyFormData });
-      }
-      setError('');
-      setFieldErrors({ ...initialFieldErrors });
     })();
+
     return () => {
       cancelled = true;
     };
