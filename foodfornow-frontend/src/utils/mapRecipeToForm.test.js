@@ -23,7 +23,7 @@ test('mapRecipeDataToForm maps mixed ingredient shapes for edit form state', () 
       { ingredient: { _id: 'ing-1', name: 'Carrot' }, quantity: 2, unit: 'piece' },
       { ingredient: 'ing-2', quantity: '1.5', unit: 'cup' },
       { name: 'Salt', quantity: 0.5, category: 'Spices' },
-      { ingredient: { name: 'Pepper' }, quantity: null, unit: '' },
+      { name: 'Pepper', quantity: null, unit: '' },
     ],
     instructions: ['Chop vegetables', 'Simmer until tender'],
     prepTime: 10,
