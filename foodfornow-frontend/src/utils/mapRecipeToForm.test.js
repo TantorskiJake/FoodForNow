@@ -65,7 +65,7 @@ test('maps free-form ingredients with safe defaults for import flow', () => {
         category: '',
       },
       {
-        ingredient: { name: 'Salt' },
+        name: 'Salt',
         quantity: 1,
       },
     ],
