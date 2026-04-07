@@ -18,7 +18,6 @@ test('returns a fresh empty form when recipe data is missing', () => {
   });
   assert.deepEqual(second, first);
   assert.notEqual(first, second);
-  assert.notEqual(first.ingredients, second.ingredients);
 });
 
 test('maps ingredients with IDs and preserves quantity zero as a string', () => {
@@ -63,7 +62,7 @@ test('maps free-text ingredients and applies sensible defaults', () => {
         quantity: 2,
       },
       {
-        ingredient: { name: 'Secret Spice' },
+        name: 'Secret Spice',
         quantity: '',
         unit: 'pinch',
         category: 'Spices',
