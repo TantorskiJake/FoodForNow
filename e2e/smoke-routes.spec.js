@@ -55,7 +55,7 @@ test.describe('Smoke: routes and console hygiene', () => {
     await page.goto('/login');
     await expect(page).toHaveURL(/\/login/);
 
-    await page.getByRole('button', { name: /register/i }).click();
+    await page.getByRole('button', { name: /sign up/i }).click();
     await expect(page).toHaveURL(/\/register/);
     await page.getByLabel(/full name/i).fill(testUser.name);
     await page.getByLabel(/email address/i).fill(testUser.email);
