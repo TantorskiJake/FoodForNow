@@ -510,30 +510,39 @@ User registration page.
 
 ### Recipes (`src/pages/Recipes.jsx`)
 
-Recipe management page that now supports both URL scraping and handwritten card imports.
+Recipe management page for personal and shared recipe libraries, including import workflows.
 
 **Features:**
 - Recipe listing with search, filters, sorting, and empty-state guidance
-- Dual import menu (URL scraper + OCR image upload powered by `tesseract.js`)
-- Category review dialog for uncertain ingredients before import completes
-- Inline editing/creation with image upload, tags, timings, and instructions
-- Toast notifications + loading states for parse/prep flows
+- `My Recipes` and `Shared Recipes` tabs with shared-recipe duplication (`POST /recipes/:id/duplicate`)
+- Add/edit via shared `RecipeFormDialog` component (also reused by `RecipeDetail`)
+- Dual import menu:
+- `From URL` (`POST /recipes/parse-url`)
+- `From handwritten recipe card` (OCR in browser with `tesseract.js`, then `POST /recipes/parse-text`)
+- `Paste recipe text` (`POST /recipes/parse-text`)
+- Category review dialog for uncertain ingredients before continuing import
+- Import continuation with `POST /recipes/prepare-import`, then open prefilled recipe form for user review before final save
+- Optimistic delete with rollback on API failure
 
 **State Management:**
-- Tracks list filters, import dialog states, OCR progress, category overrides, and pending recipe payloads
-- Uses `api.post('/recipes/parse-text')` + `/prepare-import` to hydrate forms
+- Tracks tab, search, sort, import dialog states, OCR progress, category overrides, and pending recipe payloads
+- Uses `api.cachedGet('/recipes')` and `api.cachedGet('/recipes/shared')` with targeted invalidation after write operations
+- Uses `createSeed` payloads to hydrate `RecipeFormDialog` for imported recipes
+
+**Operational Constraints:**
+- URL import parser currently accepts only `https://` URLs on the backend. Entering `http://` URLs in the UI will fail at parse time.
+- `POST /recipes/prepare-import` normalizes ingredient names/categories for review; ingredient records are resolved/created only when the user submits `POST /recipes`.
 
 ### RecipeDetail (`src/pages/RecipeDetail.jsx`)
 
 Individual recipe view page.
 
 **Features:**
-- Complete recipe information
-- Ingredient list with quantities
-- Step-by-step instructions
-- Cooking time and servings
-- Edit and delete options
-- Add to meal plan functionality
+- Loads owner-only recipe data via `GET /recipes/:id`
+- Displays recipe metadata (prep/cook time, servings), ingredient quantities, and numbered instructions
+- Header edit action opens `RecipeFormDialog` with existing recipe data
+- On successful edit, updates local recipe state and invalidates cached `/recipes` reads
+- Navigation shortcuts back to Dashboard and Recipes index
 
 **URL Parameters:**
 - `id`: Recipe ID from URL
@@ -646,6 +655,7 @@ const api = axios.create({
 - `Request (CSRF)`: for `POST|PUT|PATCH|DELETE`, calls `GET /csrf-token` once, caches the token, and sends it as `x-csrf-token`. If token bootstrap fails transiently, the cached promise is cleared so the next request can retry.
 - `Response`: on `401`, queues concurrent requests while a single `/auth/token` refresh is in flight, then replays queued requests on success.
 - `Response (failure path)`: redirects to `/login` on refresh failure, except when already on public auth routes.
+- `Response (CSRF mismatch)`: on `403` with `code: 'EBADCSRFTOKEN'`, clears cached CSRF state and retries the original request once (fresh token + cookie pair).
 - `Error`: global error passthrough for non-auth failures.
 
 **CSRF flow example:**
@@ -660,6 +670,7 @@ await api.post('/recipes', recipeData);
 **Troubleshooting:**
 - `403` on write requests with split frontend/backend origins in dev: ensure backend `CORS_ORIGIN` explicitly includes the frontend origin used by the browser, and confirm requests send credentials (`withCredentials: true`).
 - Repeated `401` + redirect loops: verify refresh cookies are being set by `/auth/login` and `/auth/token`, and confirm `VITE_API_URL` points at the backend API root (including `/api`).
+- Repeated `EBADCSRFTOKEN` on writes: verify backend `CSRF_SECRET` stability and ensure browser cookies are not being blocked/cleared between `GET /csrf-token` and subsequent write requests.
 
 **Usage:**
 ```jsx

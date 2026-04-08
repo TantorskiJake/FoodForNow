@@ -420,6 +420,45 @@ Get recipes shared by other users (excluding recipes with names the user already
 
 ---
 
+### POST `/api/recipes/:id/duplicate`
+
+Duplicate a shared recipe into the authenticated user's recipe collection.
+
+Behavior:
+- Source recipe must exist.
+- Duplicate-by-name is blocked when the user already has a recipe with the same name.
+- Referenced ingredients are reused when the user already owns a matching ingredient; otherwise ingredient records are copied into the user's ingredient collection before recipe creation.
+
+**Success Response (201) - standard:**
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "name": "Shared Recipe Name",
+  "ingredients": [...],
+  "createdBy": "507f1f77bcf86cd799439099"
+}
+```
+
+**Success Response (201) - when achievements unlock:**
+```json
+{
+  "recipe": {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "Shared Recipe Name"
+  },
+  "achievements": [
+    { "name": "Recipe Master", "description": "...", "icon": "..." }
+  ]
+}
+```
+
+**Error Responses:**
+- `404`: Recipe not found
+- `409`: Recipe already in user's collection
+- `500`: Failed to duplicate recipe
+
+---
+
 ### POST `/api/recipes`
 
 Create a new recipe.
@@ -434,6 +473,12 @@ Create a new recipe.
       "ingredient": "507f1f77bcf86cd799439012",
       "quantity": 500,
       "unit": "g"
+    },
+    {
+      "name": "Fresh basil",
+      "quantity": 5,
+      "unit": "piece",
+      "category": "Produce"
     }
   ],
   "instructions": [
@@ -448,39 +493,48 @@ Create a new recipe.
 ```
 
 **Validation Rules:**
-- `name`: Required, 1-100 characters
-- `description`: Required, 1-500 characters
+- `name`, `description`, `ingredients`, `instructions`, `prepTime`, `cookTime`, and `servings` are required
 - `ingredients`: Required, non-empty array
-- `instructions`: Required, non-empty array
+- Each ingredient must include either `ingredient` (ID) or `name`, plus `quantity` and `unit`
 - `prepTime`: Required, positive number
 - `cookTime`: Required, positive number
 - `servings`: Required, positive number
 
-**Success Response (201):**
+**Success Response (201) - standard:**
 ```json
 {
-  "success": true,
-  "message": "Recipe created successfully",
+  "_id": "507f1f77bcf86cd799439011",
+  "name": "Spaghetti Carbonara",
+  "description": "Classic Italian pasta dish",
+  "ingredients": [...],
+  "instructions": [...],
+  "prepTime": 15,
+  "cookTime": 20,
+  "servings": 4,
+  "tags": ["italian", "pasta"],
+  "createdBy": "507f1f77bcf86cd799439013",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+**Success Response (201) - when achievements unlock:**
+```json
+{
   "recipe": {
-    "id": "507f1f77bcf86cd799439011",
+    "_id": "507f1f77bcf86cd799439011",
     "name": "Spaghetti Carbonara",
-    "description": "Classic Italian pasta dish",
-    "ingredients": [...],
-    "instructions": [...],
-    "prepTime": 15,
-    "cookTime": 20,
-    "servings": 4,
-    "tags": ["italian", "pasta"],
-    "createdBy": "507f1f77bcf86cd799439013",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
+    "ingredients": [...]
+  },
+  "achievements": [
+    { "name": "First Recipe", "description": "...", "icon": "..." }
+  ]
 }
 ```
 
 **Error Responses:**
-- `400`: Validation error
-- `409`: Recipe name already exists for user
+- `400`: Validation error, invalid ingredient payload, or duplicate recipe name
+- `500`: Failed to create recipe
 
 ---
 
@@ -491,27 +545,24 @@ Get a specific recipe by ID.
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "recipe": {
-    "id": "507f1f77bcf86cd799439011",
-    "name": "Spaghetti Carbonara",
-    "description": "Classic Italian pasta dish",
-    "ingredients": [...],
-    "instructions": [...],
-    "prepTime": 15,
-    "cookTime": 20,
-    "servings": 4,
-    "tags": ["italian", "pasta"],
-    "createdBy": "507f1f77bcf86cd799439013",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
+  "_id": "507f1f77bcf86cd799439011",
+  "name": "Spaghetti Carbonara",
+  "description": "Classic Italian pasta dish",
+  "ingredients": [...],
+  "instructions": [...],
+  "prepTime": 15,
+  "cookTime": 20,
+  "servings": 4,
+  "tags": ["italian", "pasta"],
+  "createdBy": "507f1f77bcf86cd799439013",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
 }
 ```
 
 **Error Responses:**
-- `404`: Recipe not found
-- `403`: Access denied (not owner)
+- `404`: Recipe not found (or not owned by current user)
+- `500`: Failed to get recipe
 
 ---
 
@@ -524,36 +575,35 @@ Update an existing recipe.
 **Success Response (200):**
 ```json
 {
-  "success": true,
-  "message": "Recipe updated successfully",
-  "recipe": {
-    "id": "507f1f77bcf86cd799439011",
-    "name": "Updated Spaghetti Carbonara",
-    "description": "Updated description",
-    "ingredients": [...],
-    "instructions": [...],
-    "prepTime": 20,
-    "cookTime": 25,
-    "servings": 6,
-    "tags": ["italian", "pasta", "updated"],
-    "createdBy": "507f1f77bcf86cd799439013",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-02T00:00:00.000Z"
-  }
+  "_id": "507f1f77bcf86cd799439011",
+  "name": "Updated Spaghetti Carbonara",
+  "description": "Updated description",
+  "ingredients": [...],
+  "instructions": [...],
+  "prepTime": 20,
+  "cookTime": 25,
+  "servings": 6,
+  "tags": ["italian", "pasta", "updated"],
+  "createdBy": "507f1f77bcf86cd799439013",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-02T00:00:00.000Z"
 }
 ```
 
 **Error Responses:**
-- `400`: Validation error
+- `400`: Validation error, invalid ingredient payload, or duplicate recipe name
 - `404`: Recipe not found
-- `403`: Access denied (not owner)
-- `409`: Recipe name already exists for user
+- `500`: Failed to update recipe
 
 ---
 
 ### POST `/api/recipes/parse-url`
 
 Scrape recipe data from a supported website (Serious Eats, TheKitchn, Food Network, ChewOutLoud, etc.). Requires authentication.
+
+Constraints:
+- Only `https://` URLs are accepted.
+- URL must pass backend safety/allowlist checks before fetch.
 
 **Request Body:**
 ```json
@@ -585,8 +635,7 @@ Scrape recipe data from a supported website (Serious Eats, TheKitchn, Food Netwo
 ```
 
 **Error Responses:**
-- `400`: Missing/invalid URL or unsupported schema
-- `403`: Upstream site blocked scraping after retries
+- `400`: Missing/invalid URL, non-HTTPS URL, disallowed URL, or unsupported schema
 
 ---
 
@@ -611,7 +660,8 @@ Same payload shape as `parse-url`. Unparsable lines become `uncertain` ingredien
 
 ### POST `/api/recipes/prepare-import`
 
-Create ingredient records (or map to existing ones) after parsing. Returns a recipe payload where all ingredient IDs are resolvable.
+Prepare parsed recipe data for the create/edit form by normalizing ingredient names, units, and categories.
+This endpoint does **not** create ingredient records in the database.
 
 **Request Body:**
 ```json
@@ -627,23 +677,26 @@ Create ingredient records (or map to existing ones) after parsing. Returns a rec
 **Success Response (200):**
 ```json
 {
-  "recipe": {
-    "name": "Real Deal Carbonara",
-    "ingredients": [
-      {
-        "ingredient": "65f5f41fc...",
-        "quantity": 150,
-        "unit": "g"
-      }
-    ],
-    "instructions": ["..."]
-  }
+  "name": "Real Deal Carbonara",
+  "description": "Roman-style pasta",
+  "ingredients": [
+    {
+      "name": "guanciale",
+      "quantity": 150,
+      "unit": "g",
+      "category": "Meat"
+    }
+  ],
+  "instructions": ["..."],
+  "prepTime": 15,
+  "cookTime": 15,
+  "servings": 4,
+  "tags": ["italian"]
 }
 ```
 
 **Error Responses:**
-- `400`: Validation error (e.g., missing ingredient IDs)
-- `500`: Failed to create ingredient records
+- `400`: Invalid import payload or preparation failure
 
 ---
 
@@ -654,14 +707,13 @@ Delete a recipe.
 **Success Response (200):**
 ```json
 {
-  "success": true,
   "message": "Recipe deleted successfully"
 }
 ```
 
 **Error Responses:**
 - `404`: Recipe not found
-- `403`: Access denied (not owner)
+- `500`: Failed to delete recipe
 
 ---
 
