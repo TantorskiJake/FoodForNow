@@ -56,7 +56,7 @@ jobs:
       - name: Start API and Vite
         run: |
           npm run start -w foodfornow-backend > /tmp/backend.log 2>&1 &
-          npm run dev -w foodfornow-frontend > /tmp/vite.log 2>&1 &
+          npm run dev -w foodfornow-frontend -- --host 127.0.0.1 > /tmp/vite.log 2>&1 &
           npx wait-on http://127.0.0.1:3001 http://127.0.0.1:5173 -t 120000
 
       - run: npm run e2e:smoke
