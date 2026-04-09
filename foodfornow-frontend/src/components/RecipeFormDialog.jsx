@@ -26,31 +26,14 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import api from '../services/api';
 import { getSafeElement } from '../utils/safeArrayAccess';
-import { mapRecipeDataToForm } from '../utils/mapRecipeToForm';
+import {
+  EMPTY_RECIPE_FORM_DATA,
+  INITIAL_RECIPE_FIELD_ERRORS,
+  initializeRecipeFormDialogState,
+} from '../utils/recipeFormDialogState';
 
 const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
 const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
-
-const emptyFormData = {
-  name: '',
-  description: '',
-  ingredients: [{ ingredient: '', quantity: '', unit: '' }],
-  instructions: [''],
-  prepTime: '',
-  cookTime: '',
-  servings: '',
-  tags: '',
-};
-
-const initialFieldErrors = {
-  name: '',
-  description: false,
-  prepTime: '',
-  cookTime: '',
-  servings: '',
-  instructions: '',
-  ingredients: '',
-};
 
 /**
  * Add / edit recipe form in a dialog. Used from Recipes list and Recipe detail.
@@ -74,8 +57,8 @@ export default function RecipeFormDialog({
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [formData, setFormData] = useState(emptyFormData);
-  const [fieldErrors, setFieldErrors] = useState(initialFieldErrors);
+  const [formData, setFormData] = useState(() => ({ ...EMPTY_RECIPE_FORM_DATA }));
+  const [fieldErrors, setFieldErrors] = useState(() => ({ ...INITIAL_RECIPE_FIELD_ERRORS }));
   const [ingredientOptions, setIngredientOptions] = useState([]);
   const [error, setError] = useState('');
   const [internalBusy, setInternalBusy] = useState(false);
@@ -98,29 +81,15 @@ export default function RecipeFormDialog({
   }, []);
 
   useEffect(() => {
-    if (!open) return undefined;
-    let cancelled = false;
-
-    // Initialize form state immediately so we never render stale data from a
-    // previous recipe while ingredient options are still loading.
-    if (editingRecipe) {
-      setFormData(mapRecipeDataToForm(editingRecipe));
-    } else if (createSeed) {
-      setFormData(mapRecipeDataToForm(createSeed));
-    } else {
-      setFormData({ ...emptyFormData });
-    }
-    setError('');
-    setFieldErrors({ ...initialFieldErrors });
-
-    (async () => {
-      await fetchIngredients({ forceRefresh: false });
-      if (cancelled) return;
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    if (!open) return;
+    initializeRecipeFormDialogState({
+      editingRecipe,
+      createSeed,
+      setFormData,
+      setError,
+      setFieldErrors,
+      fetchIngredients,
+    });
   }, [open, editingRecipe, createSeed, fetchIngredients]);
 
   const defaultRunTask = useCallback(async (task) => {
@@ -136,11 +105,11 @@ export default function RecipeFormDialog({
 
   const handleCloseDialog = () => {
     setError('');
-    setFieldErrors({ ...initialFieldErrors });
+    setFieldErrors({ ...INITIAL_RECIPE_FIELD_ERRORS });
     onClose();
   };
 
-  const clearFieldErrors = () => setFieldErrors({ ...initialFieldErrors });
+  const clearFieldErrors = () => setFieldErrors({ ...INITIAL_RECIPE_FIELD_ERRORS });
 
   const handleAddIngredient = () => {
     setFormData({
