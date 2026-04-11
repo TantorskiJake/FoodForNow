@@ -1,4 +1,4 @@
-import { mapRecipeDataToForm } from './mapRecipeToForm';
+import { mapRecipeDataToForm } from './mapRecipeToForm.js';
 
 export function getInitialRecipeFormData({ editingRecipe, createSeed, emptyFormData }) {
   if (editingRecipe) return mapRecipeDataToForm(editingRecipe);
