@@ -252,7 +252,7 @@ api.interceptors.response.use(
         // initial /auth/me returns 401 on login page)
         if (typeof window !== 'undefined') {
           const path = window.location.pathname || '';
-          const isPublicAuthPage = /^\/(login|register|forgot-password|reset-password)(\/|$)/.test(path);
+          const isPublicAuthPage = /^\/(login|register|forgot-password|reset-password|scan)(\/|$)/.test(path);
           if (!isPublicAuthPage) {
             window.location.href = '/login';
           }
