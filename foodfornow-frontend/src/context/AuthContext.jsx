@@ -163,7 +163,8 @@ export function AuthInitializer({ children }) {
       pathname === '/login' ||
       pathname === '/register' ||
       pathname === '/forgot-password' ||
-      pathname === '/reset-password';
+      pathname === '/reset-password' ||
+      pathname === '/scan';
     if (isPublic) {
       setLoading(false);
     } else {

@@ -106,11 +106,10 @@ const Register = () => {
             password: formData.password,
             name: formData.name,
           });
-          await navigator.credentials.store(cred).catch((e) =>
-            console.error('Credential store failed:', e)
-          );
-        } catch (credErr) {
-          console.error('Credential store failed:', credErr);
+          // Best-effort only; unsupported browsers/headless runners can throw here.
+          await navigator.credentials.store(cred).catch(() => {});
+        } catch {
+          // Ignore credential-store failures since registration already succeeded.
         }
       }
 
