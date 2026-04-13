@@ -215,6 +215,31 @@ Route protection component that redirects unauthenticated users.
 />
 ```
 
+### RecipeFormDialog (`src/components/RecipeFormDialog.jsx`)
+
+Shared add/edit recipe dialog used by both `Recipes` and `RecipeDetail`.
+
+**Features:**
+- Single form flow for create, update, and imported-recipe review (`createSeed`)
+- Immediate form-state hydration on open (`editingRecipe` -> `createSeed` -> empty defaults) to prevent stale values flashing while ingredient options load
+- Ingredient autocomplete backed by `GET /ingredients` cache, with inline "Create new ingredient" path
+- Inline ingredient creation handles `409` similar-name responses by auto-selecting `existingIngredient` returned from the API
+- Client validation for required metadata, positive numeric fields, at least one instruction, and at least one fully specified ingredient row
+- Normalizes outbound payload for existing references (`{ ingredient, quantity, unit }`) and freeform rows (`{ name, quantity, unit, category }`)
+- Splits comma-delimited tags into an array on submit
+
+**Props:**
+- `open`: Boolean visibility
+- `onClose()`: Dialog close handler
+- `editingRecipe`: Existing recipe object for update mode
+- `createSeed`: Prepared import payload for create mode
+- `onSaved(payload)`: Receives `{ mode, recipe, achievements? }` after successful API save
+- `runTask(fn)`: Optional wrapper for page-level busy indicators
+- `submitDisabled`: Optional external submit lock
+
+**Operational Pitfall:**
+- Keep imported/edit recipe normalization in `mapRecipeDataToForm` aligned with this dialog's expected shape. If either side changes without the other, you'll see missing ingredient IDs, blank units, or stale field values on open.
+
 ### MealPlanGrid (`src/components/MealPlanGrid.jsx`)
 
 Weekly meal-planning grid for one selected week.
@@ -524,6 +549,14 @@ Recipe management page for personal and shared recipe libraries, including impor
 - Import continuation with `POST /recipes/prepare-import`, then open prefilled recipe form for user review before final save
 - Optimistic delete with rollback on API failure
 
+**Import Workflow Runbook:**
+1. User chooses `From URL`, `From handwritten recipe card`, or `Paste recipe text`.
+2. UI parses content via `POST /recipes/parse-url` or `POST /recipes/parse-text`.
+3. If parser marks ingredients as `uncertain`, UI requires category selection before continuing.
+4. UI calls `POST /recipes/prepare-import` with `recipeData` + `categoryOverrides`.
+5. Prepared payload opens in `RecipeFormDialog` (`createSeed`) for final user edits.
+6. User submits `POST /recipes`; ingredient records are resolved/created only at this final save step.
+
 **State Management:**
 - Tracks tab, search, sort, import dialog states, OCR progress, category overrides, and pending recipe payloads
 - Uses `api.cachedGet('/recipes')` and `api.cachedGet('/recipes/shared')` with targeted invalidation after write operations
@@ -532,6 +565,11 @@ Recipe management page for personal and shared recipe libraries, including impor
 **Operational Constraints:**
 - URL import parser currently accepts only `https://` URLs on the backend. Entering `http://` URLs in the UI will fail at parse time.
 - `POST /recipes/prepare-import` normalizes ingredient names/categories for review; ingredient records are resolved/created only when the user submits `POST /recipes`.
+
+**Troubleshooting:**
+- URL import returns `Only HTTPS URLs are allowed`: switch to an `https://` URL (frontend input accepts `http://`, but backend rejects it).
+- OCR import opens category review unexpectedly: parser marked one or more ingredients as uncertain; this is expected, and overrides are required before form hydration.
+- Imported recipe opens with odd defaults (for example `piece` units or name copied into description): verify `mapRecipeDataToForm` and `/recipes/prepare-import` are still aligned on fallback rules.
 
 ### RecipeDetail (`src/pages/RecipeDetail.jsx`)
 
