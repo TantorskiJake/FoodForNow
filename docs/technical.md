@@ -20,7 +20,7 @@ FoodForNow is a full-stack web application built with React 19 frontend and Node
 - **User Authentication**: JWT-based secure authentication system
 - **Pantry Management**: Track ingredients with quantities and expiration dates
 - **Recipe Management**: Create, edit, and organize recipes with detailed instructions
-- **Meal Planning**: Weekly meal planning with drag-and-drop interface
+- **Meal Planning**: Weekly planning with multi-meal-per-slot support and cook/uncook flows
 - **Shopping Lists**: Automatic generation based on meal plans and pantry status
 - **Achievement System**: Gamification elements to encourage user engagement
 - **Responsive Design**: Mobile-first design with Material-UI components
@@ -190,7 +190,7 @@ const recipeSchema = new mongoose.Schema({
   ingredients: [{
     ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient', required: true },
     quantity: { type: Number, required: true },
-    unit: { type: String, required: true, enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch'] }
+    unit: { type: String, required: true, enum: ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'] }
   }],
   instructions: [{ type: String, required: true }],
   prepTime: { type: Number, required: true },
@@ -249,10 +249,10 @@ const pantrySchema = new mongoose.Schema({
 const shoppingListItemSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient', required: true },
+  recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe' },
   quantity: { type: Number, required: true },
   unit: { type: String, required: true },
-  isCompleted: { type: Boolean, default: false },
-  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' }
+  completed: { type: Boolean, default: false }
 }, { timestamps: true });
 ```
 
@@ -260,14 +260,21 @@ const shoppingListItemSchema = new mongoose.Schema({
 
 ```javascript
 const achievementSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, required: true },
-  title: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  achievementId: { type: String, required: true },
+  name: { type: String, required: true },
   description: { type: String, required: true },
+  category: { type: String, required: true },
   icon: { type: String, required: true },
+  progress: { type: Number, default: 0 },
+  requiredProgress: { type: Number, default: 1 },
+  completed: { type: Boolean, default: false },
+  completedAt: { type: Date },
   unlockedAt: { type: Date, default: Date.now },
-  isRead: { type: Boolean, default: false }
 }, { timestamps: true });
+
+achievementSchema.index({ userId: 1, achievementId: 1 }, { unique: true });
+achievementSchema.index({ userId: 1, completed: 1, completedAt: -1 });
 ```
 
 ## API Reference
@@ -465,12 +472,11 @@ Add an item to the shopping list.
 {
   "ingredient": "ingredient_id",
   "quantity": 1,
-  "unit": "kg",
-  "priority": "high"
+  "unit": "kg"
 }
 ```
 
-#### PUT `/api/shopping-list/:id`
+#### PATCH `/api/shopping-list/:id`
 Update a shopping list item.
 
 #### DELETE `/api/shopping-list/:id`
@@ -710,48 +716,41 @@ The project uses GitHub Actions for automated deployment:
 
 ### Backend Testing
 
-#### Unit Tests
-- Test individual functions and methods
-- Mock database operations
-- Test error handling scenarios
+Backend tests run with the Node built-in test runner:
 
-#### Integration Tests
-- Test API endpoints
-- Test database operations
-- Test authentication flows
+```bash
+npm run test -w foodfornow-backend
+node --test foodfornow-backend/src/routes/auth.profile-route-validation.test.js
+```
 
-#### Test Structure
-```
-tests/
-├── unit/
-│   ├── models/
-│   ├── services/
-│   └── middleware/
-├── integration/
-│   ├── auth.test.js
-│   ├── recipes.test.js
-│   └── mealplan.test.js
-└── fixtures/
-    └── test-data.json
-```
+Coverage focuses on:
+- Route behavior and validation guardrails (`src/routes/*.test.js`)
+- Service-level parsing and normalization (`src/services/*.test.js`)
+- Utility and security helpers (`src/utils/*.test.js`)
+- Index and middleware behavior (`src/models/indexes.test.js`, `src/middleware/auth.test.js`)
 
 ### Frontend Testing
 
-#### Component Tests
-- Test component rendering
-- Test user interactions
-- Test prop validation
+Frontend tests also use the Node built-in test runner:
 
-#### Integration Tests
-- Test page navigation
-- Test API integration
-- Test user workflows
+```bash
+npm run test -w foodfornow-frontend
+node --test foodfornow-frontend/src/utils/mapRecipeToForm.test.js
+```
+
+Current frontend coverage is primarily utility/service-level regression tests (for example API client behavior, week filtering, recipe-form mapping, and validation helpers).
 
 ### Testing Tools
 
-- **Backend**: Jest, Supertest
-- **Frontend**: React Testing Library, Jest
-- **E2E**: Playwright or Cypress
+- **Backend**: `node:test`, Supertest, `mongodb-memory-server`
+- **Frontend**: `node:test` (module/unit tests)
+- **E2E**: Playwright (`npm run e2e:smoke`, `npm run e2e`)
+
+### CI Test Workflow
+
+Primary CI runs:
+- `npm test` (backend + frontend unit tests)
+- `npm run e2e:smoke` (Playwright smoke route coverage)
 
 ### Test Coverage
 
