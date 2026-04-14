@@ -119,3 +119,37 @@ test('falls back to one empty ingredient and blank tags for non-array tags', () 
     tags: '',
   });
 });
+
+test('clones instructions so form edits cannot mutate source recipe data', () => {
+  const source = {
+    name: 'Soup',
+    description: 'Warm',
+    ingredients: [{ ingredient: 'ing-1', quantity: 1, unit: 'cup' }],
+    instructions: ['Heat'],
+  };
+
+  const mapped = mapRecipeDataToForm(source);
+  assert.notEqual(mapped.instructions, source.instructions);
+
+  mapped.instructions[0] = 'Changed in form';
+  assert.equal(source.instructions[0], 'Heat');
+});
+
+test('returns isolated empty defaults for separate calls', () => {
+  const first = mapRecipeDataToForm(null);
+  const second = mapRecipeDataToForm(undefined);
+
+  first.ingredients[0].quantity = '3';
+  first.instructions[0] = 'Step 1';
+
+  assert.deepEqual(second, {
+    name: '',
+    description: '',
+    ingredients: [{ ingredient: '', quantity: '', unit: '' }],
+    instructions: [''],
+    prepTime: '',
+    cookTime: '',
+    servings: '',
+    tags: '',
+  });
+});
