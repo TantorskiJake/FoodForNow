@@ -9,9 +9,17 @@ const emptyFormData = {
   tags: '',
 };
 
+function cloneEmptyFormData() {
+  return {
+    ...emptyFormData,
+    ingredients: emptyFormData.ingredients.map((ingredient) => ({ ...ingredient })),
+    instructions: [...emptyFormData.instructions],
+  };
+}
+
 /** Map API / import recipe shape to RecipeFormDialog form state. */
 export function mapRecipeDataToForm(recipeData) {
-  if (!recipeData) return { ...emptyFormData };
+  if (!recipeData) return cloneEmptyFormData();
   const mappedIngredients = recipeData.ingredients?.length
     ? recipeData.ingredients.map((ing) => {
         const id = ing.ingredient?._id ?? ing.ingredient;
@@ -27,12 +35,12 @@ export function mapRecipeDataToForm(recipeData) {
           category: ing.category || 'Other',
         };
       })
-    : [{ ingredient: '', quantity: '', unit: '' }];
+    : cloneEmptyFormData().ingredients;
   return {
     name: recipeData.name || '',
     description: recipeData.description || recipeData.name || '',
     ingredients: mappedIngredients,
-    instructions: recipeData.instructions?.length ? recipeData.instructions : [''],
+    instructions: recipeData.instructions?.length ? recipeData.instructions.map((instruction) => instruction) : [''],
     prepTime: recipeData.prepTime ?? '',
     cookTime: recipeData.cookTime ?? '',
     servings: recipeData.servings ?? '',
