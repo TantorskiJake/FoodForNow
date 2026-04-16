@@ -119,3 +119,54 @@ test('falls back to one empty ingredient and blank tags for non-array tags', () 
     tags: '',
   });
 });
+
+test('returns fresh default objects for repeated empty mapping', () => {
+  const first = mapRecipeDataToForm(undefined);
+  const second = mapRecipeDataToForm(undefined);
+
+  assert.notEqual(first, second);
+  assert.notEqual(first.ingredients, second.ingredients);
+
+  first.instructions[0] = 'changed';
+  first.ingredients[0].quantity = '42';
+
+  assert.deepEqual(second, {
+    name: '',
+    description: '',
+    ingredients: [{ ingredient: '', quantity: '', unit: '' }],
+    instructions: [''],
+    prepTime: '',
+    cookTime: '',
+    servings: '',
+    tags: '',
+  });
+});
+
+test('clones instruction arrays to avoid mutating recipe source objects', () => {
+  const recipeData = {
+    name: 'Noodles',
+    description: 'Quick meal',
+    ingredients: [],
+    instructions: ['Boil water', 'Cook noodles'],
+  };
+
+  const mapped = mapRecipeDataToForm(recipeData);
+  mapped.instructions[0] = 'Updated instruction';
+
+  assert.deepEqual(recipeData.instructions, ['Boil water', 'Cook noodles']);
+});
+
+test('treats non-object ingredient entries as safe free-form defaults', () => {
+  const mapped = mapRecipeDataToForm({
+    name: 'Odd import',
+    description: 'Contains malformed ingredient entries',
+    ingredients: ['salt', null, 42],
+    instructions: ['Mix'],
+  });
+
+  assert.deepEqual(mapped.ingredients, [
+    { ingredient: '', ingredientName: '', quantity: '', unit: 'piece', category: 'Other' },
+    { ingredient: '', ingredientName: '', quantity: '', unit: 'piece', category: 'Other' },
+    { ingredient: '', ingredientName: '', quantity: '', unit: 'piece', category: 'Other' },
+  ]);
+});
