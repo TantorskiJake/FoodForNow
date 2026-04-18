@@ -27,6 +27,7 @@ import { useTheme } from '@mui/material/styles';
 import api from '../services/api';
 import { getSafeElement } from '../utils/safeArrayAccess';
 import { mapRecipeDataToForm } from '../utils/mapRecipeToForm';
+import { buildRecipePayload, getRecipeFormFieldErrors, hasRecipeFormErrors } from '../utils/recipeFormSubmission';
 
 const validUnits = ['g', 'kg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'piece', 'pinch', 'box'];
 const ingredientCategories = ['Produce', 'Dairy', 'Meat', 'Seafood', 'Pantry', 'Spices', 'Beverages', 'Other'];
@@ -250,58 +251,16 @@ export default function RecipeFormDialog({
     e.preventDefault();
 
     clearFieldErrors();
-    const nameErr = !formData.name?.trim() ? 'Please fill out this field!' : '';
-    const descriptionErr = !formData.description?.trim();
-    const prepErr = !formData.prepTime || Number(formData.prepTime) <= 0 ? 'Must be greater than 0' : '';
-    const cookErr = !formData.cookTime || Number(formData.cookTime) <= 0 ? 'Must be greater than 0' : '';
-    const servingsErr = !formData.servings || Number(formData.servings) <= 0 ? 'Must be greater than 0' : '';
-    const instructionsErr =
-      !formData.instructions?.length || !formData.instructions[0]?.trim() ? 'At least one instruction is required' : '';
-    const hasAtLeastOneIngredient = formData.ingredients?.some(
-      (ing) => (ing.ingredient || (ing.ingredientName && ing.ingredientName.trim())) && ing.quantity && ing.unit
-    );
-    const ingredientsErr =
-      !formData.ingredients?.length || !hasAtLeastOneIngredient
-        ? 'Create that ingredient or choose from your collection.'
-        : '';
-
-    setFieldErrors({
-      name: nameErr,
-      description: descriptionErr,
-      prepTime: prepErr,
-      cookTime: cookErr,
-      servings: servingsErr,
-      instructions: instructionsErr,
-      ingredients: ingredientsErr,
-    });
-    if (nameErr || descriptionErr || prepErr || cookErr || servingsErr || instructionsErr || ingredientsErr) {
+    const nextFieldErrors = getRecipeFormFieldErrors(formData);
+    setFieldErrors(nextFieldErrors);
+    if (hasRecipeFormErrors(nextFieldErrors)) {
       setError('');
       return;
     }
 
     try {
       await runTask(async () => {
-        const ingredientsPayload = formData.ingredients
-          .filter((ing) => (ing.ingredient || (ing.ingredientName && ing.ingredientName.trim())) && ing.quantity && ing.unit)
-          .map((ing) => {
-            if (ing.ingredient) {
-              return { ingredient: ing.ingredient, quantity: ing.quantity, unit: ing.unit };
-            }
-            return {
-              name: ing.ingredientName.trim(),
-              quantity: ing.quantity,
-              unit: ing.unit,
-              category: ing.category || 'Other',
-            };
-          });
-        const recipeData = {
-          ...formData,
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          instructions: formData.instructions.filter((instruction) => instruction.trim()),
-          ingredients: ingredientsPayload,
-          tags: formData.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-        };
+        const recipeData = buildRecipePayload(formData);
 
         if (editingRecipe) {
           const res = await api.put(`/recipes/${editingRecipe._id}`, recipeData);
