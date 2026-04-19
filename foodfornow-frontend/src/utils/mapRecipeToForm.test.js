@@ -119,3 +119,53 @@ test('falls back to one empty ingredient and blank tags for non-array tags', () 
     tags: '',
   });
 });
+
+test('ignores malformed ingredient entries and keeps valid rows', () => {
+  const mapped = mapRecipeDataToForm({
+    name: 'Mixed Payload',
+    ingredients: [
+      null,
+      'salt',
+      {
+        ingredient: { unexpected: true },
+        quantity: 2,
+        unit: 'cup',
+      },
+      {
+        ingredient: { _id: 'ing-3', name: 'Flour' },
+        quantity: 1,
+        unit: 'kg',
+      },
+    ],
+    instructions: ['Mix'],
+  });
+
+  assert.deepEqual(mapped.ingredients, [
+    {
+      ingredient: '',
+      ingredientName: '',
+      quantity: '2',
+      unit: 'cup',
+      category: 'Other',
+    },
+    {
+      ingredient: 'ing-3',
+      quantity: '1',
+      unit: 'kg',
+    },
+  ]);
+});
+
+test('returns detached instruction arrays to prevent source mutation', () => {
+  const recipeData = {
+    name: 'Detached Copy',
+    ingredients: [{ ingredient: 'ing-1', quantity: 1, unit: 'piece' }],
+    instructions: ['Original'],
+  };
+
+  const mapped = mapRecipeDataToForm(recipeData);
+  mapped.instructions[0] = 'Changed in form';
+
+  assert.deepEqual(recipeData.instructions, ['Original']);
+  assert.deepEqual(mapped.instructions, ['Changed in form']);
+});
