@@ -555,6 +555,13 @@ The main application component now wraps routing inside `AppRoutes`, which:
 - Creates/polls `/scan-session` IDs and posts results via `onDetected`
 - Integrates with the backend barcode proxy + ingredient auto-creation fallback
 
+#### RecipeFormDialog (`src/components/RecipeFormDialog.jsx`)
+- Shared recipe add/edit/import modal used by both `Recipes` and `RecipeDetail`
+- Accepts `editingRecipe` or `createSeed` and normalizes both through `mapRecipeDataToForm`
+- Resets form state immediately on open before async ingredient fetching to prevent stale recipe values from flashing
+- Supports inline ingredient creation (`POST /ingredients`) and 409 conflict reuse via `existingIngredient`
+- Emits `onSaved` payloads in a stable shape (`mode`, `recipe`, optional `achievements`) so parent pages can refresh caches consistently
+
 ### Pages
 
 #### Dashboard (`src/pages/Dashboard.jsx`)
@@ -564,6 +571,8 @@ The main application component now wraps routing inside `AppRoutes`, which:
 #### Recipes (`src/pages/Recipes.jsx`)
 - Recipe listing with search/sort + dual import dialog (URL scraper + OCR image ingestion)
 - Category review modal for uncertain ingredients before import finalization
+- Uses shared `RecipeFormDialog` for create/edit/import completion, reducing drift with `RecipeDetail`
+- Import pipeline: `parse-url|parse-text` -> optional category review -> `prepare-import` -> `createSeed` form hydration -> final `POST /recipes`
 
 #### Pantry (`src/pages/Pantry.jsx`)
 - Grouped ingredient cards with expiration badges and EmptyState CTA

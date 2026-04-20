@@ -250,7 +250,7 @@ npm run start        # Start production server
 - `GET /recipes/:id` - Get recipe by ID
 - `POST /recipes/parse-url` - Scrape a recipe from a supported website URL
 - `POST /recipes/parse-text` - Parse OCR/plain text (e.g., handwritten recipe cards)
-- `POST /recipes/prepare-import` - Create ingredient records from parsed recipe data
+- `POST /recipes/prepare-import` - Normalize parsed recipe payloads for review/form prefill (ingredient records are created later when saving via `POST /recipes`)
 
 ### Barcode & Scan Session
 - `GET /barcode/:code` - Look up a UPC/EAN barcode via Open Food Facts
