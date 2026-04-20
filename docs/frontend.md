@@ -383,6 +383,57 @@ Reusable call-to-action card for empty screens (dashboard widgets, pantry, shopp
 />
 ```
 
+### RecipeFormDialog (`src/components/RecipeFormDialog.jsx`)
+
+Shared add/edit modal used by `Recipes` and `RecipeDetail`, and also by import flows.
+
+**Features:**
+- Single component handles three entry modes:
+- Create empty recipe
+- Edit existing recipe (`editingRecipe`)
+- Create from parsed import payload (`createSeed`)
+- Uses `mapRecipeDataToForm` to normalize API/import payloads into form-safe state (string quantities, fallback description/instruction defaults)
+- Initializes form state immediately on open before async ingredient fetch to prevent stale values from a previously edited recipe
+- Ingredient picker supports both existing ingredient references and free-form ingredient names
+- Inline "Create new ingredient" path posts to `POST /ingredients`, then back-fills the selected ingredient row
+- Handles ingredient conflict (`409` + `existingIngredient`) by reusing the server-returned existing ingredient
+- Multi-line instruction editor with step reordering (up/down) and per-step delete
+- Supports an optional `runTask` wrapper from parent pages so saves can participate in global loading/progress UI
+
+**Validation rules in UI:**
+- Required: `name`, `description`, positive `prepTime`, positive `cookTime`, positive `servings`
+- At least one non-empty instruction
+- At least one complete ingredient row (ingredient reference or free-form name + quantity + unit)
+
+**Submit behavior:**
+- Create mode: `POST /recipes`, supports either plain recipe response or `{ recipe, achievements }` envelope
+- Edit mode: `PUT /recipes/:id`
+- On success, closes dialog first, then calls `onSaved` with normalized payload:
+- Create: `{ mode: 'create', recipe, achievements? }`
+- Update: `{ mode: 'update', recipe }`
+
+**Props:**
+- `open`: show/hide dialog
+- `onClose()`: close handler
+- `editingRecipe`: existing recipe object for edit mode
+- `createSeed`: prefilled parsed recipe payload for create mode
+- `onSaved(payload)`: callback after successful save
+- `runTask(fn)?`: optional async wrapper for parent-level busy indicators
+- `submitDisabled?`: optional extra submit disable gate
+
+**Usage:**
+```jsx
+<RecipeFormDialog
+  open={openDialog}
+  onClose={handleCloseRecipeForm}
+  editingRecipe={editingRecipe}
+  createSeed={recipeFormCreateSeed}
+  onSaved={handleRecipeSaved}
+  runTask={runTask}
+  submitDisabled={disablePageActions}
+/>
+```
+
 ### OnboardingOverlay (`src/components/OnboardingOverlay.jsx`)
 
 Stepper-style modal that guides first-time users through the workflow.
@@ -523,11 +574,13 @@ Recipe management page for personal and shared recipe libraries, including impor
 - Category review dialog for uncertain ingredients before continuing import
 - Import continuation with `POST /recipes/prepare-import`, then open prefilled recipe form for user review before final save
 - Optimistic delete with rollback on API failure
+- Save operations are coordinated through the shared dialog `runTask` hook so form submits participate in the page-level progressive loading bar
 
 **State Management:**
 - Tracks tab, search, sort, import dialog states, OCR progress, category overrides, and pending recipe payloads
 - Uses `api.cachedGet('/recipes')` and `api.cachedGet('/recipes/shared')` with targeted invalidation after write operations
 - Uses `createSeed` payloads to hydrate `RecipeFormDialog` for imported recipes
+- Uses `mapRecipeDataToForm` to normalize both edit payloads and parsed-import payloads before rendering form fields
 
 **Operational Constraints:**
 - URL import parser currently accepts only `https://` URLs on the backend. Entering `http://` URLs in the UI will fail at parse time.
@@ -542,6 +595,7 @@ Individual recipe view page.
 - Displays recipe metadata (prep/cook time, servings), ingredient quantities, and numbered instructions
 - Header edit action opens `RecipeFormDialog` with existing recipe data
 - On successful edit, updates local recipe state and invalidates cached `/recipes` reads
+- Reuses the same add/edit form codepath as `Recipes`, reducing drift between create and edit validation/serialization behavior
 - Navigation shortcuts back to Dashboard and Recipes index
 
 **URL Parameters:**
