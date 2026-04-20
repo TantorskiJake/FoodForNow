@@ -1,6 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const request = require('supertest');
 
 const originalJwtSecret = process.env.JWT_SECRET;
 const originalCsrfSecret = process.env.CSRF_SECRET;
@@ -12,13 +11,38 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 const { app, globalErrorHandler } = require('./server');
 
-test('POST /api requests without CSRF token return a structured CSRF error', async () => {
-  const response = await request(app).post('/api/recipes').send({ name: 'Tomato Soup' });
+async function withTestServer(run) {
+  const server = await new Promise((resolve) => {
+    const instance = app.listen(0, () => resolve(instance));
+  });
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  try {
+    return await run(baseUrl);
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+}
 
-  assert.equal(response.status, 403);
-  assert.equal(response.body.error, 'Security verification failed. Please refresh the page and try again.');
-  assert.equal(response.body.message, 'Security verification failed. Please refresh the page and try again.');
-  assert.equal(response.body.code, 'EBADCSRFTOKEN');
+test('POST /api requests without CSRF token return a structured CSRF error', async () => {
+  await withTestServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/recipes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Tomato Soup' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.equal(payload.error, 'Security verification failed. Please refresh the page and try again.');
+    assert.equal(payload.message, 'Security verification failed. Please refresh the page and try again.');
+    assert.equal(payload.code, 'EBADCSRFTOKEN');
+  });
 });
 
 function createMockResponse() {
