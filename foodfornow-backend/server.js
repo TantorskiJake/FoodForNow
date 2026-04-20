@@ -173,7 +173,7 @@ app.get("/", (req, res) => {
  * returns the correct status. Previously every such error became 500
  * "Something went wrong!", which hid CSRF/proxy issues from operators and users.
  */
-app.use((err, req, res, next) => {
+function globalErrorHandler(err, req, res, next) {
   if (res.headersSent) {
     return next(err);
   }
@@ -197,7 +197,9 @@ app.use((err, req, res, next) => {
   }
 
   res.status(500).json(errorPayload('Something went wrong!'));
-});
+}
+
+app.use(globalErrorHandler);
 
 /**
  * Process Error Handlers
@@ -261,5 +263,13 @@ const startServer = async () => {
   }
 };
 
-// Start the server
-startServer();
+if (require.main === module) {
+  // Start the server only when executed directly (`node server.js`).
+  startServer();
+}
+
+module.exports = {
+  app,
+  startServer,
+  globalErrorHandler,
+};
