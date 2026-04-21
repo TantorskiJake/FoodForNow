@@ -1,17 +1,19 @@
-const emptyFormData = {
-  name: '',
-  description: '',
-  ingredients: [{ ingredient: '', quantity: '', unit: '' }],
-  instructions: [''],
-  prepTime: '',
-  cookTime: '',
-  servings: '',
-  tags: '',
-};
+export function createEmptyRecipeFormData() {
+  return {
+    name: '',
+    description: '',
+    ingredients: [{ ingredient: '', quantity: '', unit: '' }],
+    instructions: [''],
+    prepTime: '',
+    cookTime: '',
+    servings: '',
+    tags: '',
+  };
+}
 
 /** Map API / import recipe shape to RecipeFormDialog form state. */
 export function mapRecipeDataToForm(recipeData) {
-  if (!recipeData) return { ...emptyFormData };
+  if (!recipeData) return createEmptyRecipeFormData();
   const mappedIngredients = recipeData.ingredients?.length
     ? recipeData.ingredients.map((ing) => {
         const id = ing.ingredient?._id ?? ing.ingredient;
@@ -27,12 +29,12 @@ export function mapRecipeDataToForm(recipeData) {
           category: ing.category || 'Other',
         };
       })
-    : [{ ingredient: '', quantity: '', unit: '' }];
+    : createEmptyRecipeFormData().ingredients;
   return {
     name: recipeData.name || '',
     description: recipeData.description || recipeData.name || '',
     ingredients: mappedIngredients,
-    instructions: recipeData.instructions?.length ? recipeData.instructions : [''],
+    instructions: recipeData.instructions?.length ? [...recipeData.instructions] : [''],
     prepTime: recipeData.prepTime ?? '',
     cookTime: recipeData.cookTime ?? '',
     servings: recipeData.servings ?? '',

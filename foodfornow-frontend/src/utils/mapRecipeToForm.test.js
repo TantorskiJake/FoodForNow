@@ -1,9 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapRecipeDataToForm } from './mapRecipeToForm.js';
+import { createEmptyRecipeFormData, mapRecipeDataToForm } from './mapRecipeToForm.js';
 
 test('returns empty form defaults when recipe data is missing', () => {
-  assert.deepEqual(mapRecipeDataToForm(null), {
+  assert.deepEqual(mapRecipeDataToForm(null), createEmptyRecipeFormData());
+});
+
+test('creates fresh nested defaults for each empty mapping call', () => {
+  const first = mapRecipeDataToForm(null);
+  first.ingredients[0].quantity = '7';
+  first.instructions[0] = 'Mutated';
+
+  const second = mapRecipeDataToForm(undefined);
+
+  assert.deepEqual(second, {
     name: '',
     description: '',
     ingredients: [{ ingredient: '', quantity: '', unit: '' }],
@@ -13,6 +23,20 @@ test('returns empty form defaults when recipe data is missing', () => {
     servings: '',
     tags: '',
   });
+});
+
+test('does not share instruction array reference with source recipe', () => {
+  const recipe = {
+    name: 'Salsa',
+    description: 'Fresh',
+    ingredients: [{ ingredient: 'ing-1', quantity: 1, unit: 'cup' }],
+    instructions: ['Chop', 'Mix'],
+  };
+
+  const mapped = mapRecipeDataToForm(recipe);
+  mapped.instructions[0] = 'Changed step';
+
+  assert.deepEqual(recipe.instructions, ['Chop', 'Mix']);
 });
 
 test('maps existing ingredient references and array tags for edit flow', () => {
