@@ -160,6 +160,80 @@ test('parseRecipeFromUrlByToken appends validated URL when proxy template has no
   }
 });
 
+test('parseRecipeFromUrlByToken retries with alternate user-agent after 403', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: undefined,
+    proxyRequired: undefined,
+  });
+
+  const calls = [];
+  axios.get = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    if (calls.length === 1) {
+      return {
+        status: 403,
+        headers: {},
+        data: '',
+        config: { url, ...opts },
+      };
+    }
+    return okHtmlResponse();
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch('https://example.com/recipe');
+    const parsed = await service.parseRecipeFromUrlByToken(token);
+
+    assert.equal(parsed.name, 'Token Import Recipe');
+    assert.equal(calls.length, 2);
+    assert.match(calls[0].opts.headers['User-Agent'], /Chrome/i);
+    assert.match(calls[1].opts.headers['User-Agent'], /Firefox/i);
+    assert.equal(calls[1].opts.headers.Referer, 'https://example.com/');
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});
+
+test('parseRecipeFromUrlByToken does not follow redirects when using proxy fetch target', async () => {
+  const originalAxiosGet = axios.get;
+  const { service, restoreEnv } = loadServiceWithEnv({
+    proxyUrl: 'https://proxy.example/import?target={{URL}}',
+    proxyRequired: undefined,
+  });
+
+  const validatedUrl = 'https://example.com/recipe?foo=bar';
+  const calls = [];
+  axios.get = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    return {
+      status: 302,
+      headers: { location: 'https://8.8.8.8/redirected' },
+      data: '',
+      config: { url, ...opts },
+    };
+  };
+
+  try {
+    const token = service.storeValidatedUrlForFetch(validatedUrl);
+    await assert.rejects(
+      () => service.parseRecipeFromUrlByToken(token),
+      /Request failed with status code 302/
+    );
+
+    assert.equal(calls.length, 1);
+    assert.equal(
+      calls[0].url,
+      `https://proxy.example/import?target=${encodeURIComponent(validatedUrl)}`
+    );
+    assert.equal(calls[0].opts.maxRedirects, 0);
+  } finally {
+    axios.get = originalAxiosGet;
+    restoreEnv();
+  }
+});
+
 test('parseRecipeFromUrlByToken rejects when proxy is required but not configured', async () => {
   const originalAxiosGet = axios.get;
   const { service, restoreEnv } = loadServiceWithEnv({
