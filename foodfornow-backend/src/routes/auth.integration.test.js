@@ -163,6 +163,36 @@ test('POST /login returns 200 and sets cookies', async () => {
   assert.ok(cookieValueFromSetCookie(cookies, 'refreshToken'));
 });
 
+test('POST /login mints unique refresh tokens even in the same second', async () => {
+  const email = uniqueEmail();
+  await request(app)
+    .post('/api/auth/register')
+    .send({ name: 'Token User', email, password: STRONG_PASSWORD })
+    .expect(201);
+
+  const originalDateNow = Date.now;
+  const fixedNow = 1_700_000_000_000;
+  Date.now = () => fixedNow;
+  try {
+    const firstLogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: STRONG_PASSWORD })
+      .expect(200);
+    const secondLogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: STRONG_PASSWORD })
+      .expect(200);
+
+    const firstRefreshToken = cookieValueFromSetCookie(firstLogin.headers['set-cookie'], 'refreshToken');
+    const secondRefreshToken = cookieValueFromSetCookie(secondLogin.headers['set-cookie'], 'refreshToken');
+    assert.ok(firstRefreshToken);
+    assert.ok(secondRefreshToken);
+    assert.notEqual(firstRefreshToken, secondRefreshToken);
+  } finally {
+    Date.now = originalDateNow;
+  }
+});
+
 test('GET /me returns 401 without cookies', async () => {
   await request(app).get('/api/auth/me').expect(401);
 });
