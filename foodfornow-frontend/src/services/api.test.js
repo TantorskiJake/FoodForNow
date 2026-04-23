@@ -10,6 +10,15 @@ const axiosResponse = (config, data = {}) => ({
   config,
 });
 
+function readHeader(config, name) {
+  const headers = config?.headers;
+  if (!headers) return undefined;
+  if (typeof headers.get === 'function') {
+    return headers.get(name);
+  }
+  return headers[name];
+}
+
 test('ensureCsrfToken retries after initial fetch failure', async () => {
   __internal.resetCsrfTokenState();
   __internal.resetRefreshState();
@@ -232,6 +241,87 @@ test('403 EBADCSRFTOKEN clears cached CSRF and retries request once', async () =
     const res = await api.post('/ingredients', { name: 'Tortilla', category: 'Pantry' });
     assert.equal(postCalls, 2);
     assert.equal(res.data.name, 'Tortilla');
+  } finally {
+    api.defaults.adapter = originalAdapter;
+    __internal.resetCsrfTokenState();
+    __internal.resetRefreshState();
+  }
+});
+
+test('csrf retry fetches a fresh token before replaying request', async () => {
+  __internal.resetCsrfTokenState();
+  __internal.resetRefreshState();
+  const originalAdapter = api.defaults.adapter;
+  const csrfTokens = ['stale-csrf', 'fresh-csrf'];
+  const observedPostTokens = [];
+
+  api.defaults.adapter = async (config) => {
+    if (config.url === '/csrf-token') {
+      const nextToken = csrfTokens.shift() ?? 'fresh-csrf';
+      return axiosResponse(config, { csrfToken: nextToken });
+    }
+    if (config.method === 'post' && config.url === '/ingredients') {
+      const requestToken = readHeader(config, 'x-csrf-token');
+      observedPostTokens.push(requestToken);
+      if (!config._csrfRetry) {
+        return Promise.reject({
+          config,
+          response: {
+            status: 403,
+            data: {
+              error: 'Security verification failed.',
+              message: 'Security verification failed.',
+              code: 'EBADCSRFTOKEN',
+            },
+          },
+        });
+      }
+      return axiosResponse(config, { _id: 'new-ing', name: 'Cilantro' });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
+  };
+
+  try {
+    const res = await api.post('/ingredients', { name: 'Cilantro', category: 'Produce' });
+    assert.equal(res.data.name, 'Cilantro');
+    assert.deepEqual(observedPostTokens, ['stale-csrf', 'fresh-csrf']);
+  } finally {
+    api.defaults.adapter = originalAdapter;
+    __internal.resetCsrfTokenState();
+    __internal.resetRefreshState();
+  }
+});
+
+test('csrf retry guard rejects when replay also returns EBADCSRFTOKEN', async () => {
+  __internal.resetCsrfTokenState();
+  __internal.resetRefreshState();
+  const originalAdapter = api.defaults.adapter;
+  let postCalls = 0;
+
+  api.defaults.adapter = async (config) => {
+    if (config.url === '/csrf-token') {
+      return axiosResponse(config, { csrfToken: `csrf-${postCalls}` });
+    }
+    if (config.method === 'post' && config.url === '/ingredients') {
+      postCalls += 1;
+      return Promise.reject({
+        config,
+        response: {
+          status: 403,
+          data: {
+            error: 'Security verification failed.',
+            message: 'Security verification failed.',
+            code: 'EBADCSRFTOKEN',
+          },
+        },
+      });
+    }
+    return Promise.reject({ config, response: { status: 500 } });
+  };
+
+  try {
+    await assert.rejects(() => api.post('/ingredients', { name: 'Pepper', category: 'Spices' }));
+    assert.equal(postCalls, 2);
   } finally {
     api.defaults.adapter = originalAdapter;
     __internal.resetCsrfTokenState();
